@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: edupath_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: edupath_db
+      POSTGRES_USER: edupath_user
+      POSTGRES_PASSWORD: edupath_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: .
+      dockerfile: ./apps/api/Dockerfile
+    container_name: edupath_api
+    restart: always
+    ports:
+      - "4000:4000"
+    environment:
+      - DATABASE_URL=postgresql://edupath_user:edupath_password@postgres:5432/edupath_db?schema=public
+      - JWT_SECRET=edupath_jwt_secret_key_2026
+      - JWT_REFRESH_SECRET=edupath_jwt_refresh_secret_key_2026
+      - PORT=4000
+    depends_on:
+      - postgres
+
+  web:
+    build:
+      context: .
+      dockerfile: ./apps/web/Dockerfile
+    container_name: edupath_web
+    restart: always
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:4000
+      - VITE_SOCKET_URL=http://localhost:4000
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
