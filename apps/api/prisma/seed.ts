@@ -106,7 +106,7 @@ async function main() {
       lessons: {
         create: [
           { title: 'Bài 1: Este lý thuyết căn bản', order: 1, duration: '12:15' },
-          { title: 'Bài 2: Tính chất hóa học Este nâng cao', duration: '16:40' },
+          { title: 'Bài 2: Tính chất hóa học Este nâng cao', order: 2, duration: '16:40' },
           { title: 'Bài 3: Phản ứng thủy phân và bài toán xà phòng hóa', order: 3, duration: '24:20' },
           { title: 'Bài 4: Lipit và chất béo cấu tạo', order: 4, duration: '18:30' },
           { title: 'Bài 5: Tổng ôn Este - Lipit từ lý thuyết đến bài tập', order: 5, duration: '32:10' }

@@ -415,7 +415,7 @@ export default function App() {
       )}
 
       <div className="main-wrapper" style={{ marginLeft: role === 'guest' ? 0 : 'var(--sidebar-width)' }}>
-        <main className="main-content" style={{ maxWidth: '100%' }}>
+        <main className="main-content" style={role === 'guest' ? { maxWidth: '100%', padding: 0 } : { maxWidth: '100%' }}>
           {role !== 'guest' ? (
             <Header
               role={role}
@@ -769,7 +769,7 @@ export default function App() {
       )}
 
       {/* Demo quick-login panel (collapsible) */}
-      <DemoPanel onQuickLogin={handleQuickLogin} />
+      {/* <DemoPanel onQuickLogin={handleQuickLogin} /> */}
     </div>
   );
 }

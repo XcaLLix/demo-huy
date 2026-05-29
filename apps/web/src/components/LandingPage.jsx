@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { HiArrowRight, HiCheck, HiStar, HiLightningBolt, HiMenuAlt3, HiX } from 'react-icons/hi';
+import FooterSunMascot from './FooterSunMascot';
 
 const SUBJECTS = [
   {
@@ -73,6 +74,23 @@ const FEATURES = [
   { icon: '📊', title: 'Theo dõi tiến độ trực quan', desc: 'Biểu đồ điểm số theo tuần, streak học tập, dự đoán điểm THPTQG theo phong độ thực tế.' },
 ];
 
+const getSpikePath = () => {
+  const points = [];
+  const numSpikes = 36;
+  const cx = 300;
+  const cy = 300;
+  const rMin = 210;
+  const rMax = 238;
+  for (let i = 0; i < numSpikes; i++) {
+    const angle1 = (i * 2 * Math.PI) / numSpikes;
+    const angle2 = ((i + 0.5) * 2 * Math.PI) / numSpikes;
+    points.push(`${(cx + rMax * Math.cos(angle1)).toFixed(1)},${(cy + rMax * Math.sin(angle1)).toFixed(1)}`);
+    points.push(`${(cx + rMin * Math.cos(angle2)).toFixed(1)},${(cy + rMin * Math.sin(angle2)).toFixed(1)}`);
+  }
+  return `M ${points.join(' L ')} Z`;
+};
+const spikePath = getSpikePath();
+
 export default function LandingPage({ onNavigateToAuth }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -127,69 +145,45 @@ export default function LandingPage({ onNavigateToAuth }) {
 
       {/* ── HERO ── */}
       <section className="lp-hero">
-        {/* Decorative blobs */}
-        <div className="lp-hero__blob lp-hero__blob--1" />
-        <div className="lp-hero__blob lp-hero__blob--2" />
-
         <div className="lp-hero__left">
-          <div className="lp-hero__badge">
-            <span className="lp-badge-dot" />
-            Nền tảng luyện thi THPTQG hàng đầu Việt Nam
+          <div className="lp-hero__title-row">
+            <h2 className="lp-hero__title-main">Nền tảng</h2>
+            <span className="lp-hero__title-badge">EduPath AI</span>
           </div>
 
-          <h1 className="lp-hero__title">
-            Nền tảng<br />
-            <span className="lp-hero__highlight">Luyện thi THPTQG</span><br />
-            thông minh với AI
-          </h1>
+          <div className="lp-hero__highlight-box">
+            Luyện thi THPTQG
+            <span className="lp-hero__cursor">|</span>
+          </div>
 
           <p className="lp-hero__sub">
-            Đầy đủ bài luyện, kiến thức, phương pháp và từ vựng giúp bạn chinh phục kỳ thi THPTQG với điểm số <strong>27+</strong> dễ dàng hơn mỗi ngày.
+            Đầy đủ tài liệu, bài luyện, phương pháp và từ vựng giúp bạn chinh phục kỳ thi THPTQG dễ dàng hơn mỗi ngày.
           </p>
 
-          <div className="lp-hero__combos">
-            <span className="lp-combo-tag lp-combo-tag--a01">A01 Toán – Lý – Anh</span>
-            <span className="lp-combo-tag lp-combo-tag--b00">B00 Toán – Hóa – Sinh</span>
-            <span className="lp-combo-tag lp-combo-tag--d01">D01 Toán – Văn – Anh</span>
+          <div className="lp-hero__follow-pill">
+            <span className="lp-hero__follow-text">Follow us on</span>
+            <button className="lp-hero__social-btn lp-hero__social-btn--fb" title="Facebook">
+              <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 320 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M279.14 288l14.22-92.66h-88.91v-60.13c0-25.35 12.42-50.06 52.24-50.06h40.42V6.26S260.43 0 225.36 0c-73.22 0-121.08 44.38-121.08 124.72v70.62H22.89V288h81.39v224h100.17V288z"></path></svg>
+            </button>
+            <button className="lp-hero__social-btn lp-hero__social-btn--tt" title="TikTok">
+              <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M448,209.91a210.06,210.06,0,0,1-122.77-39.25V349.38A162.55,162.55,0,1,1,185,188.07c8.89,0,17.44,1,25.74,2.9V273.7a81.24,81.24,0,1,0-45.74,75.68V209.91c0-43.1,34.9-78,78-78a77.34,77.34,0,0,1,47,15.82V0h81.38a206.52,206.52,0,0,0,76.57,69.57v81.38a211,211,0,0,1-76.57-21Z"></path></svg>
+            </button>
           </div>
 
           <div className="lp-hero__actions">
-            <button className="lp-btn lp-btn--primary lp-btn--lg" onClick={() => onNavigateToAuth('signup')}>
-              Bắt đầu học miễn phí
+            <button className="lp-hero__btn-white" onClick={() => onNavigateToAuth('signup')}>
+              Bài viết của EduPath
               <HiArrowRight />
             </button>
-            <button className="lp-btn lp-btn--outline-white lp-btn--lg" onClick={() => document.getElementById('subjects')?.scrollIntoView({ behavior: 'smooth' })}>
+            <button className="lp-hero__btn-explore" onClick={() => document.getElementById('subjects')?.scrollIntoView({ behavior: 'smooth' })}>
+              <svg stroke="currentColor" fill="none" strokeWidth="2.5" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="1.1em" width="1.1em" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
               Khám phá tài liệu miễn phí
             </button>
           </div>
         </div>
 
         <div className="lp-hero__right">
-          <div className="lp-hero__mascot">
-            <div className="lp-mascot-sun">
-              <div className="lp-sun-face">☀️</div>
-              <div className="lp-sun-rays" />
-            </div>
-            {/* Floating info bubble */}
-            <div className="lp-hero__bubble lp-hero__bubble--1">
-              <span className="lp-bubble-emoji">🚀</span>
-              <div>
-                <strong>Nâng điểm 200%</strong>
-                <p>nhờ bạn, TID chuẩn bị sẵn sàng</p>
-              </div>
-            </div>
-            <div className="lp-hero__bubble lp-hero__bubble--2">
-              <span className="lp-bubble-emoji">🏅</span>
-              <div>
-                <strong>42,500+ học sinh</strong>
-                <p>đang học mỗi ngày</p>
-              </div>
-            </div>
-            {/* Floating stars */}
-            <span className="lp-deco lp-deco--star1">✦</span>
-            <span className="lp-deco lp-deco--star2">✦</span>
-            <span className="lp-deco lp-deco--star3">✦</span>
-          </div>
+          <FooterSunMascot />
         </div>
       </section>
 
