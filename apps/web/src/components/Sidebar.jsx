@@ -8,14 +8,16 @@ const navConfigs = {
   student: [
     { icon: HiHome, label: 'Trang chủ', id: 'home' },
     { icon: HiAcademicCap, label: 'Lộ trình học AI', id: 'path' },
-    { icon: HiBookOpen, label: 'Khóa học của tôi', id: 'courses' },
+    { icon: HiBookOpen, label: 'Kho khóa học', id: 'courses' },
     { icon: HiClipboardCheck, label: 'Kiểm tra trực tuyến', id: 'tests' },
+    { icon: HiChat, label: 'Diễn đàn học tập', id: 'forum' },
     { icon: HiChat, label: 'Hỏi đáp AI / Giáo viên', id: 'ai-qa' },
     { icon: HiCollection, label: 'Thư viện tài liệu', id: 'library' },
     { icon: HiCog, label: 'Thiết lập profile', id: 'settings' }
   ],
   teacher: [
     { icon: HiHome, label: 'Quản lý khóa học', id: 'home' },
+    { icon: HiChat, label: 'Diễn đàn học tập', id: 'forum' },
     { icon: HiDatabase, label: 'Ngân hàng câu hỏi', id: 'questions' },
     { icon: HiChartBar, label: 'Thống kê lớp học', id: 'stats' }
   ],
@@ -37,7 +39,14 @@ export default function Sidebar({ role, active, setActive, userProfile, onLogout
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-logo">
+      <div 
+        className="sidebar-logo" 
+        onClick={() => setActive('landing')}
+        style={{ cursor: 'pointer', transition: 'opacity 0.2s' }}
+        onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+        onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+        title="Quay lại Trang chủ Công khai"
+      >
         <div className="logo-icon" style={{ background: 'linear-gradient(135deg, #6C5CE7, #FD79A8)' }}>E</div>
         <div className="logo-text">
           <h1>EduPath AI</h1>

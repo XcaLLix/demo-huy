@@ -78,6 +78,9 @@ importers:
       '@edupath/shared':
         specifier: workspace:1.0.0
         version: link:../../packages/shared
+      '@react-oauth/google':
+        specifier: ^0.13.5
+        version: 0.13.5(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       framer-motion:
         specifier: ^12.40.0
         version: 12.40.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -472,6 +475,12 @@ packages:
 
   '@prisma/get-platform@5.22.0':
     resolution: {integrity: sha512-pHhpQdr1UPFpt+zFfnPazhulaZYCUqeIcPpJViYoq9R+D/yw4fjE+CtnsnKzPYm0ddUbeXUzjGVGIRVgPDCk4Q==}
+
+  '@react-oauth/google@0.13.5':
+    resolution: {integrity: sha512-xQWri2s/3nNekZJ4uuov2aAfQYu83bN3864KcFqw2pK1nNbFurQIjPFDXhWaKH3IjYJ2r/9yyIIpsn5lMqrheQ==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
 
   '@reduxjs/toolkit@2.12.0':
     resolution: {integrity: sha512-KiT+RzZbp6mQET+Mg+h2c97+9j1sNflUxQkIHI7Yuzf6Peu+OYpmkn6nbHWmLLWj+1ZODUJFwGZ7gx3L9R9EOw==}
@@ -2276,6 +2285,11 @@ snapshots:
   '@prisma/get-platform@5.22.0':
     dependencies:
       '@prisma/debug': 5.22.0
+
+  '@react-oauth/google@0.13.5(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
+    dependencies:
+      react: 19.2.6
+      react-dom: 19.2.6(react@19.2.6)
 
   '@reduxjs/toolkit@2.12.0(react-redux@9.3.0(@types/react@19.2.15)(react@19.2.6)(redux@5.0.1))(react@19.2.6)':
     dependencies:

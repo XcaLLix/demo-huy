@@ -19,6 +19,8 @@ import TestSimulator from './components/TestSimulator';
 import TeacherDashboard from './components/TeacherDashboard';
 import AdminDashboard from './components/AdminDashboard';
 import AISystemCenter from './components/AISystemCenter';
+import Forum from './components/Forum';
+import CourseMall from './components/CourseMall';
 
 import { HiPlay, HiDocumentDownload, HiBeaker, HiX } from 'react-icons/hi';
 
@@ -161,6 +163,210 @@ const initialQuestions = [
   }
 ];
 
+const initialForumPosts = [
+  {
+    id: 1,
+    title: "Có bạn nào giải được bài toán cực trị Casio 12 câu 4 đề minh họa không?",
+    content: "Chào mọi người, em đang ôn thi phần ứng dụng đạo hàm và gặp khó khăn trong việc tìm giá trị cực trị lớn nhất bằng Casio FX-880. Em đã thử lập bảng biến thiên nhưng mất nhiều thời gian quá. Bác nào có mẹo bấm máy nhanh chỉ em với!",
+    subject: "Toán học",
+    author: "Nguyễn Minh Anh",
+    authorAvatar: "MA",
+    date: "10 phút trước",
+    likes: 5,
+    likedBy: [],
+    comments: [
+      {
+        id: 11,
+        author: "Thầy Thế Anh",
+        avatar: "TA",
+        content: "Em có thể dùng tính năng Table (Vô cực đại) trên FX-880, quét từ -5 đến 5 với bước nhảy là 0.1 để định vị vùng cực trị trước, sau đó dùng công cụ Solver để tính đạo hàm bằng 0 cực kỳ chính xác nhé!",
+        date: "5 phút trước"
+      }
+    ]
+  },
+  {
+    id: 2,
+    title: "Tổng hợp công thức Dao động cơ học 12 cần nhớ để thi THPTQG",
+    content: "Mình vừa tổng hợp lại toàn bộ các phương trình quan trọng của dao động điều hòa, con lắc lò xo và bài toán quãng đường max-min cực kỳ dễ học thuộc. Hy vọng sẽ giúp ích cho các bạn trong mùa ôn thi năm nay!",
+    subject: "Vật lý",
+    author: "Lê Minh Tuấn",
+    authorAvatar: "MT",
+    date: "1 giờ trước",
+    likes: 12,
+    likedBy: [],
+    comments: []
+  }
+];
+
+function LibraryCabinet({ addLog }) {
+  const [search, setSearch] = useState('');
+  const [selectedSubj, setSelectedSubj] = useState('All');
+  
+  // List of high-quality premium documents
+  const [docs, setDocs] = useState([
+    { id: 1, title: "Sổ tay 100 công thức giải nhanh Vật Lý 12", subject: "Vật lý", size: "4.8 MB", type: "PDF", downloads: "2,450", progress: 0, status: 'idle' },
+    { id: 2, title: "Tổng hợp các dạng bài toán Cực trị Hàm số Casio", subject: "Toán học", size: "3.2 MB", type: "PDF", downloads: "4,120", progress: 0, status: 'idle' },
+    { id: 3, title: "Trọn bộ Từ vựng & Cụm từ Tiếng Anh trọng tâm 2026", subject: "Tiếng Anh", size: "5.5 MB", type: "PDF", downloads: "1,890", progress: 0, status: 'idle' },
+    { id: 4, title: "Bài tập chuyên đề Este & Lipit nâng cao (có giải chi tiết)", subject: "Hóa học", size: "6.2 MB", type: "PDF", downloads: "850", progress: 0, status: 'idle' },
+    { id: 5, title: "Lý thuyết Sinh học ôn thi khối B (Di truyền & Tiến hóa)", subject: "Sinh học", size: "3.9 MB", type: "PDF", downloads: "620", progress: 0, status: 'idle' },
+    { id: 6, title: "Đề cương ôn tập Ngữ Văn 12 học kỳ 1 (THPT Amsterdam)", subject: "Ngữ văn", size: "2.1 MB", type: "Word", downloads: "1,150", progress: 0, status: 'idle' }
+  ]);
+
+  const handleDownload = (docId, docTitle) => {
+    // Modify status to downloading
+    setDocs(prev => prev.map(d => d.id === docId ? { ...d, status: 'downloading', progress: 0 } : d));
+    addLog(`Bắt đầu tải tài liệu: "${docTitle}"`, 'sys');
+
+    let currentProgress = 0;
+    const interval = setInterval(() => {
+      currentProgress += 10;
+      setDocs(prev => prev.map(d => {
+        if (d.id === docId) {
+          if (currentProgress >= 100) {
+            clearInterval(interval);
+            addLog(`Tải tài liệu hoàn thành: "${docTitle}"`, 'sys');
+            return { ...d, status: 'completed', progress: 100 };
+          }
+          return { ...d, progress: currentProgress };
+        }
+        return d;
+      }));
+    }, 150);
+  };
+
+  const filteredDocs = docs.filter(doc => {
+    const matchesSearch = doc.title.toLowerCase().includes(search.toLowerCase());
+    const matchesSubj = selectedSubj === 'All' || doc.subject === selectedSubj;
+    return matchesSearch && matchesSubj;
+  });
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div className="card" style={{ padding: '20px' }}>
+        <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '14px', color: 'var(--text-main)' }}>
+          📚 THƯ VIỆN CHIA SẺ TÀI LIỆU LÝ THUYẾT (UC-25)
+        </h3>
+        
+        {/* Search & Subject quick selectors */}
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '20px' }}>
+          <input 
+            type="text" 
+            className="form-control" 
+            placeholder="Tìm tài liệu ôn thi..." 
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ flex: 1, minWidth: '200px', fontSize: '13px' }}
+          />
+          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto' }}>
+            {['All', 'Toán học', 'Vật lý', 'Hóa học', 'Tiếng Anh', 'Sinh học', 'Ngữ văn'].map(subj => (
+              <button
+                key={subj}
+                onClick={() => setSelectedSubj(subj)}
+                style={{
+                  border: '1px solid var(--border)',
+                  background: selectedSubj === subj ? 'var(--primary)' : 'var(--bg-main)',
+                  color: selectedSubj === subj ? '#fff' : 'var(--text-secondary)',
+                  padding: '6px 12px',
+                  borderRadius: '16px',
+                  fontSize: '11.5px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {subj === 'All' ? 'Tất cả' : subj}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          {filteredDocs.map(doc => {
+            const radius = 12;
+            const circumference = 2 * Math.PI * radius;
+            const strokeDashoffset = circumference - (doc.progress / 100) * circumference;
+
+            return (
+              <div 
+                key={doc.id} 
+                style={{ 
+                  padding: '16px', 
+                  border: '1px solid var(--border)', 
+                  borderRadius: 'var(--radius-md)', 
+                  background: 'var(--bg-card)', 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <div>
+                  <span className="badge-pill" style={{ background: 'var(--primary-bg)', color: 'var(--primary)', fontSize: '9px', fontWeight: 'bold' }}>
+                    {doc.subject}
+                  </span>
+                  <h4 style={{ fontSize: '13.5px', fontWeight: 'bold', marginTop: '6px', color: 'var(--text-main)', margin: '6px 0 2px 0' }}>{doc.title}</h4>
+                  <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: 0 }}>
+                    Dung lượng: {doc.size} • Định dạng: {doc.type} • Tải xuống: {doc.downloads} lượt
+                  </p>
+                </div>
+
+                <div style={{ flexShrink: 0, marginLeft: '12px' }}>
+                  {doc.status === 'idle' && (
+                    <button 
+                      className="btn-primary" 
+                      style={{ padding: '6px 14px', fontSize: '11.5px' }} 
+                      onClick={() => handleDownload(doc.id, doc.title)}
+                    >
+                      Tải về
+                    </button>
+                  )}
+
+                  {doc.status === 'downloading' && (
+                    <div className="download-progress-ring" title={`Đang tải: ${doc.progress}%`}>
+                      <svg>
+                        <circle className="bg-circle" cx="20" cy="20" r={radius} />
+                        <circle 
+                          className="progress-circle" 
+                          cx="20" 
+                          cy="20" 
+                          r={radius} 
+                          strokeDasharray={circumference}
+                          strokeDashoffset={strokeDashoffset}
+                        />
+                      </svg>
+                      <span style={{ position: 'absolute', fontSize: '9px', fontWeight: 'bold', color: 'var(--primary)' }}>
+                        {doc.progress}%
+                      </span>
+                    </div>
+                  )}
+
+                  {doc.status === 'completed' && (
+                    <span 
+                      style={{ 
+                        background: 'rgba(0,184,148,0.12)', 
+                        color: 'var(--accent-green)', 
+                        fontSize: '11.5px', 
+                        fontWeight: 'bold', 
+                        padding: '6px 12px', 
+                        borderRadius: '20px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      ✓ Đã lưu
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   // Global Application States
   const [currentUser, setCurrentUser] = useState(() => JSON.parse(localStorage.getItem('current_user')) || null);
@@ -196,6 +402,8 @@ export default function App() {
     }
   ]);
 
+  const [forumPosts, setForumPosts] = useState(() => JSON.parse(localStorage.getItem('app_forum_posts')) || initialForumPosts);
+
   // View state controllers
   const [activeCourseDetails, setActiveCourseDetails] = useState(null);
   const [activeTestSimulator, setActiveTestSimulator] = useState(null);
@@ -213,7 +421,8 @@ export default function App() {
     localStorage.setItem('app_notifications', JSON.stringify(notifications));
     localStorage.setItem('app_logs', JSON.stringify(systemLogs));
     localStorage.setItem('app_approvals', JSON.stringify(courseApprovals));
-  }, [currentUser, role, theme, usersList, courses, questionBank, submissions, notifications, systemLogs, courseApprovals]);
+    localStorage.setItem('app_forum_posts', JSON.stringify(forumPosts));
+  }, [currentUser, role, theme, usersList, courses, questionBank, submissions, notifications, systemLogs, courseApprovals, forumPosts]);
 
   // Dark theme trigger
   useEffect(() => {
@@ -243,13 +452,22 @@ export default function App() {
   // Safe Authentication Handlers
   const handleAuthSuccess = (user, newlyRegisteredUser = null) => {
     if (newlyRegisteredUser) {
-      setUsersList(prev => [...prev, newlyRegisteredUser]);
+      setUsersList(prev => {
+        const filtered = prev.filter(u => u.email !== newlyRegisteredUser.email);
+        return [...filtered, newlyRegisteredUser];
+      });
       return;
     }
 
     setCurrentUser(user);
     setRole(user.role);
-    setActiveTab('home');
+    setActiveTab('landing');
+  };
+
+  const handleBackToDashboard = (targetTab) => {
+    setActiveTab(targetTab || 'home');
+    setActiveCourseDetails(null);
+    setActiveTestSimulator(null);
   };
 
   const handleLogout = () => {
@@ -261,6 +479,7 @@ export default function App() {
     setActiveTestSimulator(null);
     setCheckoutCourse(null);
   };
+
 
   const handleChangePassword = (oldPass, newPass) => {
     const matched = usersList.find(u => u.email === currentUser.email);
@@ -316,6 +535,47 @@ export default function App() {
     setSubmissions(prev => [newSubmission, ...prev]);
     setActiveTestSimulator(null);
     setActiveTab('path'); // Take them to Adaptive Roadmap to see the AI updates!
+  };
+
+  // Forum interactions
+  const handleForumAddPost = (newPost) => {
+    setForumPosts(prev => [newPost, ...prev]);
+    addLog(`Đăng bài thảo luận mới: "${newPost.title}"`, 'sys');
+  };
+
+  const handleForumLikePost = (postId) => {
+    const updated = forumPosts.map(post => {
+      if (post.id === postId) {
+        const userEmail = currentUser?.email || 'guest';
+        const alreadyLiked = post.likedBy?.includes(userEmail);
+        const nextLikedBy = alreadyLiked 
+          ? post.likedBy.filter(email => email !== userEmail)
+          : [...(post.likedBy || []), userEmail];
+        const nextLikesCount = alreadyLiked ? post.likes - 1 : post.likes + 1;
+        
+        return {
+          ...post,
+          likes: nextLikesCount,
+          likedBy: nextLikedBy
+        };
+      }
+      return post;
+    });
+    setForumPosts(updated);
+  };
+
+  const handleForumAddComment = (postId, newComment) => {
+    const updated = forumPosts.map(post => {
+      if (post.id === postId) {
+        return {
+          ...post,
+          comments: [...(post.comments || []), newComment]
+        };
+      }
+      return post;
+    });
+    setForumPosts(updated);
+    addLog(`Thêm phản hồi cho bài thảo luận`, 'sys');
   };
 
   // Teacher Workspace Actions
@@ -400,7 +660,7 @@ export default function App() {
   return (
     <div className="app-layout">
       {/* Sidebar - Guarded against guest visitors */}
-      {role !== 'guest' && (
+      {role !== 'guest' && activeTab !== 'landing' && (
         <Sidebar
           role={role}
           active={activeTab}
@@ -414,9 +674,9 @@ export default function App() {
         />
       )}
 
-      <div className="main-wrapper" style={{ marginLeft: role === 'guest' ? 0 : 'var(--sidebar-width)' }}>
-        <main className="main-content" style={role === 'guest' ? { maxWidth: '100%', padding: 0 } : { maxWidth: '100%' }}>
-          {role !== 'guest' ? (
+      <div className="main-wrapper" style={{ marginLeft: (role === 'guest' || activeTab === 'landing') ? 0 : 'var(--sidebar-width)' }}>
+        <main className="main-content" style={(role === 'guest' || activeTab === 'landing') ? { maxWidth: '100%', padding: 0 } : { maxWidth: '100%' }}>
+          {role !== 'guest' && activeTab !== 'landing' ? (
             <Header
               role={role}
               userProfile={currentUser}
@@ -439,10 +699,10 @@ export default function App() {
             )
           )}
 
-          {/* ================= GUEST PUBLIC PREVIEW ================= */}
-          {role === 'guest' && (
+          {/* ================= PUBLIC OR PREVIEW LANDING PAGE ================= */}
+          {(role === 'guest' || activeTab === 'landing') && (
             <div>
-              {activeTab === 'login' || activeTab === 'signup' ? (
+              {role === 'guest' && (activeTab === 'login' || activeTab === 'signup') ? (
                 <AuthPage
                   defaultMode={activeTab === 'signup' ? 'signup' : 'login'}
                   onAuthSuccess={(user, newlyRegistered) => {
@@ -458,14 +718,18 @@ export default function App() {
                 />
               ) : (
                 <LandingPage
+                  currentUser={currentUser}
                   onNavigateToAuth={(mode) => setActiveTab(mode)}
+                  onBackToDashboard={handleBackToDashboard}
+                  onLogout={handleLogout}
                 />
               )}
             </div>
           )}
 
           {/* ================= STUDENT WORKSPACE ================= */}
-          {role === 'student' && !activeCourseDetails && !activeTestSimulator && (
+          {role === 'student' && activeTab !== 'landing' && !activeCourseDetails && !activeTestSimulator && (
+
             <div>
               {activeTab === 'home' && (
                 <div>
@@ -586,40 +850,23 @@ export default function App() {
 
               {/* Courses tab */}
               {activeTab === 'courses' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  <div className="card">
-                    <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '14px' }}>KHO HỌC LIỆU KHÓA HỌC TRỰC TUYẾN</h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
-                      {activeUserCourses.map((c) => (
-                        <div key={c.id} className="landing-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                          <div>
-                            <span className="badge-pill" style={{ background: 'var(--primary-bg)', color: 'var(--primary)', fontSize: '10px' }}>{c.subject}</span>
-                            <h4 style={{ fontSize: '14.5px', fontWeight: 'bold', marginTop: '8px', marginBottom: '6px' }}>{c.title}</h4>
-                            <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Giảng viên: {c.teacherName}</p>
-                            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Số bài giảng: {c.lessons.length} bài • Giáo trình THPTQG</p>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
-                            {c.isUnlocked ? (
-                              <span style={{ fontSize: '12px', color: 'var(--accent-green)', fontWeight: 'bold' }}>✓ Đã mở khóa</span>
-                            ) : (
-                              <span style={{ fontSize: '14px', color: 'var(--accent-orange)', fontWeight: 'bold' }}>{c.price}đ</span>
-                            )}
-                            
-                            {c.isUnlocked ? (
-                              <button className="btn-primary" style={{ padding: '6px 12px', fontSize: '11.5px' }} onClick={() => setActiveCourseDetails(c)}>
-                                Vào lớp học
-                              </button>
-                            ) : (
-                              <button className="btn-outline" style={{ padding: '6px 12px', fontSize: '11.5px', borderColor: 'var(--accent-orange)', color: 'var(--accent-orange)' }} onClick={() => setCheckoutCourse(c)}>
-                                Mua khóa học
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+                <CourseMall
+                  courses={courses}
+                  currentUser={currentUser}
+                  onSelectCourse={setActiveCourseDetails}
+                  onCheckoutCourse={setCheckoutCourse}
+                />
+              )}
+
+              {/* Forum tab */}
+              {activeTab === 'forum' && (
+                <Forum
+                  forumPosts={forumPosts}
+                  onAddPost={handleForumAddPost}
+                  onLikePost={handleForumLikePost}
+                  onAddComment={handleForumAddComment}
+                  currentUser={currentUser}
+                />
               )}
 
               {/* Online Mock Exams tab */}
@@ -648,21 +895,7 @@ export default function App() {
 
               {/* Library docs downloads tab */}
               {activeTab === 'library' && (
-                <div className="card">
-                  <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '14px' }}>THƯ VIỆN CHIA SẺ TÀI LIỆU LÝ THUYẾT</h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    <div style={{ padding: '14px', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--bg-main)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <h4 style={{ fontSize: '13.5px', fontWeight: 'bold' }}>Sổ tay 100 công thức giải nhanh Vật Lý 12</h4>
-                        <p style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Dung lượng: 4.8 MB • Định dạng: PDF</p>
-                      </div>
-                      <button className="btn-primary" style={{ padding: '6px 12px', fontSize: '11.5px' }} onClick={() => {
-                        addLog(`Tải tài liệu: "Cong_thuc_Vat_Ly_12.pdf"`, 'sys');
-                        alert('Đã tải tài liệu Vật Lý!');
-                      }}>Tải về</button>
-                    </div>
-                  </div>
-                </div>
+                <LibraryCabinet addLog={addLog} />
               )}
 
               {/* Settings Profile tab */}
@@ -712,7 +945,7 @@ export default function App() {
           )}
 
           {/* Student classroom details view */}
-          {role === 'student' && activeCourseDetails && (
+          {role === 'student' && activeTab !== 'landing' && activeCourseDetails && (
             <CourseDetails
               course={activeCourseDetails}
               onBack={() => setActiveCourseDetails(null)}
@@ -721,7 +954,7 @@ export default function App() {
           )}
 
           {/* Student active test simulator taking view */}
-          {role === 'student' && activeTestSimulator && (
+          {role === 'student' && activeTab !== 'landing' && activeTestSimulator && (
             <TestSimulator
               testName={activeTestSimulator}
               onFinished={handleFinishedTest}
@@ -730,7 +963,7 @@ export default function App() {
           )}
 
           {/* ================= TEACHER WORKSPACE ================= */}
-          {role === 'teacher' && (
+          {role === 'teacher' && activeTab !== 'landing' && (
             <TeacherDashboard
               courses={courses}
               onCreateCourse={handleCreateCourse}
@@ -742,7 +975,7 @@ export default function App() {
           )}
 
           {/* ================= ADMIN WORKSPACE ================= */}
-          {role === 'admin' && (
+          {role === 'admin' && activeTab !== 'landing' && (
             <AdminDashboard
               users={usersList}
               onToggleUserBan={handleToggleUserBan}
