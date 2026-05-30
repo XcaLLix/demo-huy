@@ -202,6 +202,62 @@ export default function LandingPage({
     onAddComment(postId, newComment);
   };
 
+  const renderSubjectIcon = (id) => {
+    switch (id) {
+      case 'toan':
+        return (
+          <svg stroke="currentColor" fill="none" strokeWidth="2.5" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="1em" width="1em">
+            <line x1="18" y1="15" x2="12" y2="15"></line>
+            <line x1="12" y1="15" x2="9" y2="21"></line>
+            <line x1="9" y1="21" x2="6" y2="3"></line>
+            <line x1="6" y1="3" x2="2" y2="3"></line>
+          </svg>
+        );
+      case 'ly':
+        return (
+          <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="1em" width="1em">
+            <ellipse cx="12" cy="12" rx="3" ry="9" transform="rotate(45 12 12)"></ellipse>
+            <ellipse cx="12" cy="12" rx="3" ry="9" transform="rotate(-45 12 12)"></ellipse>
+            <circle cx="12" cy="12" r="2"></circle>
+          </svg>
+        );
+      case 'anh':
+        return (
+          <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="1em" width="1em">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="2" y1="12" x2="22" y2="12"></line>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+          </svg>
+        );
+      case 'hoa':
+        return (
+          <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="1em" width="1em">
+            <path d="M10 2h4"></path>
+            <path d="M12 2v6"></path>
+            <path d="M8 8h8"></path>
+            <path d="M8 8L4.5 16.5C3.5 19 5 22 8 22h8c3 0 4.5-3 3.5-5.5L16 8"></path>
+          </svg>
+        );
+      case 'sinh':
+        return (
+          <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="1em" width="1em">
+            <path d="M2 22C2 12 10 4 22 2"></path>
+            <path d="M22 2c-10 0-18 8-20 20"></path>
+            <path d="M9 15c3-3 7-5 13-7"></path>
+          </svg>
+        );
+      case 'van':
+        return (
+          <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="1em" width="1em">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+          </svg>
+        );
+      default:
+        return <span>📚</span>;
+    }
+  };
+
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 10);
     window.addEventListener('scroll', fn);
@@ -572,9 +628,11 @@ export default function LandingPage({
 
           <div className="lp-cards-row">
             {SUBJECTS.map((s) => (
-              <div key={s.id} className="lp-subject-card" style={{ '--card-bg': s.bg }}>
+              <div key={s.id} className="lp-subject-card" style={{ '--card-bg': s.bg }} onClick={() => setActiveLandingView('subjects')}>
                 {s.isFree && <span className="lp-card-free-badge">FREE</span>}
-                <div className="lp-card-emoji">{s.emoji}</div>
+                <div className="lp-card-icon-container">
+                  {renderSubjectIcon(s.id)}
+                </div>
                 <div className="lp-card-info">
                   <h3>{s.label}</h3>
                   <p>{s.desc}</p>
