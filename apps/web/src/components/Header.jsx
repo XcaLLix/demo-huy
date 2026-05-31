@@ -19,6 +19,7 @@ export default function Header({
   // Password change states
   const [oldPass, setOldPass] = useState('');
   const [newPass, setNewPass] = useState('');
+  const [confirmNewPass, setConfirmNewPass] = useState('');
 
   const getGreeting = () => {
     if (role === 'admin') return 'Chào Quản trị viên! 🛡️';
@@ -36,14 +37,19 @@ export default function Header({
 
   const handlePasswordChange = (e) => {
     e.preventDefault();
-    if (!oldPass || !newPass) return;
+    if (!oldPass || !newPass || !confirmNewPass) return;
     if (newPass.length < 6) {
       alert('Mật khẩu mới phải từ 6 ký tự trở lên!');
+      return;
+    }
+    if (newPass !== confirmNewPass) {
+      alert('Xác nhận mật khẩu mới không khớp!');
       return;
     }
     onChangePassword(oldPass, newPass);
     setOldPass('');
     setNewPass('');
+    setConfirmNewPass('');
     setShowChangePassModal(false);
   };
 
@@ -102,8 +108,10 @@ export default function Header({
             style={{
               position: 'absolute', top: '55px', right: '60px',
               width: '320px', background: 'var(--bg-card)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
               border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)',
-              boxShadow: 'var(--shadow-lg)', zIndex: 1000, padding: '16px',
+              boxShadow: 'var(--shadow-lg)', zIndex: 2000, padding: '16px',
               animation: 'fadeInUp 0.2s ease forwards'
             }}
           >
@@ -204,6 +212,16 @@ export default function Header({
                   className="form-control"
                   value={newPass}
                   onChange={e => setNewPass(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label style={{ fontSize: '11.5px', fontWeight: '600' }}>Xác nhận mật khẩu mới:</label>
+                <input
+                  type="password"
+                  className="form-control"
+                  value={confirmNewPass}
+                  onChange={e => setConfirmNewPass(e.target.value)}
                   required
                 />
               </div>

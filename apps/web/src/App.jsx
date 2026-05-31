@@ -125,6 +125,16 @@ const initialUsers = [
     avatar: 'TA',
     isBanned: false,
     status: 'active'
+  },
+  {
+    id: 103,
+    name: 'Trần Văn Thuận',
+    email: 'Tranvanthuan2005tt@gmail.com',
+    password: 'admin123',
+    role: 'admin',
+    avatar: 'AD',
+    isBanned: false,
+    status: 'active'
   }
 ];
 
@@ -375,7 +385,29 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('home');
 
   // Relational Tables databases in localStorage
-  const [usersList, setUsersList] = useState(() => JSON.parse(localStorage.getItem('users_list')) || initialUsers);
+  const [usersList, setUsersList] = useState(() => {
+    const list = JSON.parse(localStorage.getItem('users_list')) || initialUsers;
+    if (!list.find(u => u.email.toLowerCase() === 'tranvanthuan2005tt@gmail.com')) {
+      list.push({
+        id: 103,
+        name: 'Trần Văn Thuận',
+        email: 'Tranvanthuan2005tt@gmail.com',
+        password: 'admin123',
+        role: 'admin',
+        avatar: 'AD',
+        isBanned: false,
+        status: 'active'
+      });
+    } else {
+      list.forEach(u => {
+        if (u.email.toLowerCase() === 'tranvanthuan2005tt@gmail.com') {
+          u.role = 'admin';
+          u.status = 'active';
+        }
+      });
+    }
+    return list;
+  });
   const [courses, setCourses] = useState(() => JSON.parse(localStorage.getItem('app_courses')) || initialCourses);
   const [questionBank, setQuestionBank] = useState(() => JSON.parse(localStorage.getItem('app_questions')) || initialQuestions);
   const [submissions, setSubmissions] = useState(() => JSON.parse(localStorage.getItem('app_submissions')) || []);
@@ -408,6 +440,45 @@ export default function App() {
   const [activeCourseDetails, setActiveCourseDetails] = useState(null);
   const [activeTestSimulator, setActiveTestSimulator] = useState(null);
   const [checkoutCourse, setCheckoutCourse] = useState(null);
+
+  // Settings-specific local states
+  const [settingsName, setSettingsName] = useState('');
+  const [settingsAvatar, setSettingsAvatar] = useState('');
+  const [settingsDob, setSettingsDob] = useState('');
+  const [settingsPhone, setSettingsPhone] = useState('');
+  const [settingsCity, setSettingsCity] = useState('');
+  const [settingsSchool, setSettingsSchool] = useState('');
+  const [settingsCombo, setSettingsCombo] = useState('');
+  const [settingsTargetScore, setSettingsTargetScore] = useState(25.0);
+  const [settingsTargetUniversity, setSettingsTargetUniversity] = useState('');
+  const [settingsNotifEmail, setSettingsNotifEmail] = useState(true);
+  const [settingsNotifInApp, setSettingsNotifInApp] = useState(true);
+  const [settingsLinkedFb, setSettingsLinkedFb] = useState(false);
+  const [settingsLinkedGg, setSettingsLinkedGg] = useState(false);
+
+  // Password change states in Settings
+  const [settingsOldPass, setSettingsOldPass] = useState('');
+  const [settingsNewPass, setSettingsNewPass] = useState('');
+  const [settingsConfirmNewPass, setSettingsConfirmNewPass] = useState('');
+
+  // Sync settings states when current user changes or tab is settings
+  useEffect(() => {
+    if (currentUser) {
+      setSettingsName(currentUser.name || '');
+      setSettingsAvatar(currentUser.avatar || 'MA');
+      setSettingsDob(currentUser.dob || '2008-01-01');
+      setSettingsPhone(currentUser.phone || '');
+      setSettingsCity(currentUser.city || 'Hà Nội');
+      setSettingsSchool(currentUser.school || '');
+      setSettingsCombo(currentUser.combo || 'A01 (Toán – Lý – Anh)');
+      setSettingsTargetScore(currentUser.targetScore || 25.0);
+      setSettingsTargetUniversity(currentUser.targetUniversity || '');
+      setSettingsNotifEmail(currentUser.notificationsEnabled !== false);
+      setSettingsNotifInApp(currentUser.inAppAlertsEnabled !== false);
+      setSettingsLinkedFb(!!currentUser.linkedFacebook);
+      setSettingsLinkedGg(!!currentUser.linkedGoogle);
+    }
+  }, [currentUser, activeTab]);
 
   // Sync state data to localStorage
   useEffect(() => {
@@ -492,6 +563,46 @@ export default function App() {
       
       addLog(`Người dùng "${currentUser.name}" đổi mật khẩu tài khoản thành công (UC-04)`, 'sys');
       alert('Đổi mật khẩu thành công!');
+    } else {
+      alert('Mật khẩu cũ không chính xác!');
+    }
+  };
+
+  const handleSaveProfile = (updatedProfile) => {
+    setCurrentUser(updatedProfile);
+    const updatedList = usersList.map(u => u.email === updatedProfile.email ? updatedProfile : u);
+    setUsersList(updatedList);
+    addLog(`Người dùng "${updatedProfile.name}" cập nhật thông tin cá nhân thành công`, 'sys');
+    alert('Lưu thông tin cá nhân thành công!');
+  };
+
+  const handleSettingsPasswordChange = (oldPass, newPass, confirmPass) => {
+    if (!oldPass || !newPass || !confirmPass) {
+      alert('Vui lòng nhập đầy đủ các trường đổi mật khẩu!');
+      return;
+    }
+    if (newPass.length < 6) {
+      alert('Mật khẩu mới phải từ 6 ký tự trở lên!');
+      return;
+    }
+    if (newPass !== confirmPass) {
+      alert('Xác nhận mật khẩu mới không trùng khớp!');
+      return;
+    }
+
+    const matched = usersList.find(u => u.email === currentUser.email);
+    if (matched && matched.password === oldPass) {
+      const updatedList = usersList.map(u => u.email === currentUser.email ? { ...u, password: newPass } : u);
+      setUsersList(updatedList);
+      
+      const updatedUser = { ...currentUser, password: newPass };
+      setCurrentUser(updatedUser);
+      
+      addLog(`Người dùng "${currentUser.name}" đổi mật khẩu thành công từ cài đặt cá nhân`, 'sys');
+      alert('Đổi mật khẩu thành công!');
+      setSettingsOldPass('');
+      setSettingsNewPass('');
+      setSettingsConfirmNewPass('');
     } else {
       alert('Mật khẩu cũ không chính xác!');
     }
@@ -904,45 +1015,332 @@ export default function App() {
 
               {/* Settings Profile tab */}
               {activeTab === 'settings' && (
-                <div className="card" style={{ maxWidth: '600px' }}>
-                  <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '16px' }}>THIẾT LẬP TÀI KHOẢN CÁ NHÂN</h3>
-                  <form onSubmit={(e) => {
-                    e.preventDefault();
-                    alert('Đã cập nhật thông tin cá nhân!');
-                  }} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                    <div className="form-group">
-                      <label style={{ fontSize: '12px', fontWeight: '600' }}>Họ và tên của bạn:</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        value={currentUser.name}
-                        onChange={e => setCurrentUser({ ...currentUser, name: e.target.value })}
-                        required
-                      />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1100px', margin: '0 auto' }} className="animate-in">
+                  <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
+                    <h3 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--text-primary)' }}>⚙️ CÀI ĐẶT TÀI KHOẢN & HỒ SƠ</h3>
+                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Cập nhật hồ sơ cá nhân, điều chỉnh mục tiêu học tập và đổi mật khẩu bảo mật của bạn.</p>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px' }}>
+                    
+                    {/* HÀNG 1: THÔNG TIN CÁ NHÂN */}
+                    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                      <h4 style={{ fontSize: '15px', fontWeight: 'bold', borderBottom: '1px solid var(--border)', paddingBottom: '8px', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        👤 1. THÔNG TIN CÁ NHÂN & LIÊN HỆ
+                      </h4>
+
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <span style={{ fontSize: '11.5px', fontWeight: '600', color: 'var(--text-secondary)' }}>Ảnh đại diện (Avatar):</span>
+                          <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: role === 'admin' ? '#E74C3C' : (role === 'teacher' ? '#0984E3' : 'var(--primary)'), color: '#fff', fontSize: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid var(--primary-light)', boxShadow: 'var(--shadow-md)' }}>
+                            {settingsAvatar}
+                          </div>
+                        </div>
+                        <div style={{ flex: 1, minWidth: '240px' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--text-muted)' }}>CHỌN AVATAR KHÁC:</span>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                            {['🎒', '🎓', '🌟', '🚀', '💡', '🐼', '🦁', '🦊', '⚽', '🎨', '🎵', 'MA', 'TA', 'AD'].map(emoji => (
+                              <button 
+                                key={emoji}
+                                type="button"
+                                onClick={() => setSettingsAvatar(emoji)}
+                                style={{
+                                  padding: '4px 8px', fontSize: '13px', background: settingsAvatar === emoji ? 'var(--primary-bg)' : 'var(--bg-main)',
+                                  border: settingsAvatar === emoji ? '1px solid var(--primary)' : '1px solid var(--border)',
+                                  borderRadius: 'var(--radius-sm)', cursor: 'pointer', outline: 'none', transition: 'all 0.2s', fontWeight: 'bold',
+                                  color: settingsAvatar === emoji ? 'var(--primary)' : 'var(--text-secondary)'
+                                }}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                        <div className="form-group">
+                          <label style={{ fontSize: '12px', fontWeight: '600' }}>Họ và tên:</label>
+                          <input
+                            type="text"
+                            className="form-control"
+                            value={settingsName}
+                            onChange={e => setSettingsName(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label style={{ fontSize: '12px', fontWeight: '600' }}>Địa chỉ Email (Không thể đổi):</label>
+                          <input
+                            type="email"
+                            className="form-control"
+                            value={currentUser.email}
+                            disabled
+                            style={{ background: 'var(--bg-main)', color: 'var(--text-secondary)', cursor: 'not-allowed' }}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label style={{ fontSize: '12px', fontWeight: '600' }}>Số điện thoại:</label>
+                          <input
+                            type="tel"
+                            className="form-control"
+                            placeholder="Nhập số điện thoại"
+                            value={settingsPhone}
+                            onChange={e => setSettingsPhone(e.target.value)}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label style={{ fontSize: '12px', fontWeight: '600' }}>Ngày sinh:</label>
+                          <input
+                            type="date"
+                            className="form-control"
+                            value={settingsDob}
+                            onChange={e => setSettingsDob(e.target.value)}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label style={{ fontSize: '12px', fontWeight: '600' }}>Tỉnh / Thành phố:</label>
+                          <select
+                            className="form-control"
+                            value={settingsCity}
+                            onChange={e => setSettingsCity(e.target.value)}
+                          >
+                            {['Hà Nội', 'TP. Hồ Chí Minh', 'Đà Nẵng', 'Hải Phòng', 'Cần Thơ', 'Quảng Ninh', 'Nghệ An', 'Thừa Thiên Huế', 'Bình Dương', 'Đồng Nai'].map(c => (
+                              <option key={c} value={c}>{c}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
                     </div>
-                    <div className="form-group">
-                      <label style={{ fontSize: '12px', fontWeight: '600' }}>Trường THPT học tập:</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        value={currentUser.school || 'THPT Chuyên Hà Nội - Amsterdam'}
-                        onChange={e => setCurrentUser({ ...currentUser, school: e.target.value })}
-                      />
+
+                    {/* HÀNG 2: MỤC TIÊU HỌC TẬP (Chỉ hiển thị cho học sinh) */}
+                    {role === 'student' && (
+                      <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                        <h4 style={{ fontSize: '15px', fontWeight: 'bold', borderBottom: '1px solid var(--border)', paddingBottom: '8px', color: 'var(--accent-green)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          🎯 2. MỤC TIÊU HỌC TẬP & KHỐI THI
+                        </h4>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                          <div className="form-group">
+                            <label style={{ fontSize: '12px', fontWeight: '600' }}>Trường THPT:</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="Nhập tên trường cấp 3"
+                              value={settingsSchool}
+                              onChange={e => setSettingsSchool(e.target.value)}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label style={{ fontSize: '12px', fontWeight: '600' }}>Tổ hợp môn thi mục tiêu:</label>
+                            <select
+                              className="form-control"
+                              value={settingsCombo}
+                              onChange={e => setSettingsCombo(e.target.value)}
+                            >
+                              <option value="A01 (Toán – Lý – Anh)">A01 (Toán – Lý – Anh)</option>
+                              <option value="B00 (Toán – Hóa – Sinh)">B00 (Toán – Hóa – Sinh)</option>
+                              <option value="D01 (Toán – Văn – Anh)">D01 (Toán – Văn – Anh)</option>
+                            </select>
+                          </div>
+                          <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                            <label style={{ fontSize: '12px', fontWeight: '600' }}>Trường Đại học mong ước:</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="Ví dụ: Đại học Bách Khoa Hà Nội, NEU..."
+                              value={settingsTargetUniversity}
+                              onChange={e => setSettingsTargetUniversity(e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'var(--bg-main)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-primary)' }}>Mục tiêu điểm số thi THPTQG:</span>
+                            <span className="badge-pill" style={{ background: 'var(--primary)', color: '#fff', fontSize: '12px', fontWeight: 'bold' }}>{settingsTargetScore.toFixed(1)} Điểm</span>
+                          </div>
+                          <input 
+                            type="range" 
+                            min="20.0" 
+                            max="30.0" 
+                            step="0.1" 
+                            value={settingsTargetScore}
+                            onChange={e => setSettingsTargetScore(parseFloat(e.target.value))}
+                            style={{ width: '100%', accentColor: 'var(--primary)', cursor: 'pointer', height: '6px', borderRadius: '3px' }}
+                          />
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)' }}>
+                            <span>Khá (20.0đ)</span>
+                            <span>Giỏi (25.0đ)</span>
+                            <span>Xuất sắc (30.0đ)</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* HÀNG 3: BẢO MẬT VÀ THÔNG BÁO & ĐỔI MẬT KHẨU */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+                      
+                      {/* BẢO MẬT & LIÊN KẾT */}
+                      <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <h4 style={{ fontSize: '14px', fontWeight: 'bold', borderBottom: '1px solid var(--border)', paddingBottom: '8px', color: 'var(--accent-orange)' }}>
+                          🔔 3. THÔNG BÁO & KẾT NỐI
+                        </h4>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--text-muted)' }}>THIẾT LẬP THÔNG BÁO:</span>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '12.5px' }}>
+                            <input 
+                              type="checkbox" 
+                              checked={settingsNotifEmail} 
+                              onChange={e => setSettingsNotifEmail(e.target.checked)} 
+                              style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }}
+                            />
+                            Nhận email thông báo kết quả học tập tuần
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '12.5px' }}>
+                            <input 
+                              type="checkbox" 
+                              checked={settingsNotifInApp} 
+                              onChange={e => setSettingsNotifInApp(e.target.checked)} 
+                              style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }}
+                            />
+                            Hiển thị chuông thông báo hoạt động mới
+                          </label>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--text-muted)' }}>LIÊN KẾT TÀI KHOẢN MẠNG XÃ HỘI (UC-03):</span>
+                          
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'var(--bg-main)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                            <span style={{ fontSize: '12.5px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                              🌐 Tài khoản Facebook
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setSettingsLinkedFb(!settingsLinkedFb)}
+                              style={{
+                                padding: '4px 10px', fontSize: '11px', fontWeight: 'bold',
+                                background: settingsLinkedFb ? 'rgba(0,184,148,0.1)' : 'var(--border)',
+                                color: settingsLinkedFb ? 'var(--accent-green)' : 'var(--text-secondary)',
+                                border: 'none', borderRadius: '4px', cursor: 'pointer'
+                              }}
+                            >
+                              {settingsLinkedFb ? '✓ Đã liên kết' : '+ Liên kết ngay'}
+                            </button>
+                          </div>
+
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'var(--bg-main)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                            <span style={{ fontSize: '12.5px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                              📧 Tài khoản Google
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setSettingsLinkedGg(!settingsLinkedGg)}
+                              style={{
+                                padding: '4px 10px', fontSize: '11px', fontWeight: 'bold',
+                                background: settingsLinkedGg ? 'rgba(0,184,148,0.1)' : 'var(--border)',
+                                color: settingsLinkedGg ? 'var(--accent-green)' : 'var(--text-secondary)',
+                                border: 'none', borderRadius: '4px', cursor: 'pointer'
+                              }}
+                            >
+                              {settingsLinkedGg ? '✓ Đã liên kết' : '+ Liên kết ngay'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* KHỐI ĐỔI MẬT KHẨU */}
+                      <form onSubmit={(e) => {
+                        e.preventDefault();
+                        handleSettingsPasswordChange(settingsOldPass, settingsNewPass, settingsConfirmNewPass);
+                      }} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <h4 style={{ fontSize: '14px', fontWeight: 'bold', borderBottom: '1px solid var(--border)', paddingBottom: '8px', color: 'var(--accent-red)' }}>
+                          🔒 4. ĐỔI MẬT KHẨU BẢO MẬT
+                        </h4>
+
+                        <div className="form-group">
+                          <label style={{ fontSize: '11px', fontWeight: '600' }}>Mật khẩu hiện tại:</label>
+                          <input
+                            type="password"
+                            className="form-control"
+                            value={settingsOldPass}
+                            onChange={e => setSettingsOldPass(e.target.value)}
+                            required
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label style={{ fontSize: '11px', fontWeight: '600' }}>Mật khẩu mới:</label>
+                          <input
+                            type="password"
+                            className="form-control"
+                            value={settingsNewPass}
+                            onChange={e => setSettingsNewPass(e.target.value)}
+                            required
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label style={{ fontSize: '11px', fontWeight: '600' }}>Xác nhận mật khẩu mới:</label>
+                          <input
+                            type="password"
+                            className="form-control"
+                            value={settingsConfirmNewPass}
+                            onChange={e => setSettingsConfirmNewPass(e.target.value)}
+                            required
+                          />
+                        </div>
+
+                        <button type="submit" className="btn-primary" style={{ width: '100%', marginTop: '4px', background: 'var(--accent-red)', border: 'none' }}>
+                          Xác nhận đổi mật khẩu
+                        </button>
+                      </form>
+
                     </div>
-                    <div className="form-group">
-                      <label style={{ fontSize: '12px', fontWeight: '600' }}>Tổ hợp mục tiêu:</label>
-                      <select
-                        className="form-control"
-                        value={currentUser.combo}
-                        onChange={e => setCurrentUser({ ...currentUser, combo: e.target.value })}
-                      >
-                        <option value="A01 (Toán – Lý – Anh)">A01 (Toán – Lý – Anh)</option>
-                        <option value="B00 (Toán – Hóa – Sinh)">B00 (Toán – Hóa – Sinh)</option>
-                        <option value="D01 (Toán – Văn – Anh)">D01 (Toán – Văn – Anh)</option>
-                      </select>
-                    </div>
-                    <button type="submit" className="btn-primary" style={{ alignSelf: 'flex-start' }}>Lưu cấu hình</button>
-                  </form>
+
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px', marginTop: '12px' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Reset changes
+                        setActiveTab('home');
+                      }}
+                      className="header-icon-btn"
+                      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '10px 20px', fontSize: '13px', height: 'auto', color: 'var(--text-secondary)' }}
+                    >
+                      Hủy bỏ thay đổi
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Save changes
+                        const updatedUser = {
+                          ...currentUser,
+                          name: settingsName,
+                          avatar: settingsAvatar,
+                          dob: settingsDob,
+                          phone: settingsPhone,
+                          city: settingsCity,
+                          school: settingsSchool,
+                          combo: settingsCombo,
+                          targetScore: settingsTargetScore,
+                          targetUniversity: settingsTargetUniversity,
+                          notificationsEnabled: settingsNotifEmail,
+                          inAppAlertsEnabled: settingsNotifInApp,
+                          linkedFacebook: settingsLinkedFb,
+                          linkedGoogle: settingsLinkedGg
+                        };
+                        handleSaveProfile(updatedUser);
+                      }}
+                      className="btn-primary"
+                      style={{ padding: '10px 24px', fontSize: '13px', borderRadius: 'var(--radius-sm)' }}
+                    >
+                      Lưu tất cả cấu hình hồ sơ
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

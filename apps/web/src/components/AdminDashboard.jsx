@@ -155,34 +155,53 @@ export default function AdminDashboard({
 
           {/* Teacher verification profile */}
           <div className="card">
-            <h3 style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: '16px' }}>CẤP DUYỆT HỒ SƠ GIÁO VIÊN (TEACHER AUDIT)</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div style={{ padding: '14px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-main)' }}>
-                <h4 style={{ fontSize: '13px', fontWeight: 'bold' }}>Ứng viên: Thầy Vũ Khắc Ngọc</h4>
-                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '4px 0' }}>
-                  Chuyên môn: Hóa học • Kinh nghiệm: 10 năm ôn thi đại học THPTQG.
-                </p>
-                <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-                  <button
-                    className="btn-primary"
-                    style={{ padding: '5px 12px', fontSize: '11px' }}
-                    onClick={() => {
-                      onApproveTeacher('Vũ Khắc Ngọc', 'Hóa học');
-                      addLog(`Quản trị viên cấp duyệt tài khoản "Vũ Khắc Ngọc" thành vai trò GIÁO VIÊN`, 'sys');
-                      alert('Phê duyệt hồ sơ giáo viên thành công!');
-                    }}
-                  >
-                    Phê duyệt Cấp quyền
-                  </button>
-                  <button
-                    className="btn-outline"
-                    style={{ padding: '5px 12px', fontSize: '11px' }}
-                    onClick={() => alert('Từ chối hồ sơ!')}
-                  >
-                    Từ chối
-                  </button>
+            <h3 style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: '16px' }}>CẤP DUYỆT HỒ SƠ GIÁO VIÊN DÂN SỰ (TEACHER AUDIT)</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {users.filter(u => u.role === 'teacher' && u.status === 'pending').length > 0 ? (
+                users.filter(u => u.role === 'teacher' && u.status === 'pending').map(u => (
+                  <div key={u.id} style={{ padding: '14px', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--bg-main)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <h4 style={{ fontSize: '13.5px', fontWeight: 'bold', color: 'var(--text-primary)' }}>Ứng viên: {u.name}</h4>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Email: {u.email}</span>
+                      </div>
+                      <span className="badge-pill" style={{ background: 'var(--primary-bg)', color: 'var(--primary)', fontSize: '10px', fontWeight: 'bold' }}>
+                        {u.combo || 'Chuyên môn THPT'}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '11.5px', color: 'var(--text-secondary)', lineHeight: '1.4', margin: '4px 0' }}>
+                      Kinh nghiệm giảng dạy và ôn tập trực tuyến THPTQG cá nhân hóa lộ trình thích ứng.
+                    </p>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                      <button
+                        className="btn-primary"
+                        style={{ padding: '5px 14px', fontSize: '11px', fontWeight: 'bold' }}
+                        onClick={() => {
+                          onApproveTeacher(u.name, u.combo || 'Tổng hợp');
+                          addLog(`Quản trị viên cấp duyệt tài khoản "${u.name}" thành vai trò GIÁO VIÊN`, 'sys');
+                          alert(`Phê duyệt hồ sơ giáo viên "${u.name}" thành công!`);
+                        }}
+                      >
+                        Phê duyệt Cấp quyền
+                      </button>
+                      <button
+                        className="btn-outline"
+                        style={{ padding: '5px 14px', fontSize: '11px', color: 'var(--accent-red)', borderColor: 'var(--accent-red)' }}
+                        onClick={() => {
+                          alert(`Đã từ chối hồ sơ của ứng viên "${u.name}".`);
+                        }}
+                      >
+                        Từ chối
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div style={{ textAlign: 'center', padding: '24px', background: 'var(--bg-main)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)' }}>
+                  <span style={{ fontSize: '24px', display: 'block', marginBottom: '8px' }}>🎓</span>
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Không có hồ sơ đăng ký giáo viên nào đang chờ phê duyệt.</p>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

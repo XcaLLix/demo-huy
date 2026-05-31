@@ -19,14 +19,15 @@ const getSpikePath = () => {
 const spikePath = getSpikePath();
 
 export default function FooterSunMascot({ 
-  dinoText = 'Mệt thì nghỉ một chút, còn khỏe thì chiến tiếp cùng TID nha bạn.', 
-  currentDinoMessage = 'Mệt thì nghỉ một chút, còn khỏe thì chiến tiếp cùng TID nha bạn.',
+  dinoText = 'Mệt thì nghỉ một chút, còn khỏe thì chiến tiếp cùng EduPath nha bạn.', 
+  currentDinoMessage = 'Mệt thì nghỉ một chút, còn khỏe thì chiến tiếp cùng EduPath nha bạn.',
   isSmiling = false
 }) {
   const [mounted, setMounted] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isCardHovered, setIsCardHovered] = useState(false);
-  const showSmile = isSmiling || isCardHovered;
+  const [isMouthOpenAuto, setIsMouthOpenAuto] = useState(false);
+  const showSmile = isSmiling || isCardHovered || isHovered || isMouthOpenAuto;
   const containerRef = useRef(null);
   const mascotRef = useRef(null);
   
@@ -68,6 +69,34 @@ export default function FooterSunMascot({
     window.addEventListener('hero-smile', handleHeroSmile);
     return () => window.removeEventListener('hero-smile', handleHeroSmile);
   }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+
+    // Talk periodically: toggle open/close 6 times every 7.5 seconds
+    const runTalking = () => {
+      let count = 0;
+      const talkInterval = setInterval(() => {
+        setIsMouthOpenAuto(prev => !prev);
+        count++;
+        if (count >= 6) {
+          clearInterval(talkInterval);
+          setIsMouthOpenAuto(false);
+        }
+      }, 350);
+    };
+
+    // Trigger talk immediately after 2 seconds
+    const initialDelay = setTimeout(runTalking, 2000);
+    
+    // Regular interval
+    const mainTimer = setInterval(runTalking, 7500);
+    
+    return () => {
+      clearTimeout(initialDelay);
+      clearInterval(mainTimer);
+    };
+  }, [mounted]);
 
   if (!mounted) return <div style={{ height: '320px' }} />; 
 

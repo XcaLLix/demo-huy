@@ -13,45 +13,45 @@ const SUBJECTS = [
   {
     id: 'toan',
     label: 'Toán Học',
-    desc: 'Đại số, Hình học, Giải tích và các dạng bài thi THPTQG',
+    desc: 'Đại số, Hình học, Giải tích và các dạng bài thi THPTQG nâng cao.',
     count: '120+ đề',
-    bg: '#4F46E5',
+    bg: '#5b75f3',
     emoji: '🦉',
     combos: ['A01', 'B00', 'D01'],
   },
   {
     id: 'ly',
     label: 'Vật Lý',
-    desc: 'Dao động, Sóng, Điện từ — bám sát cấu trúc đề thi mới',
+    desc: 'Dao động, Sóng, Điện từ — bám sát cấu trúc đề thi mới nhất.',
     count: '100+ đề',
-    bg: '#F97316',
+    bg: '#52ad58',
     emoji: '🦊',
     combos: ['A01'],
   },
   {
     id: 'anh',
     label: 'Tiếng Anh',
-    desc: 'Ngữ pháp, Đọc hiểu, Từ vựng trọng tâm THPTQG 2026',
+    desc: 'Ngữ pháp, Đọc hiểu, Từ vựng trọng tâm thi THPTQG 2026.',
     count: '100+ đề',
-    bg: '#10B981',
+    bg: '#db8142',
     emoji: '🐸',
     combos: ['A01', 'D01'],
   },
   {
     id: 'hoa',
     label: 'Hóa Học',
-    desc: 'Hữu cơ, Vô cơ, Bài toán tính toán hóa học nâng cao',
+    desc: 'Hữu cơ, Vô cơ, Bài toán tính toán hóa học nâng cao.',
     count: '90+ đề',
-    bg: '#EF4444',
+    bg: '#cf6674',
     emoji: '🐙',
     combos: ['B00'],
   },
   {
     id: 'sinh',
     label: 'Sinh Học',
-    desc: 'Di truyền, Tiến hóa, Sinh thái — ôn thi khối B chuyên sâu',
+    desc: 'Di truyền, Tiến hóa, Sinh thái — ôn thi khối B chuyên sâu.',
     count: '80+ đề',
-    bg: '#8B5CF6',
+    bg: '#6f4ab3',
     emoji: '🐢',
     combos: ['B00'],
     isFree: true,
@@ -59,9 +59,9 @@ const SUBJECTS = [
   {
     id: 'van',
     label: 'Ngữ Văn',
-    desc: 'Nghị luận, Đọc hiểu, Phân tích tác phẩm văn học 12',
+    desc: 'Nghị luận xã hội, Nghị luận văn học, Phân tích tác phẩm.',
     count: '70+ đề',
-    bg: '#F59E0B',
+    bg: '#4598a7',
     emoji: '🦋',
     combos: ['D01'],
   },
@@ -258,6 +258,83 @@ export default function LandingPage({
     }
   };
 
+  const renderMascotSVG = (id) => {
+    switch (id) {
+      case 'toan':
+        return (
+          <svg viewBox="0 0 120 70" className="lp-neo-mascot-svg">
+            <path d="M 15 70 C 15 28, 105 28, 105 70 Z" fill="#3649c0" stroke="#000" strokeWidth="2.5" />
+            <path d="M 15 48 A 45 45 0 0 1 105 48" fill="none" stroke="#000" strokeWidth="4" />
+            <rect x="7" y="42" rx="3" ry="3" width="14" height="20" fill="#000" />
+            <rect x="99" y="42" rx="3" ry="3" width="14" height="20" fill="#000" />
+            <ellipse cx="42" cy="48" rx="8" ry="6" fill="#fff" stroke="#000" strokeWidth="2" />
+            <ellipse cx="78" cy="48" rx="8" ry="6" fill="#fff" stroke="#000" strokeWidth="2" />
+            <circle cx="44" cy="48" r="3.5" fill="#000" />
+            <circle cx="80" cy="48" r="3.5" fill="#000" />
+          </svg>
+        );
+      case 'ly':
+        return (
+          <svg viewBox="0 0 120 70" className="lp-neo-mascot-svg">
+            <path d="M 15 70 C 15 28, 105 28, 105 70 Z" fill="#3a8d3e" stroke="#000" strokeWidth="2.5" />
+            <path d="M 60 28 Q 60 12 72 9" fill="none" stroke="#000" strokeWidth="2.5" />
+            <path d="M 72 9 C 72 9, 85 7, 80 17 C 75 27, 72 9, 72 9 Z" fill="#81c784" stroke="#000" strokeWidth="2" />
+            <path d="M 60 20 C 60 20, 45 12, 48 2 C 51 -8, 60 20, 60 20 Z" fill="#81c784" stroke="#000" strokeWidth="2" />
+            <ellipse cx="42" cy="48" rx="8" ry="6" fill="#fff" stroke="#000" strokeWidth="2" />
+            <ellipse cx="78" cy="48" rx="8" ry="6" fill="#fff" stroke="#000" strokeWidth="2" />
+            <circle cx="44" cy="48" r="3.5" fill="#000" />
+            <circle cx="80" cy="48" r="3.5" fill="#000" />
+          </svg>
+        );
+      case 'anh':
+        return (
+          <svg viewBox="0 0 120 70" className="lp-neo-mascot-svg">
+            <path d="M 15 70 C 15 48, 22 36, 38 36 C 48 22, 72 22, 82 36 C 98 36, 105 48, 105 70 Z" fill="#ad5e24" stroke="#000" strokeWidth="2.5" />
+            <ellipse cx="42" cy="50" rx="8" ry="6" fill="#fff" stroke="#000" strokeWidth="2" />
+            <ellipse cx="78" cy="50" rx="8" ry="6" fill="#fff" stroke="#000" strokeWidth="2" />
+            <circle cx="44" cy="50" r="3.5" fill="#000" />
+            <circle cx="80" cy="50" r="3.5" fill="#000" />
+          </svg>
+        );
+      case 'hoa':
+        return (
+          <svg viewBox="0 0 120 70" className="lp-neo-mascot-svg">
+            <path d="M 15 70 C 15 28, 105 28, 105 70 Z" fill="#a44651" stroke="#000" strokeWidth="2.5" />
+            <path d="M 15 36 Q 60 52 105 36 L 105 70 L 15 70 Z" fill="#a44651" />
+            <path d="M 15 36 Q 60 52 105 36" fill="none" stroke="#000" strokeWidth="2.5" />
+            <ellipse cx="42" cy="52" rx="8" ry="6" fill="#fff" stroke="#000" strokeWidth="2" />
+            <ellipse cx="78" cy="52" rx="8" ry="6" fill="#fff" stroke="#000" strokeWidth="2" />
+            <circle cx="44" cy="52" r="3.5" fill="#000" />
+            <circle cx="80" cy="52" r="3.5" fill="#000" />
+          </svg>
+        );
+      case 'sinh':
+        return (
+          <svg viewBox="0 0 120 70" className="lp-neo-mascot-svg">
+            <path d="M 15 70 C 15 48, 22 36, 38 36 C 48 20, 72 20, 82 36 C 98 36, 105 48, 105 70 Z" fill="#523187" stroke="#000" strokeWidth="2.5" />
+            <ellipse cx="42" cy="48" rx="8" ry="6" fill="#fff" stroke="#000" strokeWidth="2" />
+            <ellipse cx="78" cy="48" rx="8" ry="6" fill="#fff" stroke="#000" strokeWidth="2" />
+            <circle cx="44" cy="48" r="3.5" fill="#000" />
+            <circle cx="80" cy="48" r="3.5" fill="#000" />
+          </svg>
+        );
+      case 'van':
+        return (
+          <svg viewBox="0 0 120 70" className="lp-neo-mascot-svg">
+            <path d="M 15 70 C 15 28, 105 28, 105 70 Z" fill="#2d7783" stroke="#000" strokeWidth="2.5" />
+            <polygon points="20,32 12,8 38,28" fill="#2d7783" stroke="#000" strokeWidth="2.5" strokeLinejoin="round" />
+            <polygon points="100,32 108,8 82,28" fill="#2d7783" stroke="#000" strokeWidth="2.5" strokeLinejoin="round" />
+            <ellipse cx="42" cy="50" rx="8" ry="6" fill="#fff" stroke="#000" strokeWidth="2" />
+            <ellipse cx="78" cy="50" rx="8" ry="6" fill="#fff" stroke="#000" strokeWidth="2" />
+            <circle cx="44" cy="50" r="3.5" fill="#000" />
+            <circle cx="80" cy="50" r="3.5" fill="#000" />
+          </svg>
+        );
+      default:
+        return null;
+    }
+  };
+
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 10);
     window.addEventListener('scroll', fn);
@@ -280,7 +357,14 @@ export default function LandingPage({
       <nav className={`lp-nav${scrolled ? ' lp-nav--scrolled' : ''}`}>
         <div className="lp-nav__inner">
           <div className="lp-nav__logo" onClick={() => setActiveLandingView('home')} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-            <div className="lp-logo-box">E</div>
+            <div className="lp-logo-box">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '22px', height: '22px' }}>
+                <path d="M18 6H8.5a4 4 0 100 8h8" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M14 10H8.5" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="18" cy="6" r="1.5" fill="#FFD234" />
+                <circle cx="16.5" cy="14" r="1.5" fill="#FFD234" />
+              </svg>
+            </div>
             <span>EduPath <em>AI</em></span>
           </div>
 
@@ -610,16 +694,12 @@ export default function LandingPage({
         </div>
       </section>
 
-      {/* Wavy divider */}
-      <div className="lp-wave">
-        <svg viewBox="0 0 1440 80" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M0,40 C240,80 480,0 720,40 C960,80 1200,0 1440,40 L1440,80 L0,80 Z" fill="#ffffff"/>
-        </svg>
-      </div>
+      {/* Flat horizontal divider */}
+      <div className="lp-flat-divider" />
 
       {/* ── SUBJECT CARDS ── */}
       <section id="subjects" className="lp-subjects">
-        <div className="lp-container">
+        <div className="lp-container lp-container--wide">
           <div className="lp-section-header lp-section-header--light">
             <span className="lp-eyebrow lp-eyebrow--dark">Danh mục môn học</span>
             <h2>Chinh phục từng môn theo từng khối thi</h2>
@@ -628,19 +708,44 @@ export default function LandingPage({
 
           <div className="lp-cards-row">
             {SUBJECTS.map((s) => (
-              <div key={s.id} className="lp-subject-card" style={{ '--card-bg': s.bg }} onClick={() => setActiveLandingView('subjects')}>
-                {s.isFree && <span className="lp-card-free-badge">FREE</span>}
-                <div className="lp-card-icon-container">
+              <div 
+                key={s.id} 
+                className="lp-subject-neo-card" 
+                style={{ backgroundColor: s.bg }} 
+                onClick={() => currentUser ? onBackToDashboard('library') : onNavigateToAuth('signup')}
+              >
+                {/* Background sparkles and star music notes for premium feel */}
+                <div className="lp-neo-sparkles">
+                  <span className="lp-sparkle lp-sparkle--1">✦</span>
+                  <span className="lp-sparkle lp-sparkle--2">✦</span>
+                  <span className="lp-sparkle lp-sparkle--3">✦</span>
+                  {s.id === 'toan' && <span className="lp-sparkle lp-sparkle--note-1">♫</span>}
+                  {s.id === 'toan' && <span className="lp-sparkle lp-sparkle--note-2">♪</span>}
+                  {s.id === 'ly' && <span className="lp-sparkle lp-sparkle--sun">☀️</span>}
+                </div>
+
+                {s.isFree && <span className="lp-neo-free-badge">FREE</span>}
+                
+                <div className="lp-neo-icon-box">
                   {renderSubjectIcon(s.id)}
                 </div>
-                <div className="lp-card-info">
+
+                <div className="lp-neo-info">
                   <h3>{s.label}</h3>
                   <p>{s.desc}</p>
+                  
+                  {/* Subtle glassmorphic combination pills */}
+                  <div className="lp-neo-combos">
+                    {s.combos.map(combo => (
+                      <span key={combo} className="lp-neo-combo-tag">{combo}</span>
+                    ))}
+                  </div>
                 </div>
-                <div className="lp-card-footer">
-                  <span className="lp-card-count">{s.count}</span>
-                  <div className="lp-card-combos">
-                    {s.combos.map(c => <span key={c} className="lp-card-combo-tag">{c}</span>)}
+
+                <div className="lp-neo-mascot-box">
+                  {renderMascotSVG(s.id)}
+                  <div className="lp-neo-pill-badge">
+                    {s.id === 'sinh' ? 'FREE' : s.count.toUpperCase()}
                   </div>
                 </div>
               </div>
@@ -656,54 +761,39 @@ export default function LandingPage({
       </section>
 
       {/* ── FEATURED PREMIUM COURSES ── */}
-      <section className="lp-subjects" style={{ background: '#f8faf8', borderTop: '1px solid var(--border)', padding: '60px 0' }}>
+      <section className="lp-premium-courses-section">
         <div className="lp-container">
           <div className="lp-section-header lp-section-header--light" style={{ marginBottom: '40px' }}>
-            <span className="lp-eyebrow">Khóa Học Premium Nổi Bật</span>
+            <span className="lp-eyebrow lp-eyebrow--outline">Khóa Học Premium Nổi Bật</span>
             <h2>Chương Trình Luyện Thi THPTQG Chuyên Sâu</h2>
             <p>Đăng ký khóa học của các giáo viên hàng đầu để nhận lộ trình thích ứng thông minh.</p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', maxWidth: '1000px', margin: '0 auto' }}>
+          <div className="lp-courses-grid">
             {FEATURED_COURSES.map(course => (
-              <div 
-                key={course.id} 
-                className="card landing-card" 
-                style={{ 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  justifyContent: 'space-between',
-                  overflow: 'hidden',
-                  padding: 0,
-                  height: '100%',
-                  background: 'var(--bg-card)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius-lg)'
-                }}
-              >
-                <div style={{ background: course.imageBg, height: '110px', padding: '16px', color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <span style={{ background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(4px)', width: 'fit-content', padding: '4px 10px', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold' }}>
+              <div key={course.id} className="lp-course-neo-card">
+                <div className="lp-course-header" style={{ background: course.imageBg }}>
+                  <span className="lp-course-subject-badge">
                     {course.subject}
                   </span>
-                  <h4 style={{ fontSize: '14.5px', fontWeight: 'bold', textShadow: '0 2px 4px rgba(0,0,0,0.2)', margin: 0 }}>{course.title}</h4>
+                  <h4 className="lp-course-title">{course.title}</h4>
                 </div>
 
-                <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '14px' }}>
+                <div className="lp-course-body">
                   <div>
-                    <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: 0 }}>Giảng viên: <strong>{course.teacherName}</strong></p>
-                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', marginBottom: 0 }}>{course.duration}</p>
+                    <p className="lp-course-instructor">Giảng viên: <strong>{course.teacherName}</strong></p>
+                    <p className="lp-course-duration">{course.duration}</p>
                     
-                    <div style={{ display: 'flex', gap: '16px', marginTop: '12px', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><HiStar style={{ color: '#f1c40f' }} /> {course.rating}</span>
+                    <div className="lp-course-meta">
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><HiStar style={{ color: '#FFC229' }} /> {course.rating}</span>
                       <span>👤 {course.students} học viên</span>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
-                    <span style={{ fontSize: '17px', color: 'var(--accent-orange)', fontWeight: '800' }}>{course.price}đ</span>
+                  <div className="lp-course-footer">
+                    <span className="lp-course-price">{course.price}đ</span>
                     <button 
-                      className="btn-primary" 
-                      style={{ padding: '8px 16px', fontSize: '12px' }} 
+                      className="lp-btn-course-syllabus" 
                       onClick={() => setSelectedPreviewCourse(course)}
                     >
                       Xem đề cương
@@ -720,8 +810,8 @@ export default function LandingPage({
       <section id="leaderboard" className="lp-leaderboard-section">
         <div className="lp-container">
           <div className="lp-section-header lp-section-header--light" style={{ marginBottom: '40px' }}>
-            <span className="lp-eyebrow" style={{ display: 'flex', alignItems: 'center', gap: '6px', width: 'fit-content', margin: '0 auto 14px' }}>
-              <HiSparkles style={{ color: 'var(--primary)' }} /> Vinh danh học viên
+            <span className="lp-eyebrow lp-eyebrow--outline" style={{ display: 'flex', alignItems: 'center', gap: '6px', width: 'fit-content', margin: '0 auto 14px' }}>
+              <HiSparkles style={{ color: '#FFC229' }} /> Vinh danh học viên
             </span>
             <h2>Bảng Xếp Hạng Thành Tích Học Tập THPTQG 2026</h2>
             <p>Học tập liên tục, bứt phá giới hạn và vươn lên dẫn đầu bảng xếp hạng cùng EduPath AI.</p>
@@ -733,37 +823,17 @@ export default function LandingPage({
                 <button 
                   className={`badge-pill ${leaderboardTab === 'score' ? 'active' : ''}`}
                   onClick={() => setLeaderboardTab('score')}
-                  style={{
-                    border: '1px solid var(--border)',
-                    background: leaderboardTab === 'score' ? 'var(--primary)' : 'var(--bg-main)',
-                    color: leaderboardTab === 'score' ? '#fff' : 'var(--text-secondary)',
-                    padding: '8px 16px',
-                    borderRadius: '20px',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
                 >
                   🎯 Theo điểm thi thử
                 </button>
                 <button 
                   className={`badge-pill ${leaderboardTab === 'streak' ? 'active' : ''}`}
                   onClick={() => setLeaderboardTab('streak')}
-                  style={{
-                    border: '1px solid var(--border)',
-                    background: leaderboardTab === 'streak' ? 'var(--primary)' : 'var(--bg-main)',
-                    color: leaderboardTab === 'streak' ? '#fff' : 'var(--text-secondary)',
-                    padding: '8px 16px',
-                    borderRadius: '20px',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
                 >
                   🔥 Theo chuỗi học tập (Streak)
                 </button>
               </div>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Cập nhật 5 phút trước</span>
+              <span className="leaderboard-timestamp">Cập nhật 5 phút trước</span>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -781,15 +851,15 @@ export default function LandingPage({
                     <div key={student.name} className={`leaderboard-row ${rowClass}`}>
                       <div className={`rank-badge ${rankClass}`}>{displayRank}</div>
                       <div className="leaderboard-avatar">{student.avatar}</div>
-                      <div>
+                      <div className="leaderboard-userinfo">
                         <div className="leaderboard-name">{student.name}</div>
-                        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>{student.badge}</div>
+                        <div className="leaderboard-badge-tag">{student.badge}</div>
                       </div>
-                      <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', fontWeight: 600 }}>{student.combo}</div>
-                      <div style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 'bold' }}>
+                      <div className="leaderboard-combo-name">{student.combo}</div>
+                      <div className="leaderboard-score-tag">
                         🎯 {student.actual}/{student.target}đ
                       </div>
-                      <div style={{ fontSize: '13px', color: 'var(--accent-orange)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <div className="leaderboard-streak-tag">
                         🔥 {student.streak} ngày
                       </div>
                     </div>
@@ -802,52 +872,41 @@ export default function LandingPage({
 
       {/* ── CURRICULUM PREVIEW MODAL ── */}
       {selectedPreviewCourse && (
-        <div className="checkout-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
-          <div className="checkout-modal animate-in" style={{ maxWidth: '500px', width: '90%', position: 'relative', background: 'var(--bg-card)' }}>
+        <div className="checkout-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, background: 'rgba(28, 40, 15, 0.45)', backdropFilter: 'blur(6px)' }}>
+          <div className="checkout-modal lp-modal-neo animate-in">
             <button 
               onClick={() => setSelectedPreviewCourse(null)}
-              style={{ position: 'absolute', top: '16px', right: '16px', border: 'none', background: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer' }}
+              style={{ position: 'absolute', top: '16px', right: '16px', border: 'none', background: 'none', color: '#111111', fontSize: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%', border: '2px solid #000', background: '#fff', boxShadow: '2px 2px 0px #000' }}
             >
               <HiX />
             </button>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '10px' }}>
-              <span className="badge-pill" style={{ background: 'var(--primary-bg)', color: 'var(--primary)', fontSize: '10px', fontWeight: 'bold' }}>
+              <span className="lp-course-subject-badge" style={{ background: '#FFC229' }}>
                 Đề cương bài học
               </span>
             </div>
-            <h3 style={{ fontSize: '17px', fontWeight: 'bold', marginBottom: '4px', color: 'var(--text-main)' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '900', marginBottom: '4px', color: '#111111', letterSpacing: '-0.5px' }}>
               {selectedPreviewCourse.title}
             </h3>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
-              Giảng dạy bởi: {selectedPreviewCourse.teacherName}
+            <p style={{ fontSize: '12.5px', color: '#4B5563', marginBottom: '20px', fontWeight: '700' }}>
+              Giảng dạy bởi: <span style={{ color: '#1C280F' }}>{selectedPreviewCourse.teacherName}</span>
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '280px', overflowY: 'auto', paddingRight: '4px', marginBottom: '24px' }}>
               {selectedPreviewCourse.lessons.map((lesson, idx) => (
-                <div 
-                  key={idx}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '12px 14px',
-                    borderRadius: 'var(--radius-md)',
-                    background: 'var(--bg-main)',
-                    border: '1px solid var(--border)'
-                  }}
-                >
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 'bold' }}>{idx + 1}</span>
+                <div key={idx} className="lp-modal-lesson-row">
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '13px', color: '#5b75f3', fontWeight: '900', background: '#ffffff', width: '24px', height: '24px', borderRadius: '50%', border: '1.5px solid #000', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '1px 1px 0px #000' }}>{idx + 1}</span>
                     <div>
-                      <h5 style={{ fontSize: '12.5px', fontWeight: '600', color: 'var(--text-main)', margin: 0 }}>{lesson.name}</h5>
-                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{lesson.duration}</span>
+                      <h5 style={{ fontSize: '12.5px', fontWeight: '800', color: '#111111', margin: 0 }}>{lesson.name}</h5>
+                      <span style={{ fontSize: '10.5px', color: '#6B7280', fontWeight: '600' }}>{lesson.duration}</span>
                     </div>
                   </div>
 
                   {lesson.isFree ? (
                     <button 
                       className="badge-pill" 
-                      style={{ background: 'rgba(0,184,148,0.12)', color: 'var(--accent-green)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', fontSize: '10.5px', fontWeight: 'bold' }}
+                      style={{ background: '#22C55E', color: '#ffffff', border: '2px solid #000000', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', fontSize: '10.5px', fontWeight: '900', boxShadow: '1.5px 1.5px 0px #000' }}
                       onClick={() => {
                         alert(`Bắt đầu xem thử bài học: "${lesson.name}"!`);
                         setSelectedPreviewCourse(null);
@@ -856,7 +915,7 @@ export default function LandingPage({
                       <HiPlay /> Học thử
                     </button>
                   ) : (
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ fontSize: '11px', color: '#6B7280', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '800' }}>
                       <HiLockClosed /> Premium
                     </span>
                   )}
@@ -865,8 +924,7 @@ export default function LandingPage({
             </div>
 
             <button 
-              className="btn-primary" 
-              style={{ width: '100%' }}
+              className="lp-btn lp-btn--accent lp-btn--full" 
               onClick={() => {
                 setSelectedPreviewCourse(null);
                 if (currentUser) {
@@ -904,7 +962,7 @@ export default function LandingPage({
       <section id="features" className="lp-features-section">
         <div className="lp-container">
           <div className="lp-section-header">
-            <span className="lp-eyebrow">Tại sao chọn EduPath AI?</span>
+            <span className="lp-eyebrow lp-eyebrow--outline">Tại sao chọn EduPath AI?</span>
             <h2>Học thông minh hơn, không chỉ học nhiều hơn</h2>
           </div>
 
@@ -924,7 +982,7 @@ export default function LandingPage({
       <section id="pricing" className="lp-pricing-section">
         <div className="lp-container">
           <div className="lp-section-header">
-            <span className="lp-eyebrow">Học phí minh bạch</span>
+            <span className="lp-eyebrow lp-eyebrow--outline">Học phí minh bạch</span>
             <h2>Bắt đầu miễn phí, nâng cấp khi sẵn sàng</h2>
           </div>
 
@@ -1389,7 +1447,14 @@ export default function LandingPage({
           <div className="lp-footer__grid">
             <div className="lp-footer__brand">
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                <div className="lp-logo-box" style={{ width: 36, height: 36, fontSize: 18 }}>E</div>
+                <div className="lp-logo-box" style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifycontent: 'center', padding: 0 }}>
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '20px', height: '20px' }}>
+                    <path d="M18 6H8.5a4 4 0 100 8h8" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M14 10H8.5" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx="18" cy="6" r="1.5" fill="#FFD234" />
+                    <circle cx="16.5" cy="14" r="1.5" fill="#FFD234" />
+                  </svg>
+                </div>
                 <span style={{ fontWeight: 800, fontSize: 17, color: '#fff' }}>EduPath AI</span>
               </div>
               <p>Nền tảng luyện thi THPTQG thích ứng AI — học thông minh, đạt điểm cao.</p>
