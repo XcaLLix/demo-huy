@@ -25,6 +25,7 @@ import CourseMall from './components/CourseMall';
 import ChatbotWidget from './components/ChatbotWidget.jsx';
 
 import { HiPlay, HiDocumentDownload, HiBeaker, HiX } from 'react-icons/hi';
+import { api } from './api';
 
 // Initial Database preloads
 const initialCourses = [
