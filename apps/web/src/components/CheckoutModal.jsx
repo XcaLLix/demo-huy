@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { HiX, HiCheckCircle, HiLockOpen, HiCheck, HiDuplicate, HiRefresh, HiSparkles } from 'react-icons/hi';
+import { API_BASE } from '../api';
+
 
 export default function CheckoutModal({ course, onClose, onPaymentSuccess, addLog }) {
   const [step, setStep] = useState(1); // 1: QR checkout, 2: Verification processing, 3: Success unlock
@@ -46,7 +48,7 @@ export default function CheckoutModal({ course, onClose, onPaymentSuccess, addLo
       if (!token) return;
 
       try {
-        const res = await fetch(`http://localhost:4000/enrollments/status?courseId=${courseId}`, {
+        const res = await fetch(`${API_BASE}/enrollments/status?courseId=${courseId}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -110,7 +112,7 @@ export default function CheckoutModal({ course, onClose, onPaymentSuccess, addLo
       // Wait 1.5 seconds to query the bank database
       await new Promise((resolve) => setTimeout(resolve, 1500));
       
-      const res = await fetch(`http://localhost:4000/enrollments/status?courseId=${courseId}`, {
+      const res = await fetch(`${API_BASE}/enrollments/status?courseId=${courseId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

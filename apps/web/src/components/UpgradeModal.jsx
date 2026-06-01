@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { HiX, HiCheckCircle, HiStar, HiCheck, HiDuplicate, HiRefresh, HiSparkles, HiArrowRight, HiShieldCheck } from 'react-icons/hi';
+import { API_BASE } from '../api';
+
 
 export default function UpgradeModal({ onClose, onUpgradeSuccess, addLog }) {
   const [selectedPlan, setSelectedPlan] = useState(3); // Default to yearly plan (planId: 3)
@@ -81,7 +83,7 @@ export default function UpgradeModal({ onClose, onUpgradeSuccess, addLog }) {
       if (!token) return;
 
       try {
-        const res = await fetch('http://localhost:4000/users/pro-status', {
+        const res = await fetch(`${API_BASE}/users/pro-status`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -150,7 +152,7 @@ export default function UpgradeModal({ onClose, onUpgradeSuccess, addLog }) {
     try {
       await new Promise((resolve) => setTimeout(resolve, 1500));
       
-      const res = await fetch('http://localhost:4000/users/pro-status', {
+      const res = await fetch(`${API_BASE}/users/pro-status`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
