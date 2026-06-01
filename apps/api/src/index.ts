@@ -72,6 +72,10 @@ app.get('/', (req, res) => {
 });
 
 const PORT = process.env.PORT || 4000;
-server.listen(PORT, () => {
-  console.log(`[API] EduPath Server is running on port: ${PORT}`);
-});
+if (!process.env.VERCEL) {
+  server.listen(PORT, () => {
+    console.log(`[API] EduPath Server is running on port: ${PORT}`);
+  });
+}
+
+export default app;
