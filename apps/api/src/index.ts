@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 import { initSocket } from './lib/socket.js';
 
 // Controller imports
-import { login, logout, register, sendOtp, verifyOtpRegister, googleAuth, changePassword } from './controllers/auth.js';
+import { login, logout, sendOtp, resendOtp, verifyOtpRegister, googleAuth, googleCompleteOnboarding, changePassword, requestRoleChange, getRoleChangeRequests, reviewRoleChange } from './controllers/auth.js';
 import { getCourses, getCourseById, createCourse, getCourseStats } from './controllers/course.js';
 import { getExams, startAttempt, submitAttempt } from './controllers/exam.js';
 import { streamAIChat, refreshRoadmap, generateAIQuestions } from './controllers/ai.js';
@@ -41,12 +41,18 @@ app.use((req, res, next) => {
 
 // Auth Routes
 app.post('/login', login);
-app.post('/register', register);
 app.post('/logout', logout);
 app.post('/auth/send-otp', sendOtp);
+app.post('/auth/resend-otp', resendOtp);
 app.post('/auth/verify-otp-register', verifyOtpRegister);
 app.post('/auth/google', googleAuth);
+app.post('/auth/google/complete-onboarding', googleCompleteOnboarding);
 app.post('/auth/change-password', authenticateJWT, changePassword);
+
+// Role Change Routes
+app.post('/auth/role-change-request', authenticateJWT, requestRoleChange);
+app.get('/admin/role-change-requests', authenticateJWT, requireRole(['ADMIN']), getRoleChangeRequests);
+app.post('/admin/role-change-requests/:id/review', authenticateJWT, requireRole(['ADMIN']), reviewRoleChange);
 
 // Protected Course Routes
 app.get('/courses', getCourses);

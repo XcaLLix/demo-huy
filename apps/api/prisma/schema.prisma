@@ -21,22 +21,37 @@ enum Difficulty {
   HARD
 }
 
+enum OtpPurpose {
+  REGISTRATION
+  PASSWORD_RESET
+  EMAIL_CHANGE
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
-  id           Int            @id @default(autoincrement())
-  email        String         @unique
-  passwordHash String
-  fullName     String
-  avatarUrl    String?
-  role         Role           @default(STUDENT)
-  isActive     Boolean        @default(true)
-  isPro        Boolean        @default(false)
-  googleId     String?        @unique
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  student      Student?
-  teacher      Teacher?
-  admin        Admin?
-  notifications Notification[]
+  id                 Int            @id @default(autoincrement())
+  email              String         @unique
+  passwordHash       String
+  fullName           String
+  avatarUrl          String?
+  role               Role           @default(STUDENT)
+  isActive           Boolean        @default(true)
+  isPro              Boolean        @default(false)
+  googleId           String?        @unique
+  emailVerified      Boolean        @default(false)
+  onboardingComplete Boolean        @default(true)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  student            Student?
+  teacher            Teacher?
+  admin              Admin?
+  notifications      Notification[]
+  roleChangeRequests RoleChangeRequest[]
 }
 
 model Student {
@@ -208,4 +223,34 @@ model Document {
   lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   uploadedBy  Int
   createdAt   DateTime @default(now())
+}
+
+model OtpVerification {
+  id          Int        @id @default(autoincrement())
+  email       String
+  otpHash     String
+  purpose     OtpPurpose @default(REGISTRATION)
+  payload     Json?
+  attempts    Int        @default(0)
+  maxAttempts Int        @default(5)
+  expiresAt   DateTime
+  createdAt   DateTime   @default(now())
+  isUsed      Boolean    @default(false)
+
+  @@index([email, purpose])
+}
+
+model RoleChangeRequest {
+  id            Int           @id @default(autoincrement())
+  userId        Int
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentRole   Role
+  requestedRole Role
+  reason        String?
+  status        RequestStatus @default(PENDING)
+  reviewedBy    Int?
+  reviewedAt    DateTime?
+  createdAt     DateTime      @default(now())
+
+  @@index([userId, status])
 }
