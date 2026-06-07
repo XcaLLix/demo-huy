@@ -1,264 +1,251 @@
-import { useState } from 'react';
-import { HiSearch, HiBell, HiSun, HiMoon, HiUser, HiLockClosed, HiLogout, HiX } from 'react-icons/hi';
+import { useState, useEffect } from 'react';
+import { HiSearch, HiBell, HiSun, HiMoon, HiLockClosed, HiLogout, HiX, HiChevronRight, HiCheck, HiExclamation } from 'react-icons/hi';
 
-export default function Header({
-  role,
-  userProfile,
-  theme,
-  onToggleTheme,
-  notifications,
-  onClearNotifications,
-  onLogout,
-  onChangePassword,
-  addLog
-}) {
+const breadcrumbMap = {
+  home: ['Trang chủ'],
+  path: ['Trang chủ', 'Lộ trình AI'],
+  courses: ['Trang chủ', 'Kho khóa học'],
+  tests: ['Trang chủ', 'Kiểm tra trực tuyến'],
+  forum: ['Trang chủ', 'Diễn đàn'],
+  'ai-qa': ['Trang chủ', 'Hỏi đáp AI'],
+  library: ['Trang chủ', 'Thư viện'],
+  settings: ['Trang chủ', 'Cài đặt'],
+  users: ['Quản trị', 'Tài khoản'],
+  courses_admin: ['Quản trị', 'Phê duyệt khóa học'],
+  announcements: ['Quản trị', 'Thông báo'],
+  finance: ['Quản trị', 'Tài chính'],
+  'ai-config': ['Quản trị', 'Cấu hình AI'],
+};
+
+function getTimeOfDay() {
+  const h = new Date().getHours();
+  if (h < 12) return { greet: 'Chào buổi sáng', emoji: '🌤️' };
+  if (h < 17) return { greet: 'Chào buổi chiều', emoji: '☀️' };
+  return { greet: 'Chào buổi tối', emoji: '🌙' };
+}
+
+export default function Header({ role, userProfile, theme, onToggleTheme, notifications, onClearNotifications, onLogout, onChangePassword, addLog, activeTab }) {
   const [showNotif, setShowNotif] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showChangePassModal, setShowChangePassModal] = useState(false);
+  const [searchVal, setSearchVal] = useState('');
+  const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Password change states
   const [oldPass, setOldPass] = useState('');
   const [newPass, setNewPass] = useState('');
   const [confirmNewPass, setConfirmNewPass] = useState('');
+  const [passMsg, setPassMsg] = useState(null);
 
-  const getGreeting = () => {
-    if (role === 'admin') return 'Chào Quản trị viên! 🛡️';
-    if (role === 'teacher') return `Kính chào Thầy/Cô ${userProfile?.name}! 🎓`;
-    return `Chào lại, ${userProfile?.name}! 👋`;
-  };
+  useEffect(() => {
+    const t = setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => clearInterval(t);
+  }, []);
 
-  const getSubtitle = () => {
-    if (role === 'admin') return 'Hệ thống đang hoạt động ổn định.';
-    if (role === 'teacher') return 'Hôm nay Thầy/Cô muốn chuẩn bị học liệu nào?';
-    return 'Hôm nay bạn muốn chinh phục kiến thức nào?';
-  };
-
+  const { greet, emoji } = getTimeOfDay();
   const unreadCount = notifications.filter(n => !n.read).length;
+  const crumbs = breadcrumbMap[activeTab] || ['Trang chủ'];
+
+  const formatTime = (d) => d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  const formatDate = (d) => d.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
 
   const handlePasswordChange = (e) => {
     e.preventDefault();
-    if (!oldPass || !newPass || !confirmNewPass) return;
-    if (newPass.length < 6) {
-      alert('Mật khẩu mới phải từ 6 ký tự trở lên!');
-      return;
-    }
-    if (newPass !== confirmNewPass) {
-      alert('Xác nhận mật khẩu mới không khớp!');
-      return;
-    }
+    if (newPass.length < 6) { setPassMsg({ type: 'error', text: 'Mật khẩu mới phải từ 6 ký tự!' }); return; }
+    if (newPass !== confirmNewPass) { setPassMsg({ type: 'error', text: 'Mật khẩu xác nhận không khớp!' }); return; }
     onChangePassword(oldPass, newPass);
-    setOldPass('');
-    setNewPass('');
-    setConfirmNewPass('');
-    setShowChangePassModal(false);
+    setPassMsg({ type: 'success', text: 'Đổi mật khẩu thành công!' });
+    setTimeout(() => { setOldPass(''); setNewPass(''); setConfirmNewPass(''); setPassMsg(null); setShowChangePassModal(false); }, 1200);
   };
 
+  const closeAll = () => { setShowNotif(false); setShowProfileMenu(false); };
+
   return (
-    <div className="main-header animate-in" style={{ position: 'relative' }}>
-      <div>
-        <h2>{getGreeting()}</h2>
-        <p>{getSubtitle()}</p>
-      </div>
-
-      <div className="header-actions">
-        {role === 'student' && (
-          <div className="search-box">
-            <HiSearch className="search-icon" />
-            <input type="text" placeholder="Tìm kiếm bài học, bài tập..." />
+    <>
+      <div className="main-header-v2 animate-in">
+        {/* Left: Breadcrumb + Greeting */}
+        <div className="header-left">
+          <div className="header-breadcrumb">
+            {crumbs.map((c, i) => (
+              <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                {i > 0 && <HiChevronRight style={{ color: 'var(--text-muted)', fontSize: 12 }} />}
+                <span style={{ color: i === crumbs.length - 1 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: i === crumbs.length - 1 ? 600 : 400 }}>{c}</span>
+              </span>
+            ))}
           </div>
-        )}
-
-        {/* Theme Switcher Toggle */}
-        <button
-          className="header-icon-btn"
-          onClick={onToggleTheme}
-          title={theme === 'dark' ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối'}
-        >
-          {theme === 'dark' ? <HiSun style={{ color: '#FFD700' }} /> : <HiMoon style={{ color: '#6C5CE7' }} />}
-        </button>
-
-        {/* Notification Bell */}
-        <button
-          className="header-icon-btn"
-          onClick={() => {
-            setShowNotif(!showNotif);
-            setShowProfileMenu(false);
-          }}
-          id="notifications-btn"
-        >
-          <HiBell />
-          {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
-        </button>
-
-        {/* User initials or uploaded image triggering profile menu */}
-        {userProfile?.avatar && (userProfile.avatar.startsWith('data:') || userProfile.avatar.startsWith('http') || userProfile.avatar.length > 10) ? (
-          <img
-            src={userProfile.avatar.startsWith('data:') || userProfile.avatar.startsWith('http') ? userProfile.avatar : `data:image/png;base64,${userProfile.avatar}`}
-            alt="Avatar"
-            className="header-avatar"
-            style={{
-              width: '36px', height: '36px', borderRadius: '50%',
-              objectFit: 'cover', cursor: 'pointer', border: userProfile?.isPro ? '2px solid #FFA751' : '1px solid var(--border)',
-              boxShadow: userProfile?.isPro ? '0 0 8px rgba(255, 226, 89, 0.4)' : 'none'
-            }}
-            onClick={() => {
-              setShowProfileMenu(!showProfileMenu);
-              setShowNotif(false);
-            }}
-          />
-        ) : (
-          <div
-            className="header-avatar"
-            style={{
-              background: userProfile?.isPro 
-                ? 'linear-gradient(135deg, #FFE259, #FFA751)' 
-                : (role === 'admin' ? '#E74C3C' : (role === 'teacher' ? '#0984E3' : '#6C5CE7')),
-              boxShadow: userProfile?.isPro ? '0 0 8px rgba(255, 226, 89, 0.4)' : 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 'bold'
-            }}
-            onClick={() => {
-              setShowProfileMenu(!showProfileMenu);
-              setShowNotif(false);
-            }}
-          >
-            {userProfile?.avatar && userProfile.avatar.length <= 10 ? userProfile.avatar : (userProfile?.name ? userProfile.name.slice(0, 2).toUpperCase() : 'U')}
+          <div className="header-greeting">
+            <span className="header-greeting-emoji">{emoji}</span>
+            <div>
+              <h2>
+                {role === 'admin' ? 'Xin chào, Quản trị viên!' :
+                 role === 'teacher' ? `Kính chào Thầy/Cô ${userProfile?.name?.split(' ').slice(-1)[0]}!` :
+                 `${greet}, ${userProfile?.name?.split(' ').slice(-1)[0] || 'bạn'}!`}
+              </h2>
+              <p>
+                {role === 'admin' ? 'Hệ thống đang hoạt động ổn định. Chào mừng trở lại.' :
+                 role === 'teacher' ? 'Hôm nay Thầy/Cô muốn tạo bài học gì?' :
+                 'Hôm nay bạn muốn chinh phục kiến thức nào?'}
+              </p>
+            </div>
           </div>
-        )}
+        </div>
 
-        {/* Notification Dropdown Drawer */}
-        {showNotif && (
-          <div
-            style={{
-              position: 'absolute', top: '55px', right: '60px',
-              width: '320px', background: 'var(--bg-card)',
-              backdropFilter: 'blur(12px)',
-              WebkitBackdropFilter: 'blur(12px)',
-              border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)',
-              boxShadow: 'var(--shadow-lg)', zIndex: 2000, padding: '16px',
-              animation: 'fadeInUp 0.2s ease forwards'
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
-              <span style={{ fontSize: '12px', fontWeight: 'bold' }}>THÔNG BÁO ({unreadCount})</span>
-              {unreadCount > 0 && (
-                <button
-                  onClick={() => {
-                    onClearNotifications();
-                    setShowNotif(false);
-                  }}
-                  style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}
-                >
-                  Đọc tất cả
+        {/* Right: Actions */}
+        <div className="header-right">
+          {/* Date/Time chip */}
+          <div className="header-datetime">
+            <span className="header-time">{formatTime(currentTime)}</span>
+            <span className="header-date">{formatDate(currentTime)}</span>
+          </div>
+
+          {/* Search */}
+          {role === 'student' && (
+            <div className={`header-search ${searchVal ? 'focused' : ''}`}>
+              <HiSearch className="search-icon" />
+              <input
+                type="text"
+                placeholder="Tìm bài học, đề thi..."
+                value={searchVal}
+                onChange={e => setSearchVal(e.target.value)}
+              />
+              {searchVal && (
+                <button onClick={() => setSearchVal('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0, display: 'flex' }}>
+                  <HiX style={{ fontSize: 14 }} />
                 </button>
               )}
             </div>
+          )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '240px', overflowY: 'auto', paddingRight: '4px' }}>
-              {notifications.length > 0 ? (
-                notifications.map((n) => (
-                  <div
-                    key={n.id}
-                    style={{
-                      padding: '8px 10px', borderRadius: '4px',
-                      background: n.read ? 'transparent' : 'var(--primary-bg)',
-                      borderLeft: n.read ? 'none' : '3px solid var(--primary)',
-                      fontSize: '11.5px', lineHeight: '1.4'
-                    }}
-                  >
-                    <p style={{ color: 'var(--text-primary)', fontWeight: n.read ? 'normal' : '600' }}>{n.text}</p>
-                    <span style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>{n.time}</span>
+          {/* Theme */}
+          <button className="header-icon-btn" onClick={onToggleTheme} title={theme === 'dark' ? 'Sáng' : 'Tối'}>
+            {theme === 'dark' ? <HiSun style={{ color: '#FFD700' }} /> : <HiMoon style={{ color: '#6C5CE7' }} />}
+          </button>
+
+          {/* Notifications */}
+          <div style={{ position: 'relative' }}>
+            <button
+              className={`header-icon-btn ${unreadCount > 0 ? 'has-notif' : ''}`}
+              onClick={() => { setShowNotif(v => !v); setShowProfileMenu(false); }}
+            >
+              <HiBell />
+              {unreadCount > 0 && <span className="notif-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+            </button>
+
+            {showNotif && (
+              <div className="notif-panel animate-in" onClick={e => e.stopPropagation()}>
+                <div className="notif-panel-header">
+                  <div>
+                    <strong>Thông báo</strong>
+                    {unreadCount > 0 && <span className="notif-count-pill">{unreadCount} mới</span>}
                   </div>
-                ))
-              ) : (
-                <p style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', padding: '16px 0' }}>Không có thông báo mới.</p>
-              )}
-            </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {unreadCount > 0 && (
+                      <button className="notif-action-btn" onClick={() => { onClearNotifications(); }}>
+                        <HiCheck style={{ marginRight: 3 }} /> Đọc hết
+                      </button>
+                    )}
+                    <button className="notif-action-btn icon-only" onClick={() => setShowNotif(false)}><HiX /></button>
+                  </div>
+                </div>
+                <div className="notif-list">
+                  {notifications.length === 0 ? (
+                    <div className="notif-empty">
+                      <div style={{ fontSize: 32 }}>🔔</div>
+                      <p>Chưa có thông báo nào</p>
+                    </div>
+                  ) : (
+                    notifications.slice(0, 8).map(n => (
+                      <div key={n.id} className={`notif-item ${n.read ? '' : 'unread'}`}>
+                        <div className="notif-dot" style={{ opacity: n.read ? 0 : 1 }} />
+                        <div className="notif-body">
+                          <p>{n.text}</p>
+                          <span>{n.time}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
           </div>
-        )}
 
-        {/* User Profile dropdown menu */}
-        {showProfileMenu && (
-          <div className="profile-dropdown-card" style={{ right: '10px', top: '55px' }}>
-            <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: '8px', marginBottom: '8px' }}>
-              <div style={{ fontWeight: 'bold', fontSize: '13px' }}>{userProfile?.name}</div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{userProfile?.email}</div>
-            </div>
+          {/* Avatar + Profile Menu */}
+          <div style={{ position: 'relative' }}>
             <button
-              className="dropdown-item"
-              onClick={() => {
-                setShowChangePassModal(true);
-                setShowProfileMenu(false);
-              }}
+              className="header-avatar-btn"
+              onClick={() => { setShowProfileMenu(v => !v); setShowNotif(false); }}
+              style={{ '--role-color': role === 'admin' ? '#E74C3C' : role === 'teacher' ? '#0984E3' : '#6C5CE7' }}
             >
-              <HiLockClosed /> Đổi mật khẩu
+              {userProfile?.avatar && (userProfile.avatar.startsWith('http') || userProfile.avatar.startsWith('data:')) ? (
+                <img src={userProfile.avatar} alt="" />
+              ) : (
+                <span>{userProfile?.name ? userProfile.name.slice(0, 2).toUpperCase() : 'U'}</span>
+              )}
+              {userProfile?.isPro && <span className="pro-ring" />}
             </button>
-            <button
-              className="dropdown-item"
-              style={{ color: 'var(--accent-red)' }}
-              onClick={() => {
-                onLogout();
-                setShowProfileMenu(false);
-              }}
-            >
-              <HiLogout /> Đăng xuất an toàn
-            </button>
+
+            {showProfileMenu && (
+              <div className="profile-menu animate-in" onClick={e => e.stopPropagation()}>
+                <div className="profile-menu-header">
+                  <div className="pm-avatar" style={{ background: role === 'admin' ? '#E74C3C' : role === 'teacher' ? '#0984E3' : '#6C5CE7' }}>
+                    {userProfile?.name ? userProfile.name.slice(0, 2).toUpperCase() : 'U'}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>{userProfile?.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{userProfile?.email}</div>
+                    {userProfile?.isPro && <span className="pm-pro-badge">⭐ PRO</span>}
+                  </div>
+                </div>
+                <div className="profile-menu-divider" />
+                <button className="profile-menu-item" onClick={() => { setShowChangePassModal(true); setShowProfileMenu(false); }}>
+                  <HiLockClosed /> Đổi mật khẩu
+                </button>
+                <button className="profile-menu-item danger" onClick={() => { onLogout(); setShowProfileMenu(false); }}>
+                  <HiLogout /> Đăng xuất
+                </button>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
-      {/* UC-04 Change Password Modal */}
+      {/* Click outside to close */}
+      {(showNotif || showProfileMenu) && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 999 }} onClick={closeAll} />
+      )}
+
+      {/* Change Password Modal */}
       {showChangePassModal && (
-        <div className="checkout-overlay">
-          <div className="checkout-modal animate-in" style={{ maxWidth: '400px' }}>
-            <button
-              onClick={() => setShowChangePassModal(false)}
-              style={{ position: 'absolute', top: '16px', right: '16px', border: 'none', background: 'none', color: 'var(--text-secondary)', fontSize: '20px', cursor: 'pointer' }}
-            >
-              <HiX />
-            </button>
-            <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '16px' }}>ĐỔI MẬT KHẨU BẢO MẬT (UC-04)</h3>
-            <form onSubmit={handlePasswordChange} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div className="form-group">
-                <label style={{ fontSize: '11.5px', fontWeight: '600' }}>Mật khẩu hiện tại:</label>
-                <input
-                  type="password"
-                  className="form-control"
-                  value={oldPass}
-                  onChange={e => setOldPass(e.target.value)}
-                  required
-                />
+        <div className="modal-overlay">
+          <div className="modal-box animate-in" style={{ maxWidth: 420 }}>
+            <div className="modal-header">
+              <h3>🔒 Đổi mật khẩu bảo mật</h3>
+              <button className="modal-close" onClick={() => setShowChangePassModal(false)}><HiX /></button>
+            </div>
+            <form onSubmit={handlePasswordChange} className="modal-body">
+              {passMsg && (
+                <div className={`form-msg ${passMsg.type}`}>
+                  {passMsg.type === 'error' ? <HiExclamation /> : <HiCheck />} {passMsg.text}
+                </div>
+              )}
+              <div className="form-field">
+                <label>Mật khẩu hiện tại</label>
+                <input type="password" className="form-control" value={oldPass} onChange={e => setOldPass(e.target.value)} required placeholder="••••••••" />
               </div>
-              <div className="form-group">
-                <label style={{ fontSize: '11.5px', fontWeight: '600' }}>Mật khẩu mới:</label>
-                <input
-                  type="password"
-                  className="form-control"
-                  value={newPass}
-                  onChange={e => setNewPass(e.target.value)}
-                  required
-                />
+              <div className="form-field">
+                <label>Mật khẩu mới</label>
+                <input type="password" className="form-control" value={newPass} onChange={e => setNewPass(e.target.value)} required placeholder="Tối thiểu 6 ký tự" />
               </div>
-              <div className="form-group">
-                <label style={{ fontSize: '11.5px', fontWeight: '600' }}>Xác nhận mật khẩu mới:</label>
-                <input
-                  type="password"
-                  className="form-control"
-                  value={confirmNewPass}
-                  onChange={e => setConfirmNewPass(e.target.value)}
-                  required
-                />
+              <div className="form-field">
+                <label>Xác nhận mật khẩu mới</label>
+                <input type="password" className="form-control" value={confirmNewPass} onChange={e => setConfirmNewPass(e.target.value)} required placeholder="Nhập lại mật khẩu mới" />
               </div>
-              <button type="submit" className="btn-primary" style={{ width: '100%', marginTop: '6px' }}>
-                Cập nhật mật khẩu mới
+              <button type="submit" className="btn-primary" style={{ width: '100%', marginTop: 8, padding: '12px' }}>
+                Cập nhật mật khẩu
               </button>
             </form>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

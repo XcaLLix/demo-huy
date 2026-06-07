@@ -772,6 +772,7 @@ export default function App() {
               onLogout={handleLogout}
               onChangePassword={handleChangePassword}
               addLog={addLog}
+              activeTab={activeTab}
             />
           ) : (
             // Minimal Header for Guests
@@ -821,112 +822,227 @@ export default function App() {
 
             <div>
               {activeTab === 'home' && (
-                <div>
-                  {/* Welcome stats row */}
-                  <div className="dashboard-stats-row animate-in">
-                    <div className="dash-stat-card">
-                      <div className="dash-stat-icon" style={{ background: 'rgba(108,92,231,0.12)', color: 'var(--primary)' }}>🎯</div>
-                      <div>
-                        <div className="dash-stat-value">27+</div>
-                        <div className="dash-stat-label">Điểm mục tiêu</div>
+                <div className="student-home animate-in">
+
+                  {/* ── Hero Welcome Banner ── */}
+                  <div className="hero-banner">
+                    <div className="hero-banner-bg" />
+                    <div className="hero-banner-content">
+                      <div className="hero-left">
+                        <div className="hero-tag">✨ Hệ thống học tập AI cá nhân hóa</div>
+                        <h2 className="hero-title">
+                          Chào mừng trở lại, <span>{currentUser?.name?.split(' ').slice(-1)[0] || 'bạn'}!</span>
+                        </h2>
+                        <p className="hero-sub">
+                          Khối <strong>{currentUser?.combo || 'A01'}</strong> · Mục tiêu{' '}
+                          <strong>{currentUser?.targetScore || '27+'} điểm THPTQG</strong> ·{' '}
+                          Còn <strong>180 ngày</strong> đến kỳ thi
+                        </p>
+                        <div className="hero-actions">
+                          <button className="btn-hero-primary" onClick={() => setActiveTab('path')}>
+                            🗺️ Xem lộ trình AI
+                          </button>
+                          <button className="btn-hero-secondary" onClick={() => setActiveTestSimulator('Đề Khảo sát Hàm số Chương I')}>
+                            ✏️ Làm bài thi ngay
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                    <div className="dash-stat-card">
-                      <div className="dash-stat-icon" style={{ background: 'rgba(243,156,18,0.12)', color: 'var(--accent-orange)' }}>🔥</div>
-                      <div>
-                        <div className="dash-stat-value">7 ngày</div>
-                        <div className="dash-stat-label">Học liên tiếp</div>
-                      </div>
-                    </div>
-                    <div className="dash-stat-card">
-                      <div className="dash-stat-icon" style={{ background: 'rgba(0,184,148,0.12)', color: 'var(--accent-green)' }}>📈</div>
-                      <div>
-                        <div className="dash-stat-value">72%</div>
-                        <div className="dash-stat-label">Tiến độ lộ trình</div>
-                      </div>
-                    </div>
-                    <div className="dash-stat-card">
-                      <div className="dash-stat-icon" style={{ background: 'rgba(9,132,227,0.12)', color: 'var(--accent-blue)' }}>⏰</div>
-                      <div>
-                        <div className="dash-stat-value">180 ngày</div>
-                        <div className="dash-stat-label">Đến kỳ thi</div>
+                      <div className="hero-right">
+                        <div className="hero-progress-ring">
+                          <svg width="120" height="120" viewBox="0 0 120 120">
+                            <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="8" />
+                            <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="8"
+                              strokeDasharray={`${2 * Math.PI * 52 * 0.72} ${2 * Math.PI * 52 * 0.28}`}
+                              strokeDashoffset={2 * Math.PI * 52 * 0.25}
+                              strokeLinecap="round" />
+                          </svg>
+                          <div className="ring-inner">
+                            <span className="ring-value">72%</span>
+                            <span className="ring-label">Lộ trình</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="dashboard-main-grid">
+                  {/* ── Quick Stats Row ── */}
+                  <div className="stats-row">
+                    {[
+                      { icon: '🔥', value: '7', unit: 'ngày', label: 'Streak học liên tiếp', color: '#E17055', bg: 'rgba(225,112,85,0.1)', trend: '+2 so với tuần trước' },
+                      { icon: '📊', value: '8.2', unit: '/10', label: 'Điểm TB bài kiểm tra', color: '#0984E3', bg: 'rgba(9,132,227,0.1)', trend: '↑ +0.4 điểm' },
+                      { icon: '📚', value: '3', unit: 'khóa', label: 'Đang theo học', color: '#6C5CE7', bg: 'rgba(108,92,231,0.1)', trend: '1 khóa sắp xong' },
+                      { icon: '⏱️', value: '4.5', unit: 'giờ', label: 'Học tập tuần này', color: '#00B894', bg: 'rgba(0,184,148,0.1)', trend: '↑ +1.2h so với tuần trước' },
+                    ].map((s, i) => (
+                      <div key={i} className="stat-card-v2" style={{ '--stat-color': s.color, '--stat-bg': s.bg }}>
+                        <div className="stat-icon-v2">{s.icon}</div>
+                        <div className="stat-body">
+                          <div className="stat-value-v2">{s.value}<span className="stat-unit">{s.unit}</span></div>
+                          <div className="stat-label-v2">{s.label}</div>
+                          <div className="stat-trend">{s.trend}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* ── Main Grid ── */}
+                  <div className="home-grid">
+
                     {/* Left column */}
-                    <div>
-                      <div className="card learning-path animate-in">
-                        <div className="card-header">
-                          <h3>LỘ TRÌNH HỌC TẬP AI</h3>
-                          <button className="link" onClick={() => setActiveTab('path')} style={{ background: 'none', border: 'none', font: 'inherit', color: 'var(--primary)', cursor: 'pointer', fontSize: '13px' }}>Xem đầy đủ →</button>
-                        </div>
-                        <div className="path-info-row" style={{ marginBottom: 16 }}>
-                          <div className="path-info">
-                            <p className="path-goal">Mục tiêu: <strong>Đạt 27+ điểm THPTQG</strong></p>
-                            <p className="path-combo">Khối: {currentUser?.combo || 'A01 (Toán – Lý – Anh)'}</p>
-                          </div>
-                        </div>
-                        <LearningPath />
-                      </div>
+                    <div className="home-col-main">
 
-                      <div className="card recommendations animate-in">
-                        <div className="card-header">
-                          <h3>ĐỀ XUẤT HÔM NAY</h3>
-                          <span className="badge-pill" style={{ background: 'var(--primary-bg)', color: 'var(--primary)', fontWeight: 'bold' }}>✨ AI gợi ý</span>
+                      {/* Today's Missions */}
+                      <div className="card-v2 animate-in">
+                        <div className="card-v2-header">
+                          <div className="card-v2-title">
+                            <span className="card-title-icon" style={{ background: 'rgba(253,203,110,0.2)', color: '#FDCB6E' }}>📋</span>
+                            Nhiệm vụ hôm nay
+                          </div>
+                          <span className="card-badge green">2/4 hoàn thành</span>
                         </div>
-                        <div className="rec-grid">
-                          <div className="rec-card" onClick={() => { const course = activeUserCourses.find(c => c.id === 1); if (course) setActiveCourseDetails(course); }}>
-                            <span className="rec-badge lesson">Bài học</span>
-                            <h4>Hàm số bậc 2 và đồ thị</h4>
-                            <p className="rec-subject">Toán học</p>
-                            <div className="rec-card-footer">
-                              <span className="rec-time">⏱ 45 phút</span>
-                              <button className="rec-play">▶</button>
+                        <div className="mission-list">
+                          {[
+                            { done: true, label: 'Xem bài giảng: Ứng dụng đạo hàm', sub: 'Toán học · 25 phút', icon: '▶️', xp: '+50 XP' },
+                            { done: true, label: 'Luyện 10 câu trắc nghiệm Đạo hàm', sub: 'Toán học · 8.5/10 điểm', icon: '✏️', xp: '+30 XP' },
+                            { done: false, label: 'Đọc tóm tắt lý thuyết Dao động cơ', sub: 'Vật lý · ~15 phút', icon: '📖', xp: '+20 XP', onClick: () => setActiveTab('library') },
+                            { done: false, label: 'Hỏi AI về bài tập khó hôm nay', sub: 'AI Tutor · Sẵn sàng 24/7', icon: '🤖', xp: '+10 XP', onClick: () => setActiveTab('ai-qa') },
+                          ].map((m, i) => (
+                            <div key={i} className={`mission-item ${m.done ? 'done' : ''}`} onClick={m.onClick} style={{ cursor: m.onClick ? 'pointer' : 'default' }}>
+                              <div className={`mission-check ${m.done ? 'checked' : ''}`}>
+                                {m.done ? '✓' : ''}
+                              </div>
+                              <div className="mission-icon">{m.icon}</div>
+                              <div className="mission-body">
+                                <div className="mission-label">{m.label}</div>
+                                <div className="mission-sub">{m.sub}</div>
+                              </div>
+                              <div className="mission-xp">{m.xp}</div>
                             </div>
-                          </div>
-                          <div className="rec-card" onClick={() => setActiveTestSimulator("Bài tập củng cố Đạo hàm")}>
-                            <span className="rec-badge exercise">Luyện tập</span>
-                            <h4>Sửa sai Khảo sát hàm số</h4>
-                            <p className="rec-subject">Toán học</p>
-                            <div className="rec-card-footer">
-                              <span className="rec-time">⏱ 5 câu</span>
-                              <button className="rec-play">▶</button>
-                            </div>
-                          </div>
-                          <div className="rec-card" onClick={() => setActiveTab('ai-qa')}>
-                            <span className="rec-badge review">AI Tutor</span>
-                            <h4>Hỏi EduBot về Dao động cơ</h4>
-                            <p className="rec-subject">Vật lý</p>
-                            <div className="rec-card-footer">
-                              <span className="rec-time">⏱ Trực tuyến</span>
-                              <button className="rec-play">💬</button>
-                            </div>
-                          </div>
+                          ))}
+                        </div>
+                        <div className="mission-progress-bar">
+                          <div style={{ width: '50%' }} />
                         </div>
                       </div>
 
+                      {/* AI Recommendations */}
+                      <div className="card-v2 animate-in">
+                        <div className="card-v2-header">
+                          <div className="card-v2-title">
+                            <span className="card-title-icon" style={{ background: 'rgba(162,155,254,0.2)', color: '#6C5CE7' }}>✨</span>
+                            AI đề xuất cho bạn
+                          </div>
+                          <span className="card-badge purple">Cập nhật hôm nay</span>
+                        </div>
+                        <div className="rec-grid-v2">
+                          {[
+                            {
+                              type: 'Bài học', typeColor: '#0984E3', title: 'Hàm số bậc 2 và đồ thị', subject: 'Toán học',
+                              time: '45 phút', icon: '🎬', progress: 60,
+                              reason: 'Bạn đang ở tuần 2 lộ trình Toán',
+                              onClick: () => { const c = activeUserCourses.find(c => c.id === 1); if (c) setActiveCourseDetails(c); }
+                            },
+                            {
+                              type: 'Luyện tập', typeColor: '#E17055', title: 'Sửa sai Khảo sát hàm số', subject: 'Toán học',
+                              time: '5 câu', icon: '✏️', progress: 0,
+                              reason: 'Điểm yếu phát hiện qua AI',
+                              onClick: () => setActiveTestSimulator('Bài tập củng cố Đạo hàm')
+                            },
+                            {
+                              type: 'AI Tutor', typeColor: '#00B894', title: 'Giải thích Dao động cơ', subject: 'Vật lý',
+                              time: 'Trực tuyến', icon: '🤖', progress: 0,
+                              reason: 'Chủ đề bạn chưa học tuần này',
+                              onClick: () => setActiveTab('ai-qa')
+                            },
+                          ].map((r, i) => (
+                            <div key={i} className="rec-card-v2" onClick={r.onClick}>
+                              <div className="rec-card-top">
+                                <span className="rec-type-badge" style={{ background: r.typeColor + '1a', color: r.typeColor }}>{r.type}</span>
+                                <span className="rec-icon">{r.icon}</span>
+                              </div>
+                              <h4 className="rec-title-v2">{r.title}</h4>
+                              <p className="rec-subject-v2">{r.subject}</p>
+                              <p className="rec-reason">💡 {r.reason}</p>
+                              {r.progress > 0 && (
+                                <div className="rec-progress">
+                                  <div style={{ width: r.progress + '%' }} />
+                                </div>
+                              )}
+                              <div className="rec-footer-v2">
+                                <span>⏱ {r.time}</span>
+                                <button className="rec-cta">Bắt đầu →</button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Progress Chart */}
                       <ProgressChart />
                     </div>
 
                     {/* Right column */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                      <StreakCard />
-                      <PerformanceCard />
-                      <UpcomingTests />
-                      <div className="card chatbot-card animate-in" onClick={() => setActiveTab('ai-qa')} style={{ cursor: 'pointer' }}>
-                        <div className="chatbot-header">
-                          <h3>Trợ lý EduBot AI</h3>
-                          <span className="ai-badge">AI</span>
+                    <div className="home-col-side">
+
+                      {/* Subject Performance */}
+                      <div className="card-v2 animate-in">
+                        <div className="card-v2-header">
+                          <div className="card-v2-title">
+                            <span className="card-title-icon" style={{ background: 'rgba(9,132,227,0.15)', color: '#0984E3' }}>📊</span>
+                            Năng lực theo môn
+                          </div>
                         </div>
-                        <p className="chatbot-question">{currentUser?.name}, hôm nay bạn muốn hỏi về kiến thức gì? Nhấp để bắt đầu!</p>
-                        <div className="chatbot-suggestions">
-                          <span className="chatbot-suggestion">Giải bài tập</span>
-                          <span className="chatbot-suggestion">Hỏi công thức</span>
+                        <div className="subject-bars">
+                          {[
+                            { subject: 'Toán học', score: 7.8, max: 10, color: '#6C5CE7', icon: '📐', status: 'Tốt' },
+                            { subject: 'Vật lý', score: 6.5, max: 10, color: '#0984E3', icon: '⚡', status: 'Cần cải thiện' },
+                            { subject: 'Tiếng Anh', score: 8.4, max: 10, color: '#00B894', icon: '🔤', status: 'Xuất sắc' },
+                          ].map((s, i) => (
+                            <div key={i} className="subject-bar-item">
+                              <div className="subject-bar-head">
+                                <span>{s.icon} {s.subject}</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span className="subject-status" style={{ color: s.score >= 8 ? '#00B894' : s.score >= 7 ? '#FDCB6E' : '#E17055' }}>{s.status}</span>
+                                  <strong style={{ color: s.color }}>{s.score}</strong>
+                                </div>
+                              </div>
+                              <div className="subject-bar-track">
+                                <div className="subject-bar-fill" style={{ width: `${(s.score / s.max) * 100}%`, background: s.color }} />
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                        <div className="chatbot-robot">🤖</div>
                       </div>
+
+                      {/* Streak */}
+                      <StreakCard />
+
+                      {/* Upcoming Tests */}
+                      <UpcomingTests />
+
+                      {/* EduBot Quick Access */}
+                      <div className="card-v2 edubot-card animate-in" onClick={() => setActiveTab('ai-qa')} style={{ cursor: 'pointer' }}>
+                        <div className="edubot-bg" />
+                        <div style={{ position: 'relative', zIndex: 1 }}>
+                          <div className="edubot-top">
+                            <div>
+                              <div className="edubot-title">Trợ lý EduBot AI</div>
+                              <div className="edubot-sub">Luôn sẵn sàng giải đáp 24/7</div>
+                            </div>
+                            <span className="ai-live-badge">● LIVE</span>
+                          </div>
+                          <p className="edubot-prompt">
+                            {currentUser?.name?.split(' ').slice(-1)[0]}, hôm nay muốn hỏi gì nào?
+                          </p>
+                          <div className="edubot-chips">
+                            <span>Giải bài tập</span>
+                            <span>Công thức</span>
+                            <span>Phân tích đề</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Performance Card */}
+                      <PerformanceCard />
                     </div>
                   </div>
                 </div>
