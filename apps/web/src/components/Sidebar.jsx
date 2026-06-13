@@ -1,171 +1,184 @@
 import {
   HiHome, HiAcademicCap, HiBookOpen, HiClipboardCheck,
-  HiLightBulb, HiClock, HiChartBar, HiCollection,
-  HiChat, HiCog, HiStar, HiArrowUp, HiDatabase, HiTerminal, HiUsers, HiTrendingUp
+  HiLightBulb, HiChartBar, HiCollection,
+  HiChat, HiCog, HiStar, HiArrowUp, HiDatabase, HiTerminal, HiUsers, HiTrendingUp,
+  HiMap, HiShieldCheck, HiBadgeCheck
 } from 'react-icons/hi';
 
-const navConfigs = {
+const navGroups = {
   student: [
-    { label: '🏠 Trang chủ', id: 'home' },
-    { label: '📚 Khóa học', id: 'courses' },
-    { label: '📝 Thi thử', id: 'tests' },
-    { label: '📈 Lộ trình học', id: 'path' },
-    { label: '🤖 AI Gia sư', id: 'ai-qa' },
-    { label: '📖 Ngân hàng đề', id: 'library' },
-    { label: '🏆 Bảng xếp hạng', id: 'leaderboard' },
-    { label: '💬 Cộng đồng', id: 'forum' }
+    {
+      groupLabel: '📖 Học tập',
+      items: [
+        { label: 'Trang chủ', id: 'home', icon: HiHome },
+        { label: 'Khóa học', id: 'courses', icon: HiAcademicCap },
+        { label: 'Lộ trình AI', id: 'path', icon: HiMap },
+      ],
+    },
+    {
+      groupLabel: '✏️ Luyện tập',
+      items: [
+        { label: 'Thi thử THPTQG', id: 'tests', icon: HiClipboardCheck },
+        { label: 'Ngân hàng đề', id: 'library', icon: HiBookOpen },
+      ],
+    },
+    {
+      groupLabel: '🌐 Cộng đồng',
+      items: [
+        { label: 'AI Gia sư', id: 'ai-qa', icon: HiLightBulb },
+        { label: 'Cộng đồng', id: 'forum', icon: HiChat },
+      ],
+    },
+    {
+      groupLabel: '🏆 Thành tích',
+      items: [
+        { label: 'Bảng xếp hạng', id: 'leaderboard', icon: HiChartBar },
+      ],
+    },
   ],
   teacher: [
-    { icon: HiHome, label: 'Quản lý khóa học', id: 'home' },
-    { icon: HiChat, label: 'Diễn đàn học tập', id: 'forum' },
-    { icon: HiDatabase, label: 'Ngân hàng câu hỏi', id: 'questions' },
-    { icon: HiChartBar, label: 'Thống kê lớp học', id: 'stats' }
+    {
+      groupLabel: 'Quản lý',
+      items: [
+        { icon: HiHome, label: 'Quản lý khóa học', id: 'home' },
+        { icon: HiChat, label: 'Diễn đàn học tập', id: 'forum' },
+        { icon: HiDatabase, label: 'Ngân hàng câu hỏi', id: 'questions' },
+        { icon: HiChartBar, label: 'Thống kê lớp học', id: 'stats' },
+      ],
+    },
   ],
   admin: [
-    { icon: HiTerminal, label: 'Nhật ký Live logs', id: 'home' },
-    { icon: HiUsers, label: 'Quản lý tài khoản', id: 'users' },
-    { icon: HiClipboardCheck, label: 'Phê duyệt khóa học', id: 'courses' },
-    { icon: HiChat, label: 'Diễn đàn học tập', id: 'forum' },
-    { icon: HiCollection, label: 'Gửi thông báo', id: 'announcements' },
-    { icon: HiTrendingUp, label: 'Thống kê tài chính', id: 'finance' },
-    { icon: HiCog, label: 'Cấu hình tham số AI', id: 'ai-config' }
-  ]
+    {
+      groupLabel: 'Hệ thống',
+      items: [
+        { icon: HiTerminal, label: 'Live Logs', id: 'home' },
+        { icon: HiUsers, label: 'Quản lý tài khoản', id: 'users' },
+        { icon: HiClipboardCheck, label: 'Phê duyệt khóa học', id: 'courses' },
+        { icon: HiChat, label: 'Diễn đàn', id: 'forum' },
+        { icon: HiCollection, label: 'Gửi thông báo', id: 'announcements' },
+        { icon: HiTrendingUp, label: 'Thống kê tài chính', id: 'finance' },
+        { icon: HiCog, label: 'Cấu hình AI', id: 'ai-config' },
+      ],
+    },
+  ],
 };
 
 export default function Sidebar({ role, active, setActive, userProfile, onLogout, onUpgradePRO }) {
-  // If guest, we do not render a sidebar or render a minimal one
   if (role === 'guest') return null;
 
-  const items = navConfigs[role] || [];
+  const groups = navGroups[role] || [];
+  const isPro = userProfile?.isPro;
 
   return (
-    <aside className="sidebar">
-      <div 
-        className="sidebar-logo" 
+    <aside className="sidebar sidebar--v2">
+      {/* Logo */}
+      <div
+        className="sidebar-logo sidebar-logo--v2"
         onClick={() => setActive('landing')}
-        style={{ cursor: 'pointer', transition: 'opacity 0.2s' }}
-        onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
-        onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-        title="Quay lại Trang chủ Công khai"
+        style={{ cursor: 'pointer' }}
+        title="Quay lại Trang chủ"
       >
-        <div className="logo-icon" style={{ background: 'linear-gradient(135deg, #6C5CE7, #FD79A8)' }}>E</div>
+        <div className="logo-icon logo-icon--v2">E</div>
         <div className="logo-text">
           <h1>EduPath AI</h1>
           <p>Học đúng hướng · Thi đúng đích</p>
         </div>
       </div>
 
-      <nav className="sidebar-nav">
-        {items.map(item => (
-          <button
-            key={item.id}
-            className={`nav-item ${active === item.id ? 'active' : ''}`}
-            onClick={() => setActive(item.id)}
-            style={role === 'student' ? { paddingLeft: '20px' } : {}}
-          >
-            {item.icon && <span className="nav-icon"><item.icon /></span>}
-            {item.label}
-          </button>
+      {/* Nav groups */}
+      <nav className="sidebar-nav sidebar-nav--v2">
+        {groups.map((group, gi) => (
+          <div key={gi} className="sidebar-nav-group">
+            <span className="sidebar-nav-group__label">{group.groupLabel}</span>
+            {group.items.map((item) => {
+              const Icon = item.icon;
+              const isActive = active === item.id;
+              return (
+                <button
+                  key={item.id}
+                  className={`nav-item nav-item--v2 ${isActive ? 'nav-item--active' : ''}`}
+                  onClick={() => setActive(item.id)}
+                  id={`sidebar-nav-${item.id}`}
+                >
+                  {Icon && (
+                    <span className="nav-item__icon">
+                      <Icon />
+                    </span>
+                  )}
+                  <span className="nav-item__label">{item.label}</span>
+                  {isActive && <span className="nav-item__indicator" />}
+                </button>
+              );
+            })}
+          </div>
         ))}
       </nav>
 
-      {role === 'student' && (
-        <div style={{ padding: '0 16px 12px 16px' }}>
-          <button
-            onClick={() => setActive('path')}
-            style={{
-              width: '100%',
-              padding: '11px',
-              background: 'linear-gradient(135deg, #6C5CE7, #8e7cf8)',
-              color: '#fff',
-              border: '2px solid #000',
-              borderRadius: '12px',
-              fontWeight: '900',
-              cursor: 'pointer',
-              boxShadow: '3px 3px 0px #000',
-              textAlign: 'center',
-              fontSize: '12.5px',
-              transition: 'all 0.15s'
-            }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translate(-1px, -1px)'; e.currentTarget.style.boxShadow = '4px 4px 0px #000'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '3px 3px 0px #000'; }}
-          >
-            [ Bắt đầu học ]
-          </button>
-        </div>
-      )}
-
-      {role === 'student' && !userProfile?.isPro && (
-        <div className="sidebar-upgrade">
-          <div className="upgrade-badge">
-            <HiStar /> Nâng cấp PRO
+      {/* PRO upgrade banner (student only, non-PRO) */}
+      {role === 'student' && !isPro && (
+        <div className="sidebar-upgrade sidebar-upgrade--v2">
+          <div className="sidebar-upgrade__icon">⭐</div>
+          <div className="sidebar-upgrade__body">
+            <strong>Nâng cấp PRO</strong>
+            <p>Mở toàn bộ AI nâng cao & lộ trình cá nhân hóa</p>
           </div>
-          <p>Trải nghiệm toàn bộ tính năng AI và lộ trình cá nhân hóa nâng cao.</p>
-          <button className="upgrade-btn" onClick={onUpgradePRO}>
-            <HiArrowUp style={{ marginRight: 4, verticalAlign: 'middle' }} />
-            Nâng cấp ngay
+          <button
+            className="sidebar-upgrade__btn"
+            onClick={onUpgradePRO}
+            id="sidebar-upgrade-pro-btn"
+          >
+            Nâng cấp
           </button>
         </div>
       )}
 
-      <div className="sidebar-user" style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      {/* User footer */}
+      <div className="sidebar-user sidebar-user--v2">
+        <div className="sidebar-user__avatar-wrap">
           {userProfile?.avatar && (userProfile.avatar.startsWith('data:') || userProfile.avatar.startsWith('http') || userProfile.avatar.length > 10) ? (
-            <img 
-              src={userProfile.avatar.startsWith('data:') || userProfile.avatar.startsWith('http') ? userProfile.avatar : `data:image/png;base64,${userProfile.avatar}`} 
-              alt="Avatar" 
-              className="user-avatar"
-              style={{ 
-                width: '40px', height: '40px', borderRadius: '50%', 
-                objectFit: 'cover', border: userProfile?.isPro ? '2px solid #FFA751' : '1px solid var(--border)',
-                boxShadow: userProfile?.isPro ? '0 0 10px rgba(255, 226, 89, 0.5)' : 'none'
-              }} 
+            <img
+              src={userProfile.avatar.startsWith('data:') || userProfile.avatar.startsWith('http') ? userProfile.avatar : `data:image/png;base64,${userProfile.avatar}`}
+              alt="Avatar"
+              className="sidebar-user__avatar-img"
             />
           ) : (
-            <div 
-              className="user-avatar" 
-              style={{ 
-                background: userProfile?.isPro 
-                  ? 'linear-gradient(135deg, #FFE259, #FFA751)' 
-                  : (role === 'admin' ? '#E74C3C' : (role === 'teacher' ? '#0984E3' : '#6C5CE7')),
-                boxShadow: userProfile?.isPro ? '0 0 10px rgba(255, 226, 89, 0.5)' : 'none',
-                fontWeight: 'bold',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
+            <div
+              className="sidebar-user__avatar-text"
+              style={{
+                background: isPro
+                  ? 'linear-gradient(135deg, #FFE259, #FFA751)'
+                  : role === 'admin' ? '#E74C3C' : role === 'teacher' ? '#0984E3' : 'linear-gradient(135deg, #7C3AED, #4F46E5)',
               }}
             >
-              {userProfile?.avatar && userProfile.avatar.length <= 10 ? userProfile.avatar : (userProfile?.name ? userProfile.name.slice(0, 2).toUpperCase() : 'U')}
+              {userProfile?.avatar && userProfile.avatar.length <= 10
+                ? userProfile.avatar
+                : (userProfile?.name ? userProfile.name.slice(0, 2).toUpperCase() : 'U')}
             </div>
           )}
-          <div className="user-info">
-            <h4 style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '140px', color: userProfile?.isPro ? '#FFA751' : 'inherit' }}>
-              {userProfile?.name || 'Tài khoản'}
-            </h4>
-            <p style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontSize: '11px', fontWeight: userProfile?.isPro ? 'bold' : 'normal', color: userProfile?.isPro ? '#FFA751' : 'var(--text-secondary)' }}>
-              {role === 'student' 
-                ? (userProfile?.isPro ? '⭐ HỌC VIÊN PRO' : `Lớp ${userProfile?.grade} – ${userProfile?.combo}`) 
-                : role.toUpperCase()}
-            </p>
-          </div>
+          {isPro && <span className="sidebar-user__pro-badge">PRO</span>}
         </div>
+
+        <div className="sidebar-user__info">
+          <h4
+            className="sidebar-user__name"
+            style={{ color: isPro ? '#FFA751' : 'var(--text-main)' }}
+          >
+            {userProfile?.name || 'Tài khoản'}
+          </h4>
+          <p className="sidebar-user__role">
+            {role === 'student'
+              ? (isPro ? '⭐ HỌC VIÊN PRO' : `Lớp ${userProfile?.grade || 12} · ${userProfile?.combo || 'A01'}`)
+              : role.toUpperCase()}
+          </p>
+        </div>
+
         <button
+          className="sidebar-user__logout"
           onClick={onLogout}
-          style={{
-            width: '100%', padding: '6px', border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-sm)', background: 'none', color: 'var(--text-secondary)',
-            fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s'
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.borderColor = 'var(--accent-red)';
-            e.currentTarget.style.color = 'var(--accent-red)';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.borderColor = 'var(--border)';
-            e.currentTarget.style.color = 'var(--text-secondary)';
-          }}
+          title="Đăng xuất"
+          id="sidebar-logout-btn"
         >
-          Đăng xuất an toàn
+          ⏻
         </button>
       </div>
     </aside>
