@@ -820,3 +820,503 @@
     gap: 8px;
   }
 }
+
+/* ============================================================
+   AI ADVISOR & ROADMAP ADDITIONS
+   ============================================================ */
+.exambank-ai-card {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, rgba(139, 92, 246, 0.06) 100%);
+  border: 2px dashed #c084fc;
+  border-radius: 20px;
+  padding: 24px;
+  max-width: 800px;
+  margin: 0 auto 32px;
+  text-align: left;
+  box-shadow: 0 8px 30px rgba(139, 92, 246, 0.05);
+  backdrop-filter: blur(8px);
+}
+
+.exambank-ai-card__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.exambank-ai-card__title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #6d28d9;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.exambank-ai-card__desc {
+  font-size: 13.5px;
+  color: #4b5563;
+  line-height: 1.5;
+  margin: 0 0 16px;
+}
+
+.exambank-ai-card__input-wrapper {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.exambank-ai-card__input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 2px solid #e9d5ff;
+  border-radius: 12px;
+  font-size: 14px;
+  background: white;
+  color: #1f2937;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.exambank-ai-card__input:focus {
+  border-color: #a855f7;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15);
+}
+
+.exambank-ai-card__btn-submit {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #7c3aed, #9333ea);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.exambank-ai-card__btn-submit:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+}
+
+.exambank-ai-card__quick-prompts {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.exambank-ai-card__quick-prompt-btn {
+  background: white;
+  border: 1px solid #f3e8ff;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  color: #7c3aed;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.exambank-ai-card__quick-prompt-btn:hover {
+  background: #f3e8ff;
+  border-color: #d8b4fe;
+}
+
+/* ---------- AI Recommendation Result ---------- */
+.exambank-ai-result {
+  background: white;
+  border: 2px solid #ddd6fe;
+  border-radius: 20px;
+  padding: 24px;
+  margin-top: 16px;
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.08);
+  animation: exambank-slideUp 0.3s ease;
+  text-align: left;
+}
+
+.exambank-ai-result__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #f3e8ff;
+  padding-bottom: 12px;
+  margin-bottom: 20px;
+}
+
+.exambank-ai-result__title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #1e1b4b;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.exambank-ai-result__btn-close {
+  background: #f3e8ff;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #7c3aed;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.exambank-ai-result__btn-close:hover {
+  background: #e9d5ff;
+}
+
+.exambank-ai-result__body {
+  display: grid;
+  grid-template-columns: 1.2fr 1.8fr;
+  gap: 24px;
+}
+
+@media (max-width: 768px) {
+  .exambank-ai-result__body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.exambank-ai-result__section-title {
+  font-size: 14.5px;
+  font-weight: 800;
+  color: #4c1d95;
+  margin: 0 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.exambank-ai-result__doc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.exambank-ai-result__doc-item {
+  background: #fdfcfa;
+  border: 1.5px solid #ede8dc;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.exambank-ai-result__doc-item:hover {
+  border-color: #8b5cf6;
+  background: #faf5ff;
+  transform: translateX(2px);
+}
+
+.exambank-ai-result__doc-info {
+  flex: 1;
+}
+
+.exambank-ai-result__doc-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1f2937;
+  line-height: 1.4;
+  margin: 0 0 3px;
+}
+
+.exambank-ai-result__doc-subject {
+  font-size: 11.5px;
+  color: #7c3aed;
+  font-weight: 600;
+}
+
+.exambank-ai-result__doc-btn {
+  background: #8b5cf6;
+  color: white;
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+/* ---------- Roadmap Steps ---------- */
+.exambank-roadmap {
+  border-left: 2px solid #ddd6fe;
+  padding-left: 20px;
+  margin-left: 10px;
+  position: relative;
+}
+
+.exambank-roadmap__step {
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.exambank-roadmap__step:last-child {
+  margin-bottom: 0;
+}
+
+.exambank-roadmap__dot {
+  position: absolute;
+  left: -27px;
+  top: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #8b5cf6;
+  border: 2px solid white;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+}
+
+.exambank-roadmap__step-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e1b4b;
+  margin: 0 0 4px;
+}
+
+.exambank-roadmap__step-detail {
+  font-size: 12.5px;
+  color: #4b5563;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ---------- Modal AI Chat Tab ---------- */
+.exambank-modal-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1.5px solid #f0ebe1;
+  margin-bottom: 20px;
+}
+
+.exambank-modal-tab {
+  padding: 10px 20px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 700;
+  color: #64748b;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s;
+}
+
+.exambank-modal-tab:hover {
+  color: #1a1a2e;
+}
+
+.exambank-modal-tab--active {
+  color: #059669;
+}
+
+.exambank-modal-tab--active::after {
+  content: '';
+  position: absolute;
+  bottom: -1.5px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #059669;
+  border-radius: 2px;
+}
+
+/* ---------- Chatbot Panel ---------- */
+.exambank-chat {
+  display: flex;
+  flex-direction: column;
+  height: 420px;
+  border: 1.5px solid #e8e2d6;
+  border-radius: 16px;
+  background: #faf9f6;
+  overflow: hidden;
+}
+
+.exambank-chat__history {
+  flex: 1;
+  padding: 18px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: #fdfcfa;
+}
+
+.exambank-chat__bubble {
+  max-width: 85%;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.exambank-chat__bubble--user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.exambank-chat__bubble--assistant {
+  align-self: flex-start;
+}
+
+.exambank-chat__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.exambank-chat__bubble--user .exambank-chat__avatar {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.exambank-chat__bubble--assistant .exambank-chat__avatar {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.exambank-chat__msg-content {
+  padding: 12px 16px;
+  border-radius: 14px;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.exambank-chat__bubble--user .exambank-chat__msg-content {
+  background: #059669;
+  color: white;
+  border-top-right-radius: 2px;
+}
+
+.exambank-chat__bubble--assistant .exambank-chat__msg-content {
+  background: white;
+  color: #1a1a2e;
+  border: 1px solid #e8e2d6;
+  border-top-left-radius: 2px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+  text-align: left;
+}
+
+.exambank-chat__msg-list {
+  padding-left: 20px;
+  margin: 8px 0 0;
+  list-style-type: disc;
+}
+
+.exambank-chat__msg-list li {
+  margin-bottom: 6px;
+}
+
+.exambank-chat__msg-list li:last-child {
+  margin-bottom: 0;
+}
+
+.exambank-chat__suggestions {
+  padding: 10px 18px;
+  background: #f8fafc;
+  border-top: 1px dashed #e2e8f0;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.exambank-chat__suggestion-btn {
+  background: white;
+  border: 1.5px solid #cbd5e1;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 600;
+}
+
+.exambank-chat__suggestion-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #1e293b;
+}
+
+.exambank-chat__form {
+  display: flex;
+  padding: 12px 18px;
+  background: white;
+  border-top: 1.5px solid #e8e2d6;
+  gap: 8px;
+}
+
+.exambank-chat__input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 13.5px;
+  outline: none;
+  background: #faf8f4;
+  color: #1a1a2e;
+  transition: all 0.2s;
+}
+
+.exambank-chat__input:focus {
+  border-color: #059669;
+  background: white;
+}
+
+.exambank-chat__btn-send {
+  padding: 10px 16px;
+  background: #059669;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 13.5px;
+  transition: background 0.2s;
+}
+
+.exambank-chat__btn-send:hover {
+  background: #047857;
+}
+
+/* ---------- Loading Dots Animation ---------- */
+.exambank-chat__dots {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  height: 20px;
+}
+
+.exambank-chat__dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #94a3b8;
+  animation: exambank-bounce 1.4s infinite ease-in-out both;
+}
+
+.exambank-chat__dots span:nth-child(1) { animation-delay: -0.32s; }
+.exambank-chat__dots span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes exambank-bounce {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1.0); }
+}
