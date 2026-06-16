@@ -656,7 +656,7 @@ export async function generateAiCoach(req: AuthRequest, res: Response) {
       difficultyStats = (attempt.difficultyStats as any) || {};
       weakTopics = Object.keys(topicStats).filter(t => (topicStats[t].accuracy || 0) < 0.6);
       strongTopics = Object.keys(topicStats).filter(t => (topicStats[t].accuracy || 0) >= 0.8);
-      incorrectAnswers = attempt.attemptAnswers.filter(ans => !ans.isCorrect);
+      incorrectAnswers = attempt.attemptAnswers.filter((ans: any) => !ans.isCorrect);
       examTitle = attempt.exam.title;
       examSubject = attempt.exam.subject;
       score = attempt.score || 0;
