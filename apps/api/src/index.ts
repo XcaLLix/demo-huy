@@ -19,6 +19,9 @@ import { getDocumentResources, getDocumentComments, addDocumentComment } from '.
 import { createVNPayPayment, vnpayWebhook, sepayWebhook, checkEnrollmentStatus, checkUserProStatus } from './controllers/payment.js';
 import { authenticateJWT, requireRole } from './middleware/auth.js';
 import { getAdminStats, getAdminUsers, toggleUserBan, getAdminLeads, createAdminLead, updateAdminLeadStatus, getFeatureFlags, toggleFeatureFlag, getUserDetail, blockUser, unblockUser } from './controllers/admin.js';
+import { getTeacherStats, getAdminTeachers, getTeacherDetail, createTeacherAccount, approveTeacherProfile, rejectTeacherProfile, blockTeacher, unblockTeacher } from './controllers/adminTeachers.js';
+import { getAdminCoursesStats, getAdminCourses, getAdminCourseDetail, approveCourse, rejectCourse, hideCourse, showCourse } from './controllers/adminCourses.js';
+
 import { getLeaderboardRankings, getActivityHeatmap } from './controllers/gamification.js';
 import {
   getCategories, createCategory, deleteCategory,
@@ -114,6 +117,26 @@ app.post('/admin/leads', authenticateJWT, createAdminLead);
 app.put('/admin/leads/:id/status', authenticateJWT, requireRole(['ADMIN']), updateAdminLeadStatus);
 app.get('/admin/features', getFeatureFlags);
 app.post('/admin/features/:id/toggle', authenticateJWT, requireRole(['ADMIN']), toggleFeatureFlag);
+
+// Admin Teacher Management Routes
+app.get('/admin/teachers/statistics', authenticateJWT, requireRole(['ADMIN']), getTeacherStats);
+app.get('/admin/teachers', authenticateJWT, requireRole(['ADMIN']), getAdminTeachers);
+app.get('/admin/teachers/:id', authenticateJWT, requireRole(['ADMIN']), getTeacherDetail);
+app.post('/admin/teachers', authenticateJWT, requireRole(['ADMIN']), createTeacherAccount);
+app.patch('/admin/teachers/:id/approve', authenticateJWT, requireRole(['ADMIN']), approveTeacherProfile);
+app.patch('/admin/teachers/:id/reject', authenticateJWT, requireRole(['ADMIN']), rejectTeacherProfile);
+app.patch('/admin/teachers/:id/block', authenticateJWT, requireRole(['ADMIN']), blockTeacher);
+app.patch('/admin/teachers/:id/unblock', authenticateJWT, requireRole(['ADMIN']), unblockTeacher);
+
+// Admin Course Management Routes
+app.get('/admin/courses/statistics', authenticateJWT, requireRole(['ADMIN']), getAdminCoursesStats);
+app.get('/admin/courses', authenticateJWT, requireRole(['ADMIN']), getAdminCourses);
+app.get('/admin/courses/:id', authenticateJWT, requireRole(['ADMIN']), getAdminCourseDetail);
+app.patch('/admin/courses/:id/approve', authenticateJWT, requireRole(['ADMIN']), approveCourse);
+app.patch('/admin/courses/:id/reject', authenticateJWT, requireRole(['ADMIN']), rejectCourse);
+app.patch('/admin/courses/:id/hide', authenticateJWT, requireRole(['ADMIN']), hideCourse);
+app.patch('/admin/courses/:id/show', authenticateJWT, requireRole(['ADMIN']), showCourse);
+
 
 // Protected Course Routes
 app.get('/courses', getCourses);

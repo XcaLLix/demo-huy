@@ -86,6 +86,18 @@ export async function createCourse(req: AuthRequest, res: Response) {
   if (!teacherId) return res.status(401).json({ success: false, error: 'Chưa xác thực!' });
 
   try {
+    // Check if TeacherProfile is approved
+    const profile = await prisma.teacherProfile.findUnique({
+      where: { userId: teacherId }
+    });
+
+    if (!profile || profile.status !== 'APPROVED') {
+      return res.status(403).json({
+        success: false,
+        error: 'Hồ sơ Giáo viên của bạn chưa được duyệt! Bạn chỉ có thể tạo khóa học sau khi được Admin phê duyệt.'
+      });
+    }
+
     const newCourse = await prisma.course.create({
       data: {
         title,

@@ -147,11 +147,16 @@ export default function LearningPage({ courseId, lessonId, currentUser, onSelect
     totalLessonsCount
   );
 
-  // Check enrollment
+  // Check enrollment — Admin always has full access to all courses
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'ADMIN';
   const isOwned = useMemo(() => {
     if (!courseId) return false;
+    if (isAdmin) return true; // Admin can access all courses regardless of enrollment
     return !!(currentUser?.unlockedCourses?.includes(Number(courseId)) || currentUser?.unlockedCourses?.includes(courseId.toString()));
-  }, [currentUser, courseId]);
+  }, [currentUser, courseId, isAdmin]);
+
+  const isDemoMode = window.location.search.includes('demo=true');
+  const isLocked = !isAdmin && !isDemoMode && !isOwned && currentLesson && !currentLesson.isPreview;
 
   // Load materials & discussions for current lesson
   useEffect(() => {
@@ -216,8 +221,6 @@ export default function LearningPage({ courseId, lessonId, currentUser, onSelect
     }
   }, [currentLesson, allLessons, courseId, onSelectLesson]);
 
-  const isDemoMode = window.location.search.includes('demo=true');
-  const isLocked = !isDemoMode && !isOwned && currentLesson && !currentLesson.isPreview;
 
   const currentIdx = allLessons.findIndex(l => currentLesson && l.id.toString() === currentLesson.id.toString());
   const hasPrev = currentIdx > 0;
@@ -238,7 +241,54 @@ export default function LearningPage({ courseId, lessonId, currentUser, onSelect
     <div className="cp-page-container">
       <div className="cp-page animate-in" style={{ gap: '24px' }}>
         
-        {isDemoMode && (
+        {isAdmin && (
+          <div
+            style={{
+              background: 'linear-gradient(135deg, #6c5ce7 0%, #4c3d99 100%)',
+              color: '#ffffff',
+              padding: '14px 24px',
+              borderRadius: 'var(--radius-lg)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              boxShadow: '4px 4px 0px #000000',
+              border: '2px solid #000000',
+              flexWrap: 'wrap',
+              gap: '12px'
+            }}
+            className="animate-in"
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '20px' }}>🔐</span>
+              <div>
+                <span style={{ fontSize: '13px', fontWeight: '900', display: 'block' }}>
+                  CHẾ ĐỘ XEM THỬ (ADMIN PREVIEW)
+                </span>
+                <span style={{ fontSize: '11.5px', opacity: 0.85 }}>
+                  Bạn đang xem nội dung khóa học với tư cách Quản trị viên. Mọi hoạt động xem bài sẽ không được ghi vào hệ thống.
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => onBackToCourse('/admin')}
+              style={{
+                backgroundColor: '#ffffff',
+                color: '#4c3d99',
+                border: '2px solid #000000',
+                padding: '7px 16px',
+                borderRadius: '8px',
+                fontWeight: '900',
+                fontSize: '12px',
+                cursor: 'pointer',
+                boxShadow: '2px 2px 0px #000000'
+              }}
+            >
+              ← Về Admin Dashboard
+            </button>
+          </div>
+        )}
+
+        {isDemoMode && !isAdmin && (
           <div 
             style={{
               background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',

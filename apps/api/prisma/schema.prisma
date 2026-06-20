@@ -33,6 +33,8 @@ model User {
   roleChangeRequests RoleChangeRequest[]
   student            Student?
   teacher            Teacher?
+  teacherProfile     TeacherProfile?
+
 
   // Forum Relations
   forumPosts         ForumPost[]
@@ -89,21 +91,32 @@ model Admin {
 }
 
 model Course {
-  id           Int          @id @default(autoincrement())
-  title        String
-  description  String
-  subject      String
-  level        String?
-  price        Float
-  discount     Int          @default(0)
-  thumbnailUrl String?
-  isPublished  Boolean      @default(false)
-  isApproved   Boolean      @default(false)
-  teacherId    Int
-  teacher      Teacher      @relation(fields: [teacherId], references: [userId], onDelete: Cascade)
-  enrollments  Enrollment[]
-  lessons      Lesson[]
-  reviews      Review[]
+  id             Int              @id @default(autoincrement())
+  title          String
+  description    String
+  subject        String
+  level          String?
+  price          Float
+  discount       Int              @default(0)
+  thumbnailUrl   String?
+  isPublished    Boolean          @default(false)
+  isApproved     Boolean          @default(false)
+  teacherId      Int
+  teacher        Teacher          @relation(fields: [teacherId], references: [userId], onDelete: Cascade)
+  enrollments    Enrollment[]
+  lessons        Lesson[]
+  reviews        Review[]
+  status         CourseStatus     @default(DRAFT)
+  visibility     CourseVisibility @default(HIDDEN)
+  submittedAt    DateTime?
+  approvedAt     DateTime?
+  approvedBy     Int?
+  rejectedAt     DateTime?
+  rejectedBy     Int?
+  rejectedReason String?          @db.Text
+  hiddenAt       DateTime?
+  hiddenBy       Int?
+  hiddenReason   String?          @db.Text
 }
 
 model Lesson {
@@ -124,6 +137,8 @@ model Enrollment {
   courseId      Int
   paidAt        DateTime @default(now())
   transactionId String   @unique
+  progress      Int      @default(0)
+  amount        Float    @default(0)
   course        Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   student       Student  @relation(fields: [studentId], references: [userId], onDelete: Cascade)
 }
@@ -278,6 +293,7 @@ enum Role {
   STUDENT
   TEACHER
   ADMIN
+  AFFILIATE
 }
 
 enum UserStatus {
@@ -699,6 +715,29 @@ model StudentProfile {
   student    Student  @relation(fields: [studentId], references: [userId], onDelete: Cascade)
 }
 
+model TeacherProfile {
+  userId          Int            @id
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjects        String         // Môn giảng dạy
+  education       String         // Trình độ học vấn
+  university      String         // Trường đào tạo
+  experienceYears Int            // Số năm kinh nghiệm
+  bio             String?        @db.Text // Giới thiệu bản thân
+  dob             DateTime?      // Ngày sinh
+  cvUrl           String?        // CV
+  degreeUrl       String?        // Bằng tốt nghiệp
+  certificateUrl  String?        // Chứng chỉ chuyên môn
+  status          RequestStatus  @default(PENDING) // Trạng thái duyệt
+  approvedAt      DateTime?
+  approvedBy      Int?
+  rejectedAt      DateTime?
+  rejectedBy      Int?
+  rejectedReason  String?        @db.Text
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+
 model DailyContribution {
   id              Int      @id @default(autoincrement())
   userId          Int
@@ -893,4 +932,17 @@ model DailyStatistic {
 
   @@map("daily_statistics")
 }
+
+enum CourseStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum CourseVisibility {
+  VISIBLE
+  HIDDEN
+}
+
 

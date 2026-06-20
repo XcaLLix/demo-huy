@@ -412,6 +412,39 @@ export const api = {
     request('/ai/mindmap/exam-analyse', {
       method: 'POST',
       body: payload
-    })
+    }),
+
+  getTeacherStats: () => request('/admin/teachers/statistics'),
+  getAdminTeachers: (params = {}) => {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') {
+        query.append(k, String(v));
+      }
+    });
+    return request('/admin/teachers?' + query.toString());
+  },
+  getTeacherDetail: (id) => request(`/admin/teachers/${id}`),
+  createTeacherAccount: (payload) => request('/admin/teachers', { method: 'POST', body: payload }),
+  approveTeacherProfile: (id) => request(`/admin/teachers/${id}/approve`, { method: 'PATCH' }),
+  rejectTeacherProfile: (id, reason) => request(`/admin/teachers/${id}/reject`, { method: 'PATCH', body: { reason } }),
+  blockTeacher: (id, reason) => request(`/admin/teachers/${id}/block`, { method: 'PATCH', body: { reason } }),
+  unblockTeacher: (id) => request(`/admin/teachers/${id}/unblock`, { method: 'PATCH' }),
+
+  getAdminCoursesStats: () => request('/admin/courses/statistics'),
+  getAdminCourses: (params = {}) => {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') {
+        query.append(k, String(v));
+      }
+    });
+    return request('/admin/courses?' + query.toString());
+  },
+  getAdminCourseDetail: (id) => request(`/admin/courses/${id}`),
+  approveCourse: (id) => request(`/admin/courses/${id}/approve`, { method: 'PATCH' }),
+  rejectCourse: (id, reason) => request(`/admin/courses/${id}/reject`, { method: 'PATCH', body: { reason } }),
+  hideCourse: (id, reason) => request(`/admin/courses/${id}/hide`, { method: 'PATCH', body: { reason } }),
+  showCourse: (id) => request(`/admin/courses/${id}/show`, { method: 'PATCH' })
 };
 

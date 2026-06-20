@@ -1024,6 +1024,7 @@ export default function App() {
     if (currentPath === '/admin' || currentPath.startsWith('/admin/')) {
       let subTab = 'stats';
       if (currentPath === '/admin/users') subTab = 'users';
+      else if (currentPath === '/admin/teachers') subTab = 'teachers';
       else if (currentPath === '/admin/leads') subTab = 'leads';
       else if (currentPath === '/admin/courses') subTab = 'courses';
       else if (currentPath === '/admin/announcements') subTab = 'announcements';
@@ -1979,7 +1980,7 @@ export default function App() {
           )}
 
           {/* ================= PUBLIC OR PREVIEW LANDING PAGE ================= */}
-          {(role === 'guest' || role === 'admin' || activeTab === 'landing') && parsedRoute.route !== 'admin' && !parsedRoute.route.startsWith('mock-') && parsedRoute.route !== 'ai-tutor' && parsedRoute.route !== 'exam-bank' && parsedRoute.route !== 'flashcards' && (
+          {(role === 'guest' || role === 'admin' || activeTab === 'landing') && parsedRoute.route !== 'admin' && parsedRoute.route !== 'learn' && !parsedRoute.route.startsWith('mock-') && parsedRoute.route !== 'ai-tutor' && parsedRoute.route !== 'exam-bank' && parsedRoute.route !== 'flashcards' && (
             <div>
               {role === 'guest' && activeTab === 'reset-password' ? (
                 <div className="auth-page-layout" style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh', padding: '20px' }}>
@@ -2221,7 +2222,7 @@ export default function App() {
           )}
 
           {/* ================= STUDENT LEARNING WORKSPACE ================= */}
-          {(role === 'student' || window.location.search.includes('demo=true')) && activeTab !== 'landing' && parsedRoute.route === 'learn' && (
+          {(role === 'student' || role === 'admin' || window.location.search.includes('demo=true')) && parsedRoute.route === 'learn' && (
             <div style={{ padding: '20px 0' }}>
               <LearningPage
                 courseId={parsedRoute.courseId}
