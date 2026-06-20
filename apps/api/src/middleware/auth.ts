@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { prisma } from '../lib/prisma.js';
 
 if (!process.env.JWT_SECRET) {
   throw new Error('FATAL: JWT_SECRET environment variable is missing!');
@@ -15,7 +16,7 @@ export interface AuthRequest extends Request {
   };
 }
 
-export function authenticateJWT(req: AuthRequest, res: Response, next: NextFunction) {
+export async function authenticateJWT(req: AuthRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     console.error('[auth] Missing or malformed Authorization header');
@@ -25,6 +26,21 @@ export function authenticateJWT(req: AuthRequest, res: Response, next: NextFunct
   const token = authHeader.split(' ')[1];
   try {
     const payload = jwt.verify(token, JWT_SECRET) as AuthRequest['user'];
+    
+    // Check if user is blocked or inactive in DB
+    const dbUser = await prisma.user.findUnique({
+      where: { id: payload?.id },
+      select: { status: true, isActive: true }
+    });
+    
+    if (!dbUser) {
+      return res.status(401).json({ success: false, error: 'Tài khoản không tồn tại!' });
+    }
+    
+    if (!dbUser.isActive || dbUser.status === 'BLOCKED') {
+      return res.status(403).json({ success: false, error: 'Tài khoản của bạn đã bị khóa! Không thể thao tác hệ thống.' });
+    }
+
     req.user = payload;
     next();
   } catch (err: any) {
@@ -46,3 +62,4 @@ export function requireRole(allowedRoles: ('GUEST' | 'STUDENT' | 'TEACHER' | 'AD
     next();
   };
 }
+

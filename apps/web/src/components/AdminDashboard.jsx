@@ -16,7 +16,8 @@ import {
   HiSearch,
   HiArrowLeft,
   HiShieldCheck,
-  HiCurrencyDollar
+  HiCurrencyDollar,
+  HiAcademicCap
 } from 'react-icons/hi';
 import { AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { api } from '../api';
@@ -185,9 +186,420 @@ export default function AdminDashboard({
     loadStats();
   }, [activeTab, submissions, leadsList, users, timeFilter]);
 
+
   // ────────────────────────────────────────────────────────────
   // New States and Handlers for User Management
   // ────────────────────────────────────────────────────────────
+  // --- TEACHER MANAGEMENT MODULE STATE ---
+  const [adminTeachers, setAdminTeachers] = useState([]);
+  const [teacherPagination, setTeacherPagination] = useState({ total: 0, page: 1, limit: 10, totalPages: 1 });
+  const [teacherStats, setTeacherStats] = useState({ totalTeachers: 0, pendingProfiles: 0, approvedProfiles: 0, blockedTeachers: 0 });
+  const [teacherSearch, setTeacherSearch] = useState('');
+  const [teacherProfileStatusFilter, setTeacherProfileStatusFilter] = useState('all');
+  const [teacherAccountStatusFilter, setTeacherAccountStatusFilter] = useState('all');
+  const [teacherSubjectFilter, setTeacherSubjectFilter] = useState('all');
+  const [teacherPage, setTeacherPage] = useState(1);
+  const [teachersLoading, setTeachersLoading] = useState(false);
+
+  const [selectedTeacher, setSelectedTeacher] = useState(null);
+  const [teacherDetailLoading, setTeacherDetailLoading] = useState(false);
+  const [showTeacherDetailModal, setShowTeacherDetailModal] = useState(false);
+
+  const [teacherToBlock, setTeacherToBlock] = useState(null);
+  const [teacherBlockReason, setTeacherBlockReason] = useState('');
+  const [showTeacherBlockModal, setShowTeacherBlockModal] = useState(false);
+
+  const [teacherToUnblock, setTeacherToUnblock] = useState(null);
+  const [showTeacherUnblockModal, setShowTeacherUnblockModal] = useState(false);
+
+  const [showRejectTeacherModal, setShowRejectTeacherModal] = useState(false);
+  const [rejectTeacherReason, setRejectTeacherReason] = useState('');
+  const [teacherToReject, setTeacherToReject] = useState(null);
+
+  const [showCreateTeacherModal, setShowCreateTeacherModal] = useState(false);
+  const [newTeacherForm, setNewTeacherForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    phone: '',
+    dateOfBirth: '',
+    avatarUrl: '',
+    subjects: '',
+    degree: '',
+    institution: '',
+    experienceYears: '',
+    bio: '',
+    cvUrl: '',
+    degreeUrl: '',
+    certUrl: '',
+    initialStatus: 'PENDING'
+  });
+
+  const fetchTeacherStats = async () => {
+    try {
+      const data = await api.getAdminTeacherStats();
+      if (data) setTeacherStats(data);
+    } catch (err) {
+      toast(err.message || 'Lỗi tải thống kê giáo viên', 'error');
+    }
+  };
+
+  const fetchTeachers = async () => {
+    try {
+      setTeachersLoading(true);
+      const data = await api.getAdminTeachers({
+        search: teacherSearch,
+        status: teacherProfileStatusFilter,
+        accountStatus: teacherAccountStatusFilter,
+        subject: teacherSubjectFilter,
+        page: teacherPage,
+        limit: 10
+      });
+      if (data) {
+        setAdminTeachers(data.teachers || []);
+        setTeacherPagination(data.pagination || { total: 0, page: 1, limit: 10, totalPages: 1 });
+      }
+    } catch (err) {
+      toast(err.message || 'Lỗi tải danh sách giáo viên', 'error');
+    } finally {
+      setTeachersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'teachers') {
+      fetchTeacherStats();
+      fetchTeachers();
+    }
+  }, [activeTab, teacherSearch, teacherProfileStatusFilter, teacherAccountStatusFilter, teacherSubjectFilter, teacherPage]);
+
+  const handleApproveTeacherSubmit = async (teacherId) => {
+    try {
+      await api.approveTeacherProfile(teacherId);
+      toast('Phê duyệt hồ sơ giáo viên thành công!', 'success');
+      addLog(`Phê duyệt hồ sơ giáo viên ID ${teacherId}`, 'sys');
+      fetchTeacherStats();
+      fetchTeachers();
+      if (selectedTeacher && selectedTeacher.id === teacherId) {
+        handleViewTeacherDetail(teacherId);
+      }
+    } catch (err) {
+      toast(err.message || 'Duyệt hồ sơ thất bại', 'error');
+    }
+  };
+
+  const handleOpenRejectTeacherModal = (teacher) => {
+    setTeacherToReject(teacher);
+    setRejectTeacherReason('');
+    setShowRejectTeacherModal(true);
+  };
+
+  const handleRejectTeacherSubmit = async () => {
+    if (!rejectTeacherReason.trim()) {
+      toast('Vui lòng nhập lý do từ chối!', 'error');
+      return;
+    }
+    try {
+      await api.rejectTeacherProfile(teacherToReject.id, rejectTeacherReason);
+      toast('Từ chối hồ sơ giáo viên thành công!', 'success');
+      addLog(`Từ chối hồ sơ giáo viên ID ${teacherToReject.id} lý do: ${rejectTeacherReason}`, 'sys');
+      setShowRejectTeacherModal(false);
+      fetchTeacherStats();
+      fetchTeachers();
+      if (selectedTeacher && selectedTeacher.id === teacherToReject.id) {
+        handleViewTeacherDetail(teacherToReject.id);
+      }
+    } catch (err) {
+      toast(err.message || 'Thao tác thất bại', 'error');
+    }
+  };
+
+  const handleBlockTeacherSubmit = async () => {
+    if (!teacherBlockReason.trim()) {
+      toast('Vui lòng nhập lý do khóa!', 'error');
+      return;
+    }
+    try {
+      await api.blockTeacher(teacherToBlock.id, teacherBlockReason);
+      toast('Khóa tài khoản giáo viên thành công!', 'success');
+      addLog(`Khóa tài khoản giáo viên ID ${teacherToBlock.id} lý do: ${teacherBlockReason}`, 'sys');
+      setShowTeacherBlockModal(false);
+      fetchTeacherStats();
+      fetchTeachers();
+      if (selectedTeacher && selectedTeacher.id === teacherToBlock.id) {
+        handleViewTeacherDetail(teacherToBlock.id);
+      }
+    } catch (err) {
+      toast(err.message || 'Thao tác thất bại', 'error');
+    }
+  };
+
+  const handleUnblockTeacherSubmit = async () => {
+    try {
+      await api.unblockTeacher(teacherToUnblock.id);
+      toast('Mở khóa tài khoản giáo viên thành công!', 'success');
+      addLog(`Mở khóa tài khoản giáo viên ID ${teacherToUnblock.id}`, 'sys');
+      setShowTeacherUnblockModal(false);
+      fetchTeacherStats();
+      fetchTeachers();
+      if (selectedTeacher && selectedTeacher.id === teacherToUnblock.id) {
+        handleViewTeacherDetail(teacherToUnblock.id);
+      }
+    } catch (err) {
+      toast(err.message || 'Thao tác thất bại', 'error');
+    }
+  };
+
+  const handleViewTeacherDetail = async (teacherId) => {
+    try {
+      setTeacherDetailLoading(true);
+      setShowTeacherDetailModal(true);
+      const data = await api.getTeacherDetail(teacherId);
+      if (data) {
+        setSelectedTeacher(data);
+      }
+    } catch (err) {
+      toast(err.message || 'Lỗi tải chi tiết hồ sơ', 'error');
+    } finally {
+      setTeacherDetailLoading(false);
+    }
+  };
+
+  const handleCreateTeacherSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await api.createTeacherAccount({
+        email: newTeacherForm.email,
+        fullName: newTeacherForm.name,
+        password: newTeacherForm.password,
+        phone: newTeacherForm.phone,
+        dob: newTeacherForm.dateOfBirth,
+        avatarUrl: newTeacherForm.avatarUrl,
+        subjects: newTeacherForm.subjects,
+        education: newTeacherForm.degree,
+        university: newTeacherForm.institution,
+        experienceYears: newTeacherForm.experienceYears,
+        bio: newTeacherForm.bio,
+        cvUrl: newTeacherForm.cvUrl,
+        degreeUrl: newTeacherForm.degreeUrl,
+        certificateUrl: newTeacherForm.certUrl,
+        status: newTeacherForm.initialStatus
+      });
+      toast('Tạo tài khoản giáo viên thành công!', 'success');
+      addLog(`Tạo tài khoản giáo viên mới: ${newTeacherForm.email}`, 'sys');
+      setShowCreateTeacherModal(false);
+      setNewTeacherForm({
+        name: '',
+        email: '',
+        password: '',
+        phone: '',
+        dateOfBirth: '',
+        avatarUrl: '',
+        subjects: '',
+        degree: '',
+        institution: '',
+        experienceYears: '',
+        bio: '',
+        cvUrl: '',
+        degreeUrl: '',
+        certUrl: '',
+        initialStatus: 'PENDING'
+      });
+      fetchTeacherStats();
+      fetchTeachers();
+    } catch (err) {
+      toast(err.message || 'Tạo tài khoản thất bại', 'error');
+    }
+  };
+
+  // --- COURSE MANAGEMENT STATE ---
+  const [adminCourses, setAdminCourses] = useState([]);
+  const [courseStats, setCourseStats] = useState({ totalCourses: 0, pendingCourses: 0, approvedCourses: 0, rejectedCourses: 0, hiddenCourses: 0, totalStudentsEnrolled: 0, totalRevenue: 0 });
+  const [coursePagination, setCoursePagination] = useState({ total: 0, page: 1, limit: 10, totalPages: 1 });
+  const [courseSearch, setCourseSearch] = useState('');
+  const [courseSubjectFilter, setCourseSubjectFilter] = useState('all');
+  const [courseStatusFilter, setCourseStatusFilter] = useState('all');
+  const [courseVisibilityFilter, setCourseVisibilityFilter] = useState('all');
+  const [coursePriceFrom, setCoursePriceFrom] = useState('');
+  const [coursePriceTo, setCoursePriceTo] = useState('');
+  const [courseFromDate, setCourseFromDate] = useState('');
+  const [courseToDate, setCourseToDate] = useState('');
+  const [coursePage, setCoursePage] = useState(1);
+  const [coursesLoading, setCoursesLoading] = useState(false);
+
+  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [courseDetailLoading, setCourseDetailLoading] = useState(false);
+  const [showCourseDetailModal, setShowCourseDetailModal] = useState(false);
+
+  const [courseToReject, setCourseToReject] = useState(null);
+  const [rejectCourseReason, setRejectCourseReason] = useState('');
+  const [showRejectCourseModal, setShowRejectCourseModal] = useState(false);
+
+  const [courseToHide, setCourseToHide] = useState(null);
+  const [hideCourseReason, setHideCourseReason] = useState('');
+  const [showHideCourseModal, setShowHideCourseModal] = useState(false);
+
+  const [courseActiveTab, setCourseActiveTab] = useState('all');
+
+  const fetchCourseStats = async () => {
+    try {
+      const data = await api.getAdminCoursesStats();
+      if (data) setCourseStats(data);
+    } catch (err) {
+      toast(err.message || 'Lỗi tải thống kê khóa học', 'error');
+    }
+  };
+
+  const fetchCourses = async () => {
+    try {
+      setCoursesLoading(true);
+      let apiStatus = courseStatusFilter;
+      let apiVisibility = courseVisibilityFilter;
+      if (courseActiveTab === 'pending') {
+        apiStatus = 'PENDING';
+        apiVisibility = 'all';
+      } else if (courseActiveTab === 'approved') {
+        apiStatus = 'APPROVED';
+        apiVisibility = 'all';
+      } else if (courseActiveTab === 'rejected') {
+        apiStatus = 'REJECTED';
+        apiVisibility = 'all';
+      } else if (courseActiveTab === 'hidden') {
+        apiStatus = 'APPROVED';
+        apiVisibility = 'HIDDEN';
+      }
+
+      const data = await api.getAdminCourses({
+        search: courseSearch,
+        subject: courseSubjectFilter,
+        status: apiStatus,
+        visibility: apiVisibility,
+        priceFrom: coursePriceFrom,
+        priceTo: coursePriceTo,
+        fromDate: courseFromDate,
+        toDate: courseToDate,
+        page: coursePage,
+        limit: 10
+      });
+      if (data) {
+        setAdminCourses(data.courses || []);
+        setCoursePagination(data.pagination || { total: 0, page: 1, limit: 10, totalPages: 1 });
+      }
+    } catch (err) {
+      toast(err.message || 'Lỗi tải danh sách khóa học', 'error');
+    } finally {
+      setCoursesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'courses') {
+      fetchCourseStats();
+      fetchCourses();
+    }
+  }, [activeTab, courseSearch, courseSubjectFilter, courseStatusFilter, courseVisibilityFilter, coursePriceFrom, coursePriceTo, courseFromDate, courseToDate, coursePage, courseActiveTab]);
+
+  const handleApproveCourseSubmit = async (courseId) => {
+    if (!window.confirm('Bạn có chắc chắn muốn phê duyệt khóa học này phát hành công khai không?')) return;
+    try {
+      await api.approveCourse(courseId);
+      toast('Phê duyệt khóa học thành công!', 'success');
+      if (addLog) addLog(`Phê duyệt khóa học ID ${courseId}`, 'sys');
+      fetchCourseStats();
+      fetchCourses();
+      if (selectedCourse && selectedCourse.id === courseId) {
+        handleViewCourseDetail(courseId);
+      }
+    } catch (err) {
+      toast(err.message || 'Duyệt khóa học thất bại', 'error');
+    }
+  };
+
+  const handleOpenRejectCourseModal = (course) => {
+    setCourseToReject(course);
+    setRejectCourseReason('');
+    setShowRejectCourseModal(true);
+  };
+
+  const handleRejectCourseSubmit = async () => {
+    if (!rejectCourseReason.trim()) {
+      toast('Vui lòng nhập lý do từ chối!', 'error');
+      return;
+    }
+    try {
+      await api.rejectCourse(courseToReject.id, rejectCourseReason);
+      toast('Từ chối phê duyệt khóa học thành công!', 'success');
+      if (addLog) addLog(`Từ chối khóa học ID ${courseToReject.id} lý do: ${rejectCourseReason}`, 'sys');
+      setShowRejectCourseModal(false);
+      fetchCourseStats();
+      fetchCourses();
+      if (selectedCourse && selectedCourse.id === courseToReject.id) {
+        handleViewCourseDetail(courseToReject.id);
+      }
+    } catch (err) {
+      toast(err.message || 'Thao tác thất bại', 'error');
+    }
+  };
+
+  const handleOpenHideCourseModal = (course) => {
+    setCourseToHide(course);
+    setHideCourseReason('');
+    setShowHideCourseModal(true);
+  };
+
+  const handleHideCourseSubmit = async () => {
+    if (!hideCourseReason.trim()) {
+      toast('Vui lòng nhập lý do ẩn khóa học!', 'error');
+      return;
+    }
+    try {
+      await api.hideCourse(courseToHide.id, hideCourseReason);
+      toast('Ẩn khóa học thành công!', 'success');
+      if (addLog) addLog(`Ẩn khóa học ID ${courseToHide.id} lý do: ${hideCourseReason}`, 'sys');
+      setShowHideCourseModal(false);
+      fetchCourseStats();
+      fetchCourses();
+      if (selectedCourse && selectedCourse.id === courseToHide.id) {
+        handleViewCourseDetail(courseToHide.id);
+      }
+    } catch (err) {
+      toast(err.message || 'Thao tác thất bại', 'error');
+    }
+  };
+
+  const handleShowCourseSubmit = async (courseId) => {
+    if (!window.confirm('Bạn có chắc chắn muốn hiển thị lại khóa học này không?')) return;
+    try {
+      await api.showCourse(courseId);
+      toast('Hiển thị lại khóa học thành công!', 'success');
+      if (addLog) addLog(`Hiển thị lại khóa học ID ${courseId}`, 'sys');
+      fetchCourseStats();
+      fetchCourses();
+      if (selectedCourse && selectedCourse.id === courseId) {
+        handleViewCourseDetail(courseId);
+      }
+    } catch (err) {
+      toast(err.message || 'Thao tác thất bại', 'error');
+    }
+  };
+
+  const handleViewCourseDetail = async (courseId) => {
+    try {
+      setCourseDetailLoading(true);
+      setShowCourseDetailModal(true);
+      setSelectedCourse(null);
+      const data = await api.getAdminCourseDetail(courseId);
+      if (data) {
+        setSelectedCourse(data);
+      }
+    } catch (err) {
+      toast(err.message || 'Lỗi tải chi tiết khóa học', 'error');
+      setShowCourseDetailModal(false);
+    } finally {
+      setCourseDetailLoading(false);
+    }
+  };
+
   const [adminUsers, setAdminUsers] = useState([]);
   const [userPagination, setUserPagination] = useState({ total: 0, page: 1, limit: 10, totalPages: 1 });
   const [userStats, setUserStats] = useState({ totalUsers: 0, totalStudents: 0, totalTeachers: 0, totalBlocked: 0 });
@@ -651,6 +1063,29 @@ export default function AdminDashboard({
           transform: translate(-1px, -1px);
           box-shadow: 3px 3px 0px #2D3229;
           background-color: #FCFBFA;
+        }
+
+        .admin-table-btn {
+          background-color: #FFFFFF;
+          border: 1.5px solid #2D3229;
+          color: #2D3229;
+          padding: 4px 8px;
+          border-radius: 6px;
+          font-size: 11px;
+          font-weight: 800;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+          transition: all 0.15s;
+          white-space: nowrap;
+          box-shadow: none;
+        }
+
+        .admin-table-btn:hover {
+          transform: translate(-1px, -1px);
+          box-shadow: 2px 2px 0px #2D3229;
         }
 
         /* ── MAIN WORKSPACE ── */
@@ -1464,6 +1899,18 @@ export default function AdminDashboard({
             <HiUsers style={{ fontSize: '18px' }} /> Người dùng
           </button>
           <button 
+            className={`admin-menu-item ${activeTab === 'teachers' ? 'active' : ''}`}
+            onClick={() => setActiveTab('teachers')}
+          >
+            <HiAcademicCap style={{ fontSize: '18px' }} /> Quản lý Giáo viên
+          </button>
+          <button 
+            className={`admin-menu-item ${activeTab === 'courses' ? 'active' : ''}`}
+            onClick={() => setActiveTab('courses')}
+          >
+            <HiBookOpen style={{ fontSize: '18px' }} /> Quản lý Khóa học
+          </button>
+          <button 
             className={`admin-menu-item ${activeTab === 'leads' ? 'active' : ''}`}
             onClick={() => setActiveTab('leads')}
           >
@@ -1537,6 +1984,8 @@ export default function AdminDashboard({
                 {activeTab === 'content' && 'QUẢN TRỊ NỘI DUNG'}
                 {activeTab === 'books' && 'ĐỀ XUẤT SÁCH ÔN THI'}
                 {activeTab === 'users' && 'QUẢN LÝ NGƯỜI DÙNG'}
+                {activeTab === 'teachers' && 'QUẢN LÝ GIÁO VIÊN'}
+                {activeTab === 'courses' && 'QUẢN LÝ KHÓA HỌC'}
                 {activeTab === 'leads' && 'QUẢN LÝ ĐĂNG KÝ HỌC VIÊN (LEADS)'}
                 {activeTab === 'features' && 'QUẢN LÝ CÁC CHỨC NĂNG HỆ THỐNG'}
                 {activeTab === 'moderation' && 'KIỂM DUYỆT BÁO CÁO VI PHẠM'}
@@ -2132,24 +2581,24 @@ export default function AdminDashboard({
                             <td style={{ textAlign: 'center' }}>
                               <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
                                 <button
-                                  className="admin-back-btn"
-                                  style={{ padding: '4px 8px', fontSize: '11px', width: 'auto', boxShadow: 'none', background: '#3B82F6', color: '#FFF', borderColor: '#000' }}
+                                  className="admin-table-btn"
+                                  style={{ background: '#3B82F6', color: '#FFF', borderColor: '#000' }}
                                   onClick={() => handleViewUserDetail(user.id)}
                                 >
                                   Chi tiết
                                 </button>
                                 {user.status === 'BLOCKED' ? (
                                   <button
-                                    className="admin-back-btn"
-                                    style={{ padding: '4px 8px', fontSize: '11px', width: 'auto', boxShadow: 'none', background: '#10B981', color: '#FFF', borderColor: '#000' }}
+                                    className="admin-table-btn"
+                                    style={{ background: '#10B981', color: '#FFF', borderColor: '#000' }}
                                     onClick={() => { setUserToUnblock(user); setShowUnblockModal(true); }}
                                   >
                                     Mở khóa
                                   </button>
                                 ) : (
                                   <button
-                                    className="admin-back-btn"
-                                    style={{ padding: '4px 8px', fontSize: '11px', width: 'auto', boxShadow: 'none', background: '#EF4444', color: '#FFF', borderColor: '#000', opacity: isSelf ? 0.5 : 1 }}
+                                    className="admin-table-btn"
+                                    style={{ background: '#EF4444', color: '#FFF', borderColor: '#000', opacity: isSelf ? 0.5 : 1 }}
                                     disabled={isSelf}
                                     title={isSelf ? 'Bạn không thể tự khóa chính mình' : ''}
                                     onClick={() => { setUserToBlock(user); setShowBlockModal(true); }}
@@ -2200,6 +2649,612 @@ export default function AdminDashboard({
               </div>
             </div>
           )}
+
+          {/* ==========================================
+              TAB: QUẢN LÝ GIÁO VIÊN
+              ========================================== */}
+          {activeTab === 'teachers' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Thống kê Giáo viên */}
+              <div className="stats-row-5col" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '0' }}>
+                {renderKpiCard('Tổng Giáo viên', <HiAcademicCap />, teacherStats.totalTeachers, 'blue')}
+                {renderKpiCard('Hồ sơ chờ duyệt', <HiClipboardCheck />, teacherStats.pendingProfiles, 'amber')}
+                {renderKpiCard('Hồ sơ đã duyệt', <HiPlus />, teacherStats.approvedProfiles, 'green')}
+                {renderKpiCard('Tài khoản bị khóa', <HiUsers />, teacherStats.blockedTeachers, 'purple')}
+              </div>
+
+              {/* Bộ lọc & Tìm kiếm & Nút Tạo giáo viên */}
+              <div className="admin-card" style={{ marginBottom: '0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '16px' }}>
+                  <span style={{ fontSize: '13.5px', color: '#7A7A7A', fontWeight: '800' }}>
+                    Tìm kiếm và lọc danh sách giáo viên trong hệ thống
+                  </span>
+                  <button 
+                    className="admin-back-btn" 
+                    style={{ background: '#1C2B17', color: '#FFFFFF', width: 'auto', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}
+                    onClick={() => setShowCreateTeacherModal(true)}
+                  >
+                    <HiPlus /> Tạo tài khoản Giáo viên ⚡
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px' }}>
+                  {/* Search input */}
+                  <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+                    <HiSearch style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#7A7A7A' }} />
+                    <input
+                      type="text"
+                      className="admin-form-input"
+                      placeholder="Tìm theo Tên, Email hoặc Số điện thoại..."
+                      value={teacherSearch}
+                      onChange={(e) => { setTeacherSearch(e.target.value); setTeacherPage(1); }}
+                      style={{ paddingLeft: '32px' }}
+                    />
+                  </div>
+
+                  {/* Filter by Profile Status */}
+                  <div style={{ width: '160px' }}>
+                    <select
+                      className="admin-filter-select"
+                      value={teacherProfileStatusFilter}
+                      onChange={(e) => { setTeacherProfileStatusFilter(e.target.value); setTeacherPage(1); }}
+                      style={{ width: '100%', height: '100%', minHeight: '38px' }}
+                    >
+                      <option value="all">Trạng thái hồ sơ: Tất cả</option>
+                      <option value="PENDING">Chờ duyệt</option>
+                      <option value="APPROVED">Đã duyệt</option>
+                      <option value="REJECTED">Bị từ chối</option>
+                    </select>
+                  </div>
+
+                  {/* Filter by Account Status */}
+                  <div style={{ width: '160px' }}>
+                    <select
+                      className="admin-filter-select"
+                      value={teacherAccountStatusFilter}
+                      onChange={(e) => { setTeacherAccountStatusFilter(e.target.value); setTeacherPage(1); }}
+                      style={{ width: '100%', height: '100%', minHeight: '38px' }}
+                    >
+                      <option value="all">Tài khoản: Tất cả</option>
+                      <option value="ACTIVE">Hoạt động</option>
+                      <option value="BLOCKED">Bị khóa</option>
+                    </select>
+                  </div>
+
+                  {/* Filter by Subject */}
+                  <div style={{ width: '160px' }}>
+                    <select
+                      className="admin-filter-select"
+                      value={teacherSubjectFilter}
+                      onChange={(e) => { setTeacherSubjectFilter(e.target.value); setTeacherPage(1); }}
+                      style={{ width: '100%', height: '100%', minHeight: '38px' }}
+                    >
+                      <option value="all">Môn giảng dạy: Tất cả</option>
+                      <option value="Toán học">Toán học</option>
+                      <option value="Vật lý">Vật lý</option>
+                      <option value="Hóa học">Hóa học</option>
+                      <option value="Sinh học">Sinh học</option>
+                      <option value="Tiếng Anh">Tiếng Anh</option>
+                      <option value="Ngữ văn">Ngữ văn</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Bảng Giáo viên */}
+                <div className="leads-table-container">
+                  <table className="leads-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '60px', textAlign: 'center' }}>Avatar</th>
+                        <th>Họ tên</th>
+                        <th>Email</th>
+                        <th>Số điện thoại</th>
+                        <th>Môn học</th>
+                        <th style={{ textAlign: 'center' }}>Hồ sơ</th>
+                        <th style={{ textAlign: 'center' }}>Tài khoản</th>
+                        <th>Ngày đăng ký</th>
+                        <th style={{ textAlign: 'center', width: '240px' }}>Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adminTeachers.map(teacher => {
+                        const profileStatus = teacher.profile?.status || 'Chưa tạo';
+                        const accountStatus = teacher.accountStatus;
+                        return (
+                          <tr key={teacher.id} style={{ opacity: teachersLoading ? 0.5 : 1 }}>
+                            <td style={{ textAlign: 'center' }}>
+                              {teacher.avatarUrl && (teacher.avatarUrl.startsWith('http') || teacher.avatarUrl.startsWith('data:')) ? (
+                                <img
+                                  src={teacher.avatarUrl}
+                                  alt="Avatar"
+                                  style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid #000' }}
+                                />
+                              ) : (
+                                <div style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  borderRadius: '50%',
+                                  background: '#3B82F6',
+                                  color: '#FFF',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '12px',
+                                  fontWeight: '800',
+                                  margin: '0 auto',
+                                  border: '1.5px solid #000'
+                                }}>
+                                  {teacher.name ? teacher.name.slice(0, 2).toUpperCase() : 'TA'}
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ fontWeight: '800' }}>{teacher.name}</td>
+                            <td>{teacher.email}</td>
+                            <td>{teacher.phone || <span style={{ color: '#7A7A7A', fontStyle: 'italic' }}>Chưa có</span>}</td>
+                            <td>
+                              <span style={{ fontWeight: '750', color: '#1C2B17' }}>
+                                {teacher.profile?.subjects || <span style={{ color: '#7A7A7A', fontStyle: 'italic' }}>Chưa thiết lập</span>}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <span style={{
+                                display: 'inline-block',
+                                whiteSpace: 'nowrap',
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                fontSize: '10px',
+                                fontWeight: '800',
+                                border: '1.5px solid #000',
+                                background: profileStatus === 'APPROVED' ? '#D1FAE5' : profileStatus === 'PENDING' ? '#FEF3C7' : '#FEE2E2',
+                                color: profileStatus === 'APPROVED' ? '#065F46' : profileStatus === 'PENDING' ? '#D97706' : '#991B1B'
+                              }}>
+                                {profileStatus === 'APPROVED' ? 'ĐÃ DUYỆT' : profileStatus === 'PENDING' ? 'CHỜ DUYỆT' : profileStatus === 'REJECTED' ? 'BỊ TỪ CHỐI' : profileStatus}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <span style={{
+                                display: 'inline-block',
+                                whiteSpace: 'nowrap',
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                fontSize: '10px',
+                                fontWeight: '800',
+                                border: '1.5px solid #000',
+                                background: accountStatus === 'BLOCKED' ? '#F3F4F6' : '#D1FAE5',
+                                color: accountStatus === 'BLOCKED' ? '#374151' : '#065F46'
+                              }}>
+                                {accountStatus === 'BLOCKED' ? 'BỊ KHÓA' : 'HOẠT ĐỘNG'}
+                              </span>
+                            </td>
+                            <td>{teacher.registeredDate}</td>
+                            <td style={{ textAlign: 'center' }}>
+                              <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', flexWrap: 'nowrap' }}>
+                                <button
+                                  className="admin-table-btn"
+                                  style={{ background: '#3B82F6', color: '#FFF', borderColor: '#000' }}
+                                  onClick={() => handleViewTeacherDetail(teacher.id)}
+                                >
+                                  Chi tiết
+                                </button>
+                                {profileStatus === 'PENDING' && (
+                                  <>
+                                    <button
+                                      className="admin-table-btn"
+                                      style={{ background: '#10B981', color: '#FFF', borderColor: '#000' }}
+                                      onClick={() => handleApproveTeacherSubmit(teacher.id)}
+                                    >
+                                      Duyệt
+                                    </button>
+                                    <button
+                                      className="admin-table-btn"
+                                      style={{ background: '#EF4444', color: '#FFF', borderColor: '#000' }}
+                                      onClick={() => handleOpenRejectTeacherModal(teacher)}
+                                    >
+                                      Từ chối
+                                    </button>
+                                  </>
+                                )}
+                                {accountStatus === 'BLOCKED' ? (
+                                  <button
+                                    className="admin-table-btn"
+                                    style={{ background: '#10B981', color: '#FFF', borderColor: '#000' }}
+                                    onClick={() => { setTeacherToUnblock(teacher); setShowTeacherUnblockModal(true); }}
+                                  >
+                                    Mở khóa
+                                  </button>
+                                ) : (
+                                  <button
+                                    className="admin-table-btn"
+                                    style={{ background: '#EF4444', color: '#FFF', borderColor: '#000' }}
+                                    onClick={() => { setTeacherToBlock(teacher); setShowTeacherBlockModal(true); }}
+                                  >
+                                    Khóa
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {adminTeachers.length === 0 && (
+                        <tr>
+                          <td colSpan="9" style={{ textAlign: 'center', padding: '36px', color: '#7A7A7A', fontWeight: 'bold' }}>
+                            Không tìm thấy tài khoản giáo viên nào.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Phân trang */}
+                {teacherPagination.totalPages > 1 && (
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '16px' }}>
+                    <button
+                      className="admin-back-btn"
+                      style={{ padding: '4px 12px', fontSize: '11px', width: 'auto', boxShadow: 'none', opacity: teacherPage === 1 ? 0.5 : 1 }}
+                      disabled={teacherPage === 1}
+                      onClick={() => setTeacherPage(prev => Math.max(1, prev - 1))}
+                    >
+                      Trước
+                    </button>
+                    <span style={{ display: 'flex', alignItems: 'center', fontSize: '12px', fontWeight: 'bold', padding: '0 8px' }}>
+                      Trang {teacherPage} / {teacherPagination.totalPages} (Tổng: {teacherPagination.total})
+                    </span>
+                    <button
+                      className="admin-back-btn"
+                      style={{ padding: '4px 12px', fontSize: '11px', width: 'auto', boxShadow: 'none', opacity: teacherPage === teacherPagination.totalPages ? 0.5 : 1 }}
+                      disabled={teacherPage === teacherPagination.totalPages}
+                      onClick={() => setTeacherPage(prev => Math.min(teacherPagination.totalPages, prev + 1))}
+                    >
+                      Sau
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+
+          {/* ==========================================
+              TAB: QUẢN LÝ KHÓA HỌC
+              ========================================== */}
+          {activeTab === 'courses' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Thống kê Khóa học */}
+              <div className="stats-row-5col" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '0' }}>
+                {renderKpiCard('Tổng số khóa học', <HiBookOpen />, { value: courseStats.totalCourses, change: 0, description: 'Khóa học trong hệ thống' }, 'blue')}
+                {renderKpiCard('Chờ duyệt', <HiClipboardCheck />, { value: courseStats.pendingCourses, change: 0, description: 'Cần Admin phê duyệt' }, 'amber')}
+                {renderKpiCard('Đã duyệt', <HiPlus />, { value: courseStats.approvedCourses, change: 0, description: 'Trạng thái APPROVED' }, 'green')}
+                {renderKpiCard('Bị từ chối', <HiUsers />, { value: courseStats.rejectedCourses, change: 0, description: 'Trạng thái REJECTED' }, 'purple')}
+              </div>
+              <div className="stats-row-5col" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '0' }}>
+                {renderKpiCard('Đang bị ẩn', <HiBookOpen />, { value: courseStats.hiddenCourses, change: 0, description: 'Trạng thái HIDDEN' }, 'amber')}
+                {renderKpiCard('Tổng học viên tham gia', <HiUsers />, { value: courseStats.totalStudentsEnrolled, change: 0, description: 'Học viên đăng ký học' }, 'blue')}
+                {renderKpiCard('Tổng doanh thu khóa học', <HiTrendingUp />, { value: courseStats.totalRevenue, change: 0, description: 'Doanh thu học phí' }, 'green')}
+              </div>
+
+              {/* Bộ lọc & Tìm kiếm */}
+              <div className="admin-card" style={{ marginBottom: '0' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* Hàng 1: Tabs phân loại trạng thái duyệt */}
+                  <div className="admin-sub-tabs" style={{ marginBottom: '0', borderBottom: 'none', paddingBottom: '0' }}>
+                    <button 
+                      className={`admin-sub-tab-btn ${courseActiveTab === 'all' ? 'active' : ''}`}
+                      onClick={() => { setCourseActiveTab('all'); setCoursePage(1); }}
+                    >
+                      Tất cả khóa học
+                    </button>
+                    <button 
+                      className={`admin-sub-tab-btn ${courseActiveTab === 'pending' ? 'active' : ''}`}
+                      onClick={() => { setCourseActiveTab('pending'); setCoursePage(1); }}
+                    >
+                      Chờ duyệt ({courseStats.pendingCourses})
+                    </button>
+                    <button 
+                      className={`admin-sub-tab-btn ${courseActiveTab === 'approved' ? 'active' : ''}`}
+                      onClick={() => { setCourseActiveTab('approved'); setCoursePage(1); }}
+                    >
+                      Đã duyệt ({courseStats.approvedCourses})
+                    </button>
+                    <button 
+                      className={`admin-sub-tab-btn ${courseActiveTab === 'rejected' ? 'active' : ''}`}
+                      onClick={() => { setCourseActiveTab('rejected'); setCoursePage(1); }}
+                    >
+                      Bị từ chối ({courseStats.rejectedCourses})
+                    </button>
+                    <button 
+                      className={`admin-sub-tab-btn ${courseActiveTab === 'hidden' ? 'active' : ''}`}
+                      onClick={() => { setCourseActiveTab('hidden'); setCoursePage(1); }}
+                    >
+                      Đang bị ẩn ({courseStats.hiddenCourses})
+                    </button>
+                  </div>
+
+                  {/* Hàng 2: Ô tìm kiếm + Lọc môn học */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr', gap: '12px', alignItems: 'center' }}>
+                    {/* Search */}
+                    <div style={{ position: 'relative' }}>
+                      <HiSearch style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#7A7A7A' }} />
+                      <input
+                        type="text"
+                        className="admin-form-input"
+                        placeholder="Tìm theo tên khóa học hoặc giáo viên..."
+                        value={courseSearch}
+                        onChange={(e) => { setCourseSearch(e.target.value); setCoursePage(1); }}
+                        style={{ paddingLeft: '32px' }}
+                      />
+                    </div>
+
+                    {/* Subject Filter */}
+                    <select
+                      className="admin-form-input"
+                      value={courseSubjectFilter}
+                      onChange={(e) => { setCourseSubjectFilter(e.target.value); setCoursePage(1); }}
+                      style={{ height: '40px', padding: '0 10px' }}
+                    >
+                      <option value="all">Tất cả môn học</option>
+                      <option value="Toán học">Toán học</option>
+                      <option value="Vật lý">Vật lý</option>
+                      <option value="Hóa học">Hóa học</option>
+                      <option value="Sinh học">Sinh học</option>
+                      <option value="Tiếng Anh">Tiếng Anh</option>
+                      <option value="Ngữ văn">Ngữ văn</option>
+                    </select>
+
+                    {/* Price range */}
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <input
+                        type="number"
+                        className="admin-form-input"
+                        placeholder="Giá từ..."
+                        value={coursePriceFrom}
+                        onChange={(e) => { setCoursePriceFrom(e.target.value); setCoursePage(1); }}
+                        style={{ height: '40px', fontSize: '12px' }}
+                      />
+                      <span style={{ fontSize: '12px', fontWeight: 'bold' }}>-</span>
+                      <input
+                        type="number"
+                        className="admin-form-input"
+                        placeholder="đến..."
+                        value={coursePriceTo}
+                        onChange={(e) => { setCoursePriceTo(e.target.value); setCoursePage(1); }}
+                        style={{ height: '40px', fontSize: '12px' }}
+                      />
+                    </div>
+
+                    {/* Date range */}
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <input
+                        type="date"
+                        className="admin-form-input"
+                        value={courseFromDate}
+                        onChange={(e) => { setCourseFromDate(e.target.value); setCoursePage(1); }}
+                        style={{ fontSize: '11px', height: '40px', padding: '0 8px' }}
+                        title="Ngày tạo từ"
+                      />
+                      <span style={{ fontSize: '12px', fontWeight: 'bold' }}>-</span>
+                      <input
+                        type="date"
+                        className="admin-form-input"
+                        value={courseToDate}
+                        onChange={(e) => { setCourseToDate(e.target.value); setCoursePage(1); }}
+                        style={{ fontSize: '11px', height: '40px', padding: '0 8px' }}
+                        title="Ngày tạo đến"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bảng danh sách khóa học */}
+              <div className="admin-card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <h3 className="chart-card-title" style={{ margin: 0 }}>DANH SÁCH KHÓA HỌC HỆ THỐNG</h3>
+                  {coursesLoading && <div className="stats-spinner" style={{ width: '20px', height: '20px' }} />}
+                </div>
+
+                <div className="leads-table-container">
+                  <table className="leads-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '80px', textAlign: 'center' }}>Ảnh bìa</th>
+                        <th>Tên khóa học</th>
+                        <th>Giáo viên</th>
+                        <th>Môn học</th>
+                        <th>Giá bán</th>
+                        <th style={{ textAlign: 'center' }}>Học viên</th>
+                        <th style={{ textAlign: 'center' }}>Hoàn thành</th>
+                        <th style={{ textAlign: 'center' }}>Tỷ lệ</th>
+                        <th>Doanh thu</th>
+                        <th style={{ textAlign: 'center' }}>Phê duyệt</th>
+                        <th style={{ textAlign: 'center' }}>Hiển thị</th>
+                        <th style={{ textAlign: 'center', width: '220px' }}>Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adminCourses.map(course => {
+                        return (
+                          <tr key={course.id} style={{ opacity: coursesLoading ? 0.5 : 1 }}>
+                            <td style={{ textAlign: 'center' }}>
+                              {course.thumbnailUrl && (course.thumbnailUrl.startsWith('http') || course.thumbnailUrl.startsWith('data:')) ? (
+                                <img
+                                  src={course.thumbnailUrl}
+                                  alt="Thumbnail"
+                                  style={{ width: '48px', height: '36px', objectFit: 'cover', borderRadius: '4px', border: '1.5px solid #000' }}
+                                />
+                              ) : (
+                                <div style={{
+                                  width: '48px',
+                                  height: '36px',
+                                  borderRadius: '4px',
+                                  background: '#E8ECF1',
+                                  color: '#2D3229',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '11px',
+                                  fontWeight: '800',
+                                  margin: '0 auto',
+                                  border: '1.5px solid #000'
+                                }}>
+                                  {course.subject ? course.subject.slice(0, 2).toUpperCase() : 'KH'}
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ fontWeight: '800', fontSize: '13.5px', maxWidth: '240px' }} title={course.title}>
+                              <div style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                                {course.title}
+                              </div>
+                            </td>
+                            <td>
+                              <div style={{ fontWeight: '700' }}>{course.teacherName}</div>
+                              <div style={{ fontSize: '10.5px', color: '#7A7A7A' }}>{course.teacherEmail}</div>
+                            </td>
+                            <td style={{ fontWeight: '700' }}>{course.subject}</td>
+                            <td style={{ fontWeight: '850', color: '#1C2B17' }}>
+                              {course.discount > 0 ? (
+                                <div>
+                                  <div style={{ fontSize: '11px', textDecoration: 'line-through', color: '#7A7A7A' }}>{formatCurrency(course.price)}</div>
+                                  <div style={{ color: '#EF4444' }}>{formatCurrency(course.price * (1 - course.discount / 100))}</div>
+                                </div>
+                              ) : (
+                                formatCurrency(course.price)
+                              )}
+                            </td>
+                            <td style={{ textAlign: 'center', fontWeight: '800' }}>{course.enrolledCount}</td>
+                            <td style={{ textAlign: 'center', fontWeight: '800', color: '#10B981' }}>{course.completedCount}</td>
+                            <td style={{ textAlign: 'center', fontWeight: '850' }}>
+                              <span style={{
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                background: course.completionRate >= 50 ? '#D1FAE5' : '#FEF3C7',
+                                color: course.completionRate >= 50 ? '#065F46' : '#D97706',
+                                border: '1px solid currentColor',
+                                fontSize: '11px'
+                              }}>
+                                {course.completionRate}%
+                              </span>
+                            </td>
+                            <td style={{ fontWeight: '850', color: '#2563EB' }}>{formatCurrency(course.revenue)}</td>
+                            <td style={{ textAlign: 'center' }}>
+                              <span style={{
+                                display: 'inline-block',
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                fontSize: '10px',
+                                fontWeight: '850',
+                                border: '1.5px solid #000',
+                                background: course.status === 'APPROVED' ? '#D1FAE5' : course.status === 'PENDING' ? '#FEF3C7' : '#FEE2E2',
+                                color: course.status === 'APPROVED' ? '#065F46' : course.status === 'PENDING' ? '#D97706' : '#991B1B'
+                              }}>
+                                {course.status === 'APPROVED' ? 'ĐÃ DUYỆT' : course.status === 'PENDING' ? 'CHỜ DUYỆT' : 'BỊ TỪ CHỐI'}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <span style={{
+                                display: 'inline-block',
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                fontSize: '10px',
+                                fontWeight: '850',
+                                border: '1.5px solid #000',
+                                background: course.visibility === 'VISIBLE' ? '#D1FAE5' : '#F3F4F6',
+                                color: course.visibility === 'VISIBLE' ? '#065F46' : '#374151'
+                              }}>
+                                {course.visibility === 'VISIBLE' ? 'HIỂN THỊ' : 'ẨN'}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', flexWrap: 'nowrap' }}>
+                                <button
+                                  className="admin-table-btn"
+                                  style={{ background: '#3B82F6', color: '#FFF', borderColor: '#000' }}
+                                  onClick={() => handleViewCourseDetail(course.id)}
+                                >
+                                  Chi tiết
+                                </button>
+                                {course.status === 'PENDING' && (
+                                  <>
+                                    <button
+                                      className="admin-table-btn"
+                                      style={{ background: '#10B981', color: '#FFF', borderColor: '#000' }}
+                                      onClick={() => handleApproveCourseSubmit(course.id)}
+                                    >
+                                      Duyệt
+                                    </button>
+                                    <button
+                                      className="admin-table-btn"
+                                      style={{ background: '#EF4444', color: '#FFF', borderColor: '#000' }}
+                                      onClick={() => handleOpenRejectCourseModal(course)}
+                                    >
+                                      Từ chối
+                                    </button>
+                                  </>
+                                )}
+                                {course.status === 'APPROVED' && (
+                                  course.visibility === 'VISIBLE' ? (
+                                    <button
+                                      className="admin-table-btn"
+                                      style={{ background: '#F59E0B', color: '#FFF', borderColor: '#000' }}
+                                      onClick={() => handleOpenHideCourseModal(course)}
+                                    >
+                                      Ẩn
+                                    </button>
+                                  ) : (
+                                    <button
+                                      className="admin-table-btn"
+                                      style={{ background: '#10B981', color: '#FFF', borderColor: '#000' }}
+                                      onClick={() => handleShowCourseSubmit(course.id)}
+                                    >
+                                      Hiện
+                                    </button>
+                                  )
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {adminCourses.length === 0 && (
+                        <tr>
+                          <td colSpan="12" style={{ textAlign: 'center', padding: '36px', color: '#7A7A7A', fontWeight: 'bold' }}>
+                            Không tìm thấy khóa học nào phù hợp với bộ lọc.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Phân trang */}
+                {coursePagination.totalPages > 1 && (
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '16px' }}>
+                    <button
+                      className="admin-back-btn"
+                      style={{ padding: '4px 12px', fontSize: '11px', width: 'auto', boxShadow: 'none', opacity: coursePage === 1 ? 0.5 : 1 }}
+                      disabled={coursePage === 1}
+                      onClick={() => setCoursePage(prev => Math.max(1, prev - 1))}
+                    >
+                      Trước
+                    </button>
+                    <span style={{ display: 'flex', alignItems: 'center', fontSize: '12px', fontWeight: 'bold', padding: '0 8px' }}>
+                      Trang {coursePage} / {coursePagination.totalPages} (Tổng: {coursePagination.total})
+                    </span>
+                    <button
+                      className="admin-back-btn"
+                      style={{ padding: '4px 12px', fontSize: '11px', width: 'auto', boxShadow: 'none', opacity: coursePage === coursePagination.totalPages ? 0.5 : 1 }}
+                      disabled={coursePage === coursePagination.totalPages}
+                      onClick={() => setCoursePage(prev => Math.min(coursePagination.totalPages, prev + 1))}
+                    >
+                      Sau
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
 
           {/* ==========================================
               TAB: LEADS REGISTRY
@@ -3001,6 +4056,997 @@ export default function AdminDashboard({
           </div>
         </div>
       )}
+
+      {/* ==========================================
+          TEACHER DETAIL MODAL
+          ========================================== */}
+      {showTeacherDetailModal && (
+        <div className="admin-modal-backdrop" onClick={() => setShowTeacherDetailModal(false)}>
+          <div className="admin-modal" style={{ maxWidth: '650px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+            <header className="admin-modal-header">
+              <span>HỒ SƠ CHI TIẾT GIÁO VIÊN</span>
+              <button 
+                onClick={() => setShowTeacherDetailModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold' }}
+              >
+                ×
+              </button>
+            </header>
+
+            <div className="admin-modal-body" style={{ overflowY: 'auto', flex: 1 }}>
+              {teacherDetailLoading || !selectedTeacher ? (
+                <div style={{ textAlign: 'center', padding: '40px' }}>
+                  <div className="stats-spinner" style={{ margin: '0 auto 12px auto' }} />
+                  <p style={{ fontWeight: 'bold' }}>Đang tải hồ sơ giáo viên...</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {/* Personal info card */}
+                  <div style={{ display: 'flex', gap: '16px', alignItems: 'center', background: '#FCFBFA', padding: '16px', border: '2px solid #000', borderRadius: '12px' }}>
+                    {selectedTeacher.avatarUrl && (selectedTeacher.avatarUrl.startsWith('http') || selectedTeacher.avatarUrl.startsWith('data:')) ? (
+                      <img
+                        src={selectedTeacher.avatarUrl}
+                        alt="Avatar"
+                        style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #000' }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: '64px',
+                        height: '64px',
+                        borderRadius: '50%',
+                        background: '#3B82F6',
+                        color: '#FFF',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '24px',
+                        fontWeight: '800',
+                        border: '2px solid #000'
+                      }}>
+                        {selectedTeacher.name ? selectedTeacher.name.slice(0, 2).toUpperCase() : 'TA'}
+                      </div>
+                    )}
+                    <div>
+                      <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: '950' }}>{selectedTeacher.name}</h3>
+                      <p style={{ margin: '0 0 4px 0', fontSize: '13px', color: '#666', fontWeight: '600' }}>Email: {selectedTeacher.email}</p>
+                      <p style={{ margin: 0, fontSize: '13px', color: '#666', fontWeight: '600' }}>Điện thoại: {selectedTeacher.phone || 'Chưa cung cấp'}</p>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div className="admin-form-group" style={{ margin: 0 }}>
+                      <label>Môn giảng dạy:</label>
+                      <span style={{ fontWeight: '800', fontSize: '14px', color: '#1C2B17' }}>{selectedTeacher.profile?.subjects || 'Chưa có'}</span>
+                    </div>
+
+                    <div className="admin-form-group" style={{ margin: 0 }}>
+                      <label>Ngày sinh:</label>
+                      <span style={{ fontWeight: '750' }}>{selectedTeacher.profile?.dob ? new Date(selectedTeacher.profile.dob).toLocaleDateString('vi-VN') : 'Chưa cung cấp'}</span>
+                    </div>
+
+                    <div className="admin-form-group" style={{ margin: 0 }}>
+                      <label>Học vị & Trường đào tạo:</label>
+                      <span style={{ fontWeight: '750' }}>
+                        {selectedTeacher.profile?.education || 'Chưa rõ'} tại {selectedTeacher.profile?.university || 'Chưa rõ'}
+                      </span>
+                    </div>
+
+                    <div className="admin-form-group" style={{ margin: 0 }}>
+                      <label>Số năm kinh nghiệm:</label>
+                      <span style={{ fontWeight: '800' }}>{selectedTeacher.profile?.experienceYears ?? 0} năm</span>
+                    </div>
+
+                    <div className="admin-form-group" style={{ margin: 0 }}>
+                      <label>Trạng thái hồ sơ:</label>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: '800',
+                        border: '1.5px solid #000',
+                        background: selectedTeacher.profile?.status === 'APPROVED' ? '#D1FAE5' : selectedTeacher.profile?.status === 'PENDING' ? '#FEF3C7' : '#FEE2E2',
+                        color: selectedTeacher.profile?.status === 'APPROVED' ? '#065F46' : selectedTeacher.profile?.status === 'PENDING' ? '#D97706' : '#991B1B'
+                      }}>
+                        {selectedTeacher.profile?.status === 'APPROVED' ? 'ĐÃ DUYỆT' : selectedTeacher.profile?.status === 'PENDING' ? 'CHỜ DUYỆT' : selectedTeacher.profile?.status === 'REJECTED' ? 'BỊ TỪ CHỐI' : 'CHƯA TẠO'}
+                      </span>
+                    </div>
+
+                    <div className="admin-form-group" style={{ margin: 0 }}>
+                      <label>Trạng thái tài khoản:</label>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: '800',
+                        border: '1.5px solid #000',
+                        background: selectedTeacher.accountStatus === 'BLOCKED' ? '#F3F4F6' : '#D1FAE5',
+                        color: selectedTeacher.accountStatus === 'BLOCKED' ? '#374151' : '#065F46'
+                      }}>
+                        {selectedTeacher.accountStatus === 'BLOCKED' ? 'BỊ KHÓA' : 'HOẠT ĐỘNG'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="admin-form-group" style={{ margin: 0 }}>
+                    <label>Giới thiệu bản thân:</label>
+                    <div style={{ background: '#FCFBFA', border: '1.5px solid #E8E7E3', padding: '12px', borderRadius: '8px', fontSize: '13px', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
+                      {selectedTeacher.profile?.bio || <span style={{ color: '#7A7A7A', fontStyle: 'italic' }}>Không có giới thiệu</span>}
+                    </div>
+                  </div>
+
+                  {/* Minh chứng chuyên môn */}
+                  <div className="admin-form-group" style={{ margin: 0 }}>
+                    <label>Tài liệu minh chứng chuyên môn:</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
+                      {selectedTeacher.profile?.cvUrl ? (
+                        <a href={selectedTeacher.profile.cvUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '800', color: '#3B82F6', textDecoration: 'underline' }}>
+                          📄 Hồ sơ năng lực (CV) của giáo viên
+                        </a>
+                      ) : (
+                        <span style={{ fontSize: '13px', color: '#7A7A7A', fontStyle: 'italic' }}>Chưa cập nhật CV</span>
+                      )}
+                      {selectedTeacher.profile?.degreeUrl ? (
+                        <a href={selectedTeacher.profile.degreeUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '800', color: '#3B82F6', textDecoration: 'underline' }}>
+                          🎓 Bằng tốt nghiệp / Bằng cấp chuyên môn
+                        </a>
+                      ) : (
+                        <span style={{ fontSize: '13px', color: '#7A7A7A', fontStyle: 'italic' }}>Chưa cập nhật bằng cấp</span>
+                      )}
+                      {selectedTeacher.profile?.certificateUrl ? (
+                        <a href={selectedTeacher.profile.certificateUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '800', color: '#3B82F6', textDecoration: 'underline' }}>
+                          📜 Chứng chỉ nghiệp vụ sư phạm / chuyên môn
+                        </a>
+                      ) : (
+                        <span style={{ fontSize: '13px', color: '#7A7A7A', fontStyle: 'italic' }}>Chưa cập nhật chứng chỉ khác</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Lịch sử phê duyệt hồ sơ */}
+                  {selectedTeacher.profile && (selectedTeacher.profile.approvedAt || selectedTeacher.profile.rejectedAt) && (
+                    <div style={{ background: '#FCFBFA', border: '1.5px solid #000', borderRadius: '12px', padding: '14px' }}>
+                      <h4 style={{ margin: '0 0 8px 0', fontSize: '13.5px', fontWeight: '900' }}>NHẬT KÝ DUYỆT HỒ SƠ</h4>
+                      {selectedTeacher.profile.status === 'APPROVED' ? (
+                        <p style={{ margin: 0, fontSize: '12.5px', fontWeight: '700', color: '#065F46' }}>
+                          ✓ Được phê duyệt vào ngày: {new Date(selectedTeacher.profile.approvedAt).toLocaleString('vi-VN')}
+                        </p>
+                      ) : selectedTeacher.profile.status === 'REJECTED' ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <p style={{ margin: 0, fontSize: '12.5px', fontWeight: '750', color: '#991B1B' }}>
+                            ✗ Bị từ chối phê duyệt vào ngày: {new Date(selectedTeacher.profile.rejectedAt).toLocaleString('vi-VN')}
+                          </p>
+                          <p style={{ margin: 0, fontSize: '12.5px', color: '#333', fontWeight: '700' }}>
+                            Lý do: <span style={{ fontStyle: 'italic', color: '#EF4444' }}>{selectedTeacher.profile.rejectedReason}</span>
+                          </p>
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+
+                  {/* Lịch sử khóa tài khoản */}
+                  {selectedTeacher.accountStatus === 'BLOCKED' && (
+                    <div style={{ background: '#FFFBEB', border: '2px solid #F59E0B', borderRadius: '12px', padding: '14px' }}>
+                      <h4 style={{ margin: '0 0 6px 0', fontSize: '13.5px', fontWeight: '900', color: '#B45309' }}>TÀI KHOẢN ĐANG BỊ KHÓA</h4>
+                      <p style={{ margin: '0 0 4px 0', fontSize: '12.5px', fontWeight: '700' }}>
+                        Ngày khóa: {new Date(selectedTeacher.blockedAt).toLocaleString('vi-VN')} bởi {selectedTeacher.blockedBy || 'Admin'}
+                      </p>
+                      <p style={{ margin: 0, fontSize: '12.5px', fontWeight: '700' }}>
+                        Lý do khóa: <span style={{ color: '#EF4444', fontStyle: 'italic' }}>{selectedTeacher.blockedReason}</span>
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Danh sách khóa học đã tạo */}
+                  <div className="admin-form-group" style={{ margin: 0 }}>
+                    <label>Khóa giảng dạy đã phát hành ({selectedTeacher.courses?.length || 0}):</label>
+                    {selectedTeacher.courses && selectedTeacher.courses.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
+                        {selectedTeacher.courses.map(course => (
+                          <div key={course.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FFFFFF', border: '1.5px solid #000', padding: '10px 12px', borderRadius: '8px' }}>
+                            <span style={{ fontSize: '12.5px', fontWeight: '800' }}>{course.title}</span>
+                            <span style={{
+                              display: 'inline-block',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontSize: '10px',
+                              fontWeight: '800',
+                              border: '1px solid #000',
+                              background: course.status === 'PUBLISHED' ? '#D1FAE5' : '#FEF3C7',
+                              color: '#000000'
+                            }}>{course.status === 'PUBLISHED' ? 'ĐÃ PHÁT HÀNH' : 'BẢN NHÁP'}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p style={{ margin: '4px 0 0 0', fontSize: '12.5px', color: '#7A7A7A', fontStyle: 'italic' }}>Chưa tạo khóa học nào.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <footer className="admin-modal-footer">
+              <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'flex-end' }}>
+                {selectedTeacher && selectedTeacher.profile?.status === 'PENDING' && (
+                  <>
+                    <button 
+                      type="button" 
+                      className="admin-table-btn" 
+                      style={{ background: '#10B981', color: '#FFFFFF', borderColor: '#000' }}
+                      onClick={() => handleApproveTeacherSubmit(selectedTeacher.id)}
+                    >
+                      Duyệt hồ sơ
+                    </button>
+                    <button 
+                      type="button" 
+                      className="admin-table-btn" 
+                      style={{ background: '#EF4444', color: '#FFFFFF', borderColor: '#000' }}
+                      onClick={() => handleOpenRejectTeacherModal(selectedTeacher)}
+                    >
+                      Từ chối
+                    </button>
+                  </>
+                )}
+                {selectedTeacher && (
+                  selectedTeacher.accountStatus === 'BLOCKED' ? (
+                    <button 
+                      type="button" 
+                      className="admin-table-btn" 
+                      style={{ background: '#10B981', color: '#FFFFFF', borderColor: '#000' }}
+                      onClick={() => { setTeacherToUnblock(selectedTeacher); setShowTeacherUnblockModal(true); }}
+                    >
+                      Mở khóa
+                    </button>
+                  ) : (
+                    <button 
+                      type="button" 
+                      className="admin-table-btn" 
+                      style={{ background: '#EF4444', color: '#FFFFFF', borderColor: '#000' }}
+                      onClick={() => { setTeacherToBlock(selectedTeacher); setShowTeacherBlockModal(true); }}
+                    >
+                      Khóa tài khoản
+                    </button>
+                  )
+                )}
+                <button 
+                  type="button" 
+                  className="admin-back-btn" 
+                  style={{ background: '#1C2B17', color: '#FFFFFF', width: 'auto', margin: 0, boxShadow: 'none' }}
+                  onClick={() => setShowTeacherDetailModal(false)}
+                >
+                  Đóng
+                </button>
+              </div>
+            </footer>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          TEACHER REJECT MODAL
+          ========================================== */}
+      {showRejectTeacherModal && teacherToReject && (
+        <div className="admin-modal-backdrop" onClick={() => setShowRejectTeacherModal(false)}>
+          <div className="admin-modal" style={{ maxWidth: '450px' }} onClick={e => e.stopPropagation()}>
+            <header className="admin-modal-header" style={{ borderBottom: '2px solid #EF4444' }}>
+              <span style={{ color: '#EF4444', fontWeight: '900' }}>✗ TỪ CHỐI DUYỆT HỒ SƠ GIÁO VIÊN</span>
+              <button 
+                onClick={() => setShowRejectTeacherModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold' }}
+              >
+                ×
+              </button>
+            </header>
+
+            <div className="admin-modal-body">
+              <p style={{ fontWeight: 'bold', marginBottom: '16px' }}>
+                Từ chối phê duyệt hồ sơ của giáo viên:
+                <br />
+                <span style={{ color: '#EF4444', fontSize: '16px', fontWeight: '950' }}>{teacherToReject.name}</span>?
+              </p>
+              
+              <div className="admin-form-group">
+                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>Lý do từ chối (Bắt buộc):</label>
+                <textarea
+                  className="admin-form-textarea"
+                  placeholder="Nhập lý do từ chối duyệt hồ sơ (VD: Minh chứng bằng cấp bị mờ, CV thiếu kinh nghiệm...)"
+                  value={rejectTeacherReason}
+                  onChange={e => setRejectTeacherReason(e.target.value)}
+                  rows="3"
+                  required
+                />
+              </div>
+            </div>
+
+            <footer className="admin-modal-footer">
+              <button 
+                type="button" 
+                className="admin-back-btn" 
+                style={{ background: 'none', boxShadow: 'none' }}
+                onClick={() => setShowRejectTeacherModal(false)}
+              >
+                Hủy bỏ
+              </button>
+              <button 
+                type="button" 
+                className="admin-back-btn"
+                style={{ background: '#EF4444', color: '#FFFFFF', borderColor: '#000' }}
+                onClick={handleRejectTeacherSubmit}
+              >
+                Từ chối hồ sơ
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          TEACHER BLOCK MODAL
+          ========================================== */}
+      {showTeacherBlockModal && teacherToBlock && (
+        <div className="admin-modal-backdrop" onClick={() => setShowTeacherBlockModal(false)}>
+          <div className="admin-modal" style={{ maxWidth: '450px' }} onClick={e => e.stopPropagation()}>
+            <header className="admin-modal-header" style={{ borderBottom: '2px solid #EF4444' }}>
+              <span style={{ color: '#EF4444', fontWeight: '900' }}>🔒 XÁC NHẬN KHÓA GIÁO VIÊN</span>
+              <button 
+                onClick={() => setShowTeacherBlockModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold' }}
+              >
+                ×
+              </button>
+            </header>
+
+            <div className="admin-modal-body">
+              <p style={{ fontWeight: 'bold', marginBottom: '16px' }}>
+                Khóa tài khoản của giáo viên:
+                <br />
+                <span style={{ color: '#EF4444', fontSize: '16px', fontWeight: '950' }}>{teacherToBlock.name}</span> ({teacherToBlock.email})?
+              </p>
+              
+              <div className="admin-form-group">
+                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>Lý do khóa tài khoản (Bắt buộc):</label>
+                <textarea
+                  className="admin-form-textarea"
+                  placeholder="Nhập lý do khóa..."
+                  value={teacherBlockReason}
+                  onChange={e => setTeacherBlockReason(e.target.value)}
+                  rows="3"
+                  required
+                />
+              </div>
+            </div>
+
+            <footer className="admin-modal-footer">
+              <button 
+                type="button" 
+                className="admin-back-btn" 
+                style={{ background: 'none', boxShadow: 'none' }}
+                onClick={() => setShowTeacherBlockModal(false)}
+              >
+                Hủy bỏ
+              </button>
+              <button 
+                type="button" 
+                className="admin-back-btn"
+                style={{ background: '#EF4444', color: '#FFFFFF', borderColor: '#000' }}
+                onClick={handleBlockTeacherSubmit}
+              >
+                Khóa giáo viên
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          TEACHER UNBLOCK MODAL
+          ========================================== */}
+      {showTeacherUnblockModal && teacherToUnblock && (
+        <div className="admin-modal-backdrop" onClick={() => setShowTeacherUnblockModal(false)}>
+          <div className="admin-modal" style={{ maxWidth: '450px' }} onClick={e => e.stopPropagation()}>
+            <header className="admin-modal-header" style={{ borderBottom: '2px solid #10B981' }}>
+              <span style={{ color: '#10B981', fontWeight: '900' }}>🔓 XÁC NHẬN MỞ KHÓA GIÁO VIÊN</span>
+              <button 
+                onClick={() => setShowTeacherUnblockModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold' }}
+              >
+                ×
+              </button>
+            </header>
+
+            <div className="admin-modal-body">
+              <p style={{ fontWeight: 'bold', margin: 0 }}>
+                Bạn muốn mở khóa hoạt động lại cho giáo viên:
+                <br />
+                <span style={{ color: '#10B981', fontSize: '16px', fontWeight: '950' }}>{teacherToUnblock.name}</span> ({teacherToUnblock.email})?
+              </p>
+            </div>
+
+            <footer className="admin-modal-footer">
+              <button 
+                type="button" 
+                className="admin-back-btn" 
+                style={{ background: 'none', boxShadow: 'none' }}
+                onClick={() => setShowTeacherUnblockModal(false)}
+              >
+                Hủy bỏ
+              </button>
+              <button 
+                type="button" 
+                className="admin-back-btn"
+                style={{ background: '#10B981', color: '#FFFFFF', borderColor: '#000' }}
+                onClick={handleUnblockTeacherSubmit}
+              >
+                Mở khóa
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          CREATE TEACHER MODAL
+          ========================================== */}
+      {showCreateTeacherModal && (
+        <div className="admin-modal-backdrop" onClick={() => setShowCreateTeacherModal(false)}>
+          <div className="admin-modal" style={{ maxWidth: '650px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+            <header className="admin-modal-header">
+              <span>TẠO MỚI TÀI KHOẢN GIÁO VIÊN</span>
+              <button 
+                onClick={() => setShowCreateTeacherModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold' }}
+              >
+                ×
+              </button>
+            </header>
+
+            <form onSubmit={handleCreateTeacherSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+              <div className="admin-modal-body" style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <h4 style={{ margin: '0 0 4px 0', fontSize: '13.5px', fontWeight: '900', borderBottom: '2px dashed #E8E7E3', paddingBottom: '4px' }}>THÔNG TIN CÁ NHÂN</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="admin-form-group" style={{ margin: 0 }}>
+                    <label>Họ và tên (Bắt buộc):</label>
+                    <input
+                      type="text"
+                      className="admin-form-input"
+                      required
+                      placeholder="Nhập họ tên giáo viên..."
+                      value={newTeacherForm.name}
+                      onChange={e => setNewTeacherForm({ ...newTeacherForm, name: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="admin-form-group" style={{ margin: 0 }}>
+                    <label>Email (Bắt buộc):</label>
+                    <input
+                      type="email"
+                      className="admin-form-input"
+                      required
+                      placeholder="Nhập email giáo viên..."
+                      value={newTeacherForm.email}
+                      onChange={e => setNewTeacherForm({ ...newTeacherForm, email: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="admin-form-group" style={{ margin: 0 }}>
+                    <label>Mật khẩu (Bắt buộc):</label>
+                    <input
+                      type="password"
+                      className="admin-form-input"
+                      required
+                      placeholder="Nhập mật khẩu ban đầu..."
+                      value={newTeacherForm.password}
+                      onChange={e => setNewTeacherForm({ ...newTeacherForm, password: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="admin-form-group" style={{ margin: 0 }}>
+                    <label>Số điện thoại:</label>
+                    <input
+                      type="text"
+                      className="admin-form-input"
+                      placeholder="Nhập số điện thoại..."
+                      value={newTeacherForm.phone}
+                      onChange={e => setNewTeacherForm({ ...newTeacherForm, phone: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="admin-form-group" style={{ margin: 0 }}>
+                    <label>Ngày sinh:</label>
+                    <input
+                      type="date"
+                      className="admin-form-input"
+                      value={newTeacherForm.dateOfBirth}
+                      onChange={e => setNewTeacherForm({ ...newTeacherForm, dateOfBirth: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="admin-form-group" style={{ margin: 0 }}>
+                    <label>Ảnh đại diện (URL):</label>
+                    <input
+                      type="text"
+                      className="admin-form-input"
+                      placeholder="Nhập link ảnh đại diện..."
+                      value={newTeacherForm.avatarUrl}
+                      onChange={e => setNewTeacherForm({ ...newTeacherForm, avatarUrl: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <h4 style={{ margin: '12px 0 4px 0', fontSize: '13.5px', fontWeight: '900', borderBottom: '2px dashed #E8E7E3', paddingBottom: '4px' }}>THÔNG TIN CHUYÊN MÔN</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="admin-form-group" style={{ margin: 0 }}>
+                    <label>Môn học giảng dạy (Bắt buộc):</label>
+                    <select
+                      className="admin-filter-select"
+                      required
+                      value={newTeacherForm.subjects}
+                      onChange={e => setNewTeacherForm({ ...newTeacherForm, subjects: e.target.value })}
+                      style={{ width: '100%', minHeight: '38px' }}
+                    >
+                      <option value="">Chọn môn học...</option>
+                      <option value="Toán học">Toán học</option>
+                      <option value="Vật lý">Vật lý</option>
+                      <option value="Hóa học">Hóa học</option>
+                      <option value="Sinh học">Sinh học</option>
+                      <option value="Tiếng Anh">Tiếng Anh</option>
+                      <option value="Ngữ văn">Ngữ văn</option>
+                    </select>
+                  </div>
+
+                  <div className="admin-form-group" style={{ margin: 0 }}>
+                    <label>Trình độ học vấn (Bắt buộc):</label>
+                    <input
+                      type="text"
+                      className="admin-form-input"
+                      required
+                      placeholder="VD: Cử nhân, Thạc sĩ, Tiến sĩ..."
+                      value={newTeacherForm.degree}
+                      onChange={e => setNewTeacherForm({ ...newTeacherForm, degree: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="admin-form-group" style={{ margin: 0 }}>
+                    <label>Trường đào tạo (Bắt buộc):</label>
+                    <input
+                      type="text"
+                      className="admin-form-input"
+                      required
+                      placeholder="VD: Đại học Sư phạm Hà Nội..."
+                      value={newTeacherForm.institution}
+                      onChange={e => setNewTeacherForm({ ...newTeacherForm, institution: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="admin-form-group" style={{ margin: 0 }}>
+                    <label>Số năm kinh nghiệm:</label>
+                    <input
+                      type="number"
+                      className="admin-form-input"
+                      placeholder="VD: 5"
+                      value={newTeacherForm.experienceYears}
+                      onChange={e => setNewTeacherForm({ ...newTeacherForm, experienceYears: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="admin-form-group" style={{ margin: 0 }}>
+                  <label>Giới thiệu bản thân:</label>
+                  <textarea
+                    className="admin-form-textarea"
+                    placeholder="Giới thiệu bản thân, phương pháp giảng dạy..."
+                    rows="3"
+                    value={newTeacherForm.bio}
+                    onChange={e => setNewTeacherForm({ ...newTeacherForm, bio: e.target.value })}
+                  />
+                </div>
+
+                <h4 style={{ margin: '12px 0 4px 0', fontSize: '13.5px', fontWeight: '900', borderBottom: '2px dashed #E8E7E3', paddingBottom: '4px' }}>MINH CHỨNG CHUYÊN MÔN & PHÊ DUYỆT</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="admin-form-group" style={{ margin: 0 }}>
+                    <label>Đường dẫn Hồ sơ năng lực (CV URL):</label>
+                    <input
+                      type="text"
+                      className="admin-form-input"
+                      placeholder="Nhập URL CV..."
+                      value={newTeacherForm.cvUrl}
+                      onChange={e => setNewTeacherForm({ ...newTeacherForm, cvUrl: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="admin-form-group" style={{ margin: 0 }}>
+                    <label>Đường dẫn Bằng cấp tốt nghiệp (Degree URL):</label>
+                    <input
+                      type="text"
+                      className="admin-form-input"
+                      placeholder="Nhập URL bằng tốt nghiệp..."
+                      value={newTeacherForm.degreeUrl}
+                      onChange={e => setNewTeacherForm({ ...newTeacherForm, degreeUrl: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="admin-form-group" style={{ margin: 0 }}>
+                    <label>Đường dẫn Chứng chỉ chuyên môn (Cert URL):</label>
+                    <input
+                      type="text"
+                      className="admin-form-input"
+                      placeholder="Nhập URL chứng chỉ chuyên môn..."
+                      value={newTeacherForm.certUrl}
+                      onChange={e => setNewTeacherForm({ ...newTeacherForm, certUrl: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="admin-form-group" style={{ margin: 0 }}>
+                    <label>Trạng thái duyệt ban đầu:</label>
+                    <select
+                      className="admin-filter-select"
+                      value={newTeacherForm.initialStatus}
+                      onChange={e => setNewTeacherForm({ ...newTeacherForm, initialStatus: e.target.value })}
+                      style={{ width: '100%', minHeight: '38px' }}
+                    >
+                      <option value="PENDING">Chờ duyệt (PENDING)</option>
+                      <option value="APPROVED">Phê duyệt trực tiếp (APPROVED)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <footer className="admin-modal-footer">
+                <button 
+                  type="button" 
+                  className="admin-back-btn" 
+                  style={{ background: 'none', boxShadow: 'none' }}
+                  onClick={() => setShowCreateTeacherModal(false)}
+                >
+                  Hủy bỏ
+                </button>
+                <button 
+                  type="submit" 
+                  className="admin-back-btn"
+                  style={{ background: '#1C2B17', color: '#FFFFFF', borderColor: '#000' }}
+                >
+                  Lưu & Tạo tài khoản ⚡
+                </button>
+              </footer>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL: CHI TIẾT KHÓA HỌC (ADMIN VIEW)
+          ========================================== */}
+      {showCourseDetailModal && (
+        <div className="admin-modal-backdrop" onClick={() => setShowCourseDetailModal(false)}>
+          <div className="admin-modal" style={{ maxWidth: '800px' }} onClick={e => e.stopPropagation()}>
+            <header className="admin-modal-header">
+              <span>HỒ SƠ CHI TIẾT KHÓA HỌC</span>
+              <button 
+                onClick={() => setShowCourseDetailModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold' }}
+              >
+                ×
+              </button>
+            </header>
+
+            <div className="admin-modal-body" style={{ maxHeight: '70vh', overflowY: 'auto', padding: '20px' }}>
+              {courseDetailLoading || !selectedCourse ? (
+                <div style={{ textAlign: 'center', padding: '40px' }}>
+                  <div className="stats-spinner" style={{ margin: '0 auto 16px auto' }} />
+                  <p style={{ fontWeight: 'bold' }}>Đang tải thông tin chi tiết khóa học...</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {/* Row 1: Cover Image & Basic Info */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '20px', alignItems: 'start' }}>
+                    <div style={{ border: '3px solid #000', borderRadius: '12px', overflow: 'hidden', background: '#FCFBFA', boxShadow: '3px 3px 0px #000' }}>
+                      {selectedCourse.thumbnailUrl && (selectedCourse.thumbnailUrl.startsWith('http') || selectedCourse.thumbnailUrl.startsWith('data:')) ? (
+                        <img 
+                          src={selectedCourse.thumbnailUrl} 
+                          alt="Cover" 
+                          style={{ width: '100%', height: '160px', objectFit: 'cover' }} 
+                        />
+                      ) : (
+                        <div style={{ height: '160px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#E8ECF1', fontWeight: '900', fontSize: '24px' }}>
+                          {selectedCourse.subject}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <span style={{
+                        display: 'inline-block',
+                        background: '#E0E7FF',
+                        border: '1.5px solid #000',
+                        color: '#4F46E5',
+                        fontSize: '11px',
+                        fontWeight: '800',
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        marginBottom: '8px',
+                        textTransform: 'uppercase'
+                      }}>
+                        {selectedCourse.subject}
+                      </span>
+                      <h3 style={{ fontSize: '20px', fontWeight: '950', margin: '0 0 8px 0', lineHeight: '1.3' }}>{selectedCourse.title}</h3>
+                      <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#555', fontWeight: '600' }}>{selectedCourse.description}</p>
+                      
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '12.5px', fontWeight: '700' }}>
+                        <div><strong>Giáo viên:</strong> {selectedCourse.teacher?.name}</div>
+                        <div><strong>Email:</strong> {selectedCourse.teacher?.email}</div>
+                        <div>
+                          <strong>Giá bán:</strong>{' '}
+                          {selectedCourse.discount > 0 ? (
+                            <span style={{ color: '#EF4444' }}>
+                              {formatCurrency(selectedCourse.price * (1 - selectedCourse.discount / 100))} (Giảm {selectedCourse.discount}%)
+                            </span>
+                          ) : (
+                            formatCurrency(selectedCourse.price)
+                          )}
+                        </div>
+                        <div><strong>Ngày tạo:</strong> {selectedCourse.courseCreatedAt ? new Date(selectedCourse.courseCreatedAt).toLocaleDateString('vi-VN') : 'Chưa rõ'}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Row 2: Stats Grid */}
+                  <div style={{ border: '2.5px solid #000', borderRadius: '12px', background: '#F8FAFC', padding: '16px', boxShadow: '3px 3px 0px #000' }}>
+                    <h4 style={{ margin: '0 0 12px 0', fontSize: '13.5px', fontWeight: '900', textTransform: 'uppercase' }}>📊 THỐNG KÊ HIỆU QUẢ ĐÀO TẠO</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px', textAlign: 'center' }}>
+                      <div style={{ background: '#FFF', border: '1.5px solid #000', padding: '8px', borderRadius: '8px' }}>
+                        <div style={{ fontSize: '18px', fontWeight: '950', color: '#2563EB' }}>{selectedCourse.stats?.enrolledCount}</div>
+                        <div style={{ fontSize: '10.5px', color: '#666', fontWeight: 'bold' }}>HỌC VIÊN</div>
+                      </div>
+                      <div style={{ background: '#FFF', border: '1.5px solid #000', padding: '8px', borderRadius: '8px' }}>
+                        <div style={{ fontSize: '18px', fontWeight: '950', color: '#D97706' }}>{selectedCourse.stats?.activeCount}</div>
+                        <div style={{ fontSize: '10.5px', color: '#666', fontWeight: 'bold' }}>ĐANG HỌC</div>
+                      </div>
+                      <div style={{ background: '#FFF', border: '1.5px solid #000', padding: '8px', borderRadius: '8px' }}>
+                        <div style={{ fontSize: '18px', fontWeight: '950', color: '#10B981' }}>{selectedCourse.stats?.completedCount}</div>
+                        <div style={{ fontSize: '10.5px', color: '#666', fontWeight: 'bold' }}>HOÀN THÀNH</div>
+                      </div>
+                      <div style={{ background: '#FFF', border: '1.5px solid #000', padding: '8px', borderRadius: '8px' }}>
+                        <div style={{ fontSize: '18px', fontWeight: '950', color: '#7C3AED' }}>{selectedCourse.stats?.completionRate}%</div>
+                        <div style={{ fontSize: '10.5px', color: '#666', fontWeight: 'bold' }}>TỶ LỆ HT</div>
+                      </div>
+                      <div style={{ background: '#FFF', border: '1.5px solid #000', padding: '8px', borderRadius: '8px' }}>
+                        <div style={{ fontSize: '14px', fontWeight: '950', color: '#EF4444', height: '27px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {formatCurrency(selectedCourse.stats?.revenue)}
+                        </div>
+                        <div style={{ fontSize: '10.5px', color: '#666', fontWeight: 'bold' }}>DOANH THU</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Row 3: Curriculum / Lessons */}
+                  <div>
+                    <h4 style={{ margin: '0 0 8px 0', fontSize: '13.5px', fontWeight: '900', textTransform: 'uppercase' }}>📖 NỘI DUNG CHƯƠNG TRÌNH HỌC ({selectedCourse.lessons?.length || 0} BÀI GIẢNG)</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '180px', overflowY: 'auto' }}>
+                      {selectedCourse.lessons && selectedCourse.lessons.length > 0 ? (
+                        selectedCourse.lessons.map((lesson, idx) => (
+                          <div key={lesson.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: '#F1F5F9', border: '1.5px solid #000', borderRadius: '6px', fontSize: '12.5px', fontWeight: '700' }}>
+                            <span>Bài {lesson.order}: {lesson.title}</span>
+                            <span style={{ color: '#64748B', fontSize: '11.5px' }}>{lesson.duration || 'Chưa định lượng'}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <p style={{ fontSize: '12px', fontStyle: 'italic', color: '#7A7A7A' }}>Khóa học chưa được cập nhật bài giảng.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Row 4: Approval Audit History */}
+                  <div style={{ borderTop: '2px dashed #E8E7E3', paddingTop: '16px', fontSize: '12.5px', fontWeight: '700' }}>
+                    <h4 style={{ margin: '0 0 8px 0', fontSize: '13.5px', fontWeight: '900', textTransform: 'uppercase' }}>⏱️ LỊCH SỬ DUYỆT & TRẠNG THÁI</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                      <div>
+                        <strong>Trạng thái duyệt:</strong>{' '}
+                        <span style={{ textTransform: 'uppercase', color: selectedCourse.status === 'APPROVED' ? '#10B981' : selectedCourse.status === 'PENDING' ? '#F59E0B' : '#EF4444' }}>
+                          {selectedCourse.status}
+                        </span>
+                        {selectedCourse.approvedAt && (
+                          <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+                            Duyệt ngày: {new Date(selectedCourse.approvedAt).toLocaleString('vi-VN')} bởi Admin {selectedCourse.approvedBy?.fullName || `ID: ${selectedCourse.approvedBy}`}
+                          </div>
+                        )}
+                        {selectedCourse.rejectedAt && (
+                          <div style={{ fontSize: '11px', color: '#EF4444', marginTop: '4px' }}>
+                            Từ chối ngày: {new Date(selectedCourse.rejectedAt).toLocaleString('vi-VN')} bởi Admin {selectedCourse.rejectedBy?.fullName || `ID: ${selectedCourse.rejectedBy}`}
+                            <div style={{ fontWeight: 'normal', color: '#000', marginTop: '2px' }}><strong>Lý do từ chối:</strong> {selectedCourse.rejectedReason}</div>
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <strong>Hiển thị trên Landing:</strong>{' '}
+                        <span style={{ color: selectedCourse.visibility === 'VISIBLE' ? '#10B981' : '#64748B' }}>
+                          {selectedCourse.visibility === 'VISIBLE' ? 'HIỂN THỊ (VISIBLE)' : 'ẨN (HIDDEN)'}
+                        </span>
+                        {selectedCourse.hiddenAt && (
+                          <div style={{ fontSize: '11px', color: '#64748B', marginTop: '4px' }}>
+                            Ẩn ngày: {new Date(selectedCourse.hiddenAt).toLocaleString('vi-VN')} bởi Admin {selectedCourse.hiddenBy?.fullName || `ID: ${selectedCourse.hiddenBy}`}
+                            <div style={{ fontWeight: 'normal', color: '#000', marginTop: '2px' }}><strong>Lý do ẩn:</strong> {selectedCourse.hiddenReason}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <footer className="admin-modal-footer">
+              <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'flex-end' }}>
+                {selectedCourse && selectedCourse.status === 'PENDING' && (
+                  <>
+                    <button 
+                      type="button" 
+                      className="admin-table-btn" 
+                      style={{ background: '#10B981', color: '#FFFFFF', borderColor: '#000' }}
+                      onClick={() => handleApproveCourseSubmit(selectedCourse.id)}
+                    >
+                      Duyệt & Phát hành
+                    </button>
+                    <button 
+                      type="button" 
+                      className="admin-table-btn" 
+                      style={{ background: '#EF4444', color: '#FFFFFF', borderColor: '#000' }}
+                      onClick={() => handleOpenRejectCourseModal(selectedCourse)}
+                    >
+                      Từ chối
+                    </button>
+                  </>
+                )}
+                {selectedCourse && selectedCourse.status === 'APPROVED' && (
+                  selectedCourse.visibility === 'VISIBLE' ? (
+                    <button 
+                      type="button" 
+                      className="admin-table-btn" 
+                      style={{ background: '#F59E0B', color: '#FFFFFF', borderColor: '#000' }}
+                      onClick={() => handleOpenHideCourseModal(selectedCourse)}
+                    >
+                      Ẩn khóa học
+                    </button>
+                  ) : (
+                    <button 
+                      type="button" 
+                      className="admin-table-btn" 
+                      style={{ background: '#10B981', color: '#FFFFFF', borderColor: '#000' }}
+                      onClick={() => handleShowCourseSubmit(selectedCourse.id)}
+                    >
+                      Hiển thị lại
+                    </button>
+                  )
+                )}
+                {selectedCourse && (
+                  <button
+                    type="button"
+                    className="admin-table-btn"
+                    style={{ background: '#6c5ce7', color: '#FFFFFF', borderColor: '#000', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    onClick={() => window.open(`${window.location.origin}/learn/${selectedCourse.id}`, '_blank')}
+                    title="Mở trang học bài của khóa học này theo góc nhìn học sinh"
+                  >
+                    🎓 Xem trang học bài
+                  </button>
+                )}
+                <button 
+                  type="button" 
+                  className="admin-back-btn" 
+                  style={{ background: '#1C2B17', color: '#FFFFFF', width: 'auto', margin: 0, boxShadow: 'none' }}
+                  onClick={() => setShowCourseDetailModal(false)}
+                >
+                  Đóng
+                </button>
+              </div>
+            </footer>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL: TỪ CHỐI DUYỆT KHÓA HỌC
+          ========================================== */}
+      {showRejectCourseModal && (
+        <div className="admin-modal-backdrop" onClick={() => setShowRejectCourseModal(false)}>
+          <div className="admin-modal" onClick={e => e.stopPropagation()}>
+            <header className="admin-modal-header">
+              <span>TỪ CHỐI DUYỆT KHÓA HỌC</span>
+              <button 
+                onClick={() => setShowRejectCourseModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold' }}
+              >
+                ×
+              </button>
+            </header>
+
+            <div className="admin-modal-body">
+              <div className="admin-form-group">
+                <label>Lý do từ chối phê duyệt (Bắt buộc):</label>
+                <textarea
+                  className="admin-form-textarea"
+                  rows="4"
+                  placeholder="Vui lòng cung cấp lý do từ chối chi tiết để giáo viên sửa đổi lại khóa học (Ví dụ: thiếu bài giảng, video lỗi, thiếu tài liệu...)"
+                  value={rejectCourseReason}
+                  onChange={e => setRejectCourseReason(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <footer className="admin-modal-footer">
+              <button 
+                type="button" 
+                className="admin-back-btn" 
+                style={{ background: 'none', boxShadow: 'none' }}
+                onClick={() => setShowRejectCourseModal(false)}
+              >
+                Hủy bỏ
+              </button>
+              <button 
+                type="button" 
+                className="admin-back-btn"
+                style={{ background: '#EF4444', color: '#FFFFFF', borderColor: '#000' }}
+                onClick={handleRejectCourseSubmit}
+              >
+                Gửi từ chối ✕
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL: ẨN KHÓA HỌC ĐA PHÊ DUYỆT
+          ========================================== */}
+      {showHideCourseModal && (
+        <div className="admin-modal-backdrop" onClick={() => setShowHideCourseModal(false)}>
+          <div className="admin-modal" onClick={e => e.stopPropagation()}>
+            <header className="admin-modal-header">
+              <span>ẨN KHÓA HỌC HỆ THỐNG</span>
+              <button 
+                onClick={() => setShowHideCourseModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold' }}
+              >
+                ×
+              </button>
+            </header>
+
+            <div className="admin-modal-body">
+              <div className="admin-form-group">
+                <label>Lý do tạm ẩn khóa học (Bắt buộc):</label>
+                <textarea
+                  className="admin-form-textarea"
+                  rows="4"
+                  placeholder="Nhập lý do ẩn khóa học khỏi giao diện hiển thị cho học sinh (Ví dụ: giáo viên yêu cầu cập nhật, nâng cấp học liệu, khóa học cũ lỗi thời...)"
+                  value={hideCourseReason}
+                  onChange={e => setHideCourseReason(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <footer className="admin-modal-footer">
+              <button 
+                type="button" 
+                className="admin-back-btn" 
+                style={{ background: 'none', boxShadow: 'none' }}
+                onClick={() => setShowHideCourseModal(false)}
+              >
+                Hủy bỏ
+              </button>
+              <button 
+                type="button" 
+                className="admin-back-btn"
+                style={{ background: '#F59E0B', color: '#FFFFFF', borderColor: '#000' }}
+                onClick={handleHideCourseSubmit}
+              >
+                Xác nhận Ẩn khóa học
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
