@@ -120,18 +120,7 @@ async function main() {
       where: { userId: user.id },
       update: {
         isApproved: t.isApproved,
-        bio: `Giáo viên chuyên môn ${t.subject} với nhiều năm giảng dạy.`
-      },
-      create: {
-        userId: user.id,
-        isApproved: t.isApproved,
-        bio: `Giáo viên chuyên môn ${t.subject} với nhiều năm giảng dạy.`
-      }
-    });
-
-    await prisma.teacherProfile.upsert({
-      where: { userId: user.id },
-      update: {
+        bio: `Giáo viên chuyên môn ${t.subject} với nhiều năm giảng dạy.`,
         subjects: t.subject,
         education: 'Thạc sĩ',
         university: 'Đại học Sư phạm Hà Nội',
@@ -142,6 +131,8 @@ async function main() {
       },
       create: {
         userId: user.id,
+        isApproved: t.isApproved,
+        bio: `Giáo viên chuyên môn ${t.subject} với nhiều năm giảng dạy.`,
         subjects: t.subject,
         education: 'Thạc sĩ',
         university: 'Đại học Sư phạm Hà Nội',

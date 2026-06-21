@@ -146,6 +146,11 @@ export const api = {
   getCourseById: (id) => request(`/courses/${id}`),
 
   createCourse: (payload) => request('/courses', { method: 'POST', body: payload }),
+  updateCourse: (id, payload) => request(`/courses/${id}`, { method: 'PUT', body: payload }),
+  deleteCourse: (id) => request(`/courses/${id}`, { method: 'DELETE' }),
+  createLesson: (payload) => request('/lessons', { method: 'POST', body: payload }),
+  updateLesson: (id, payload) => request(`/lessons/${id}`, { method: 'PUT', body: payload }),
+  deleteLesson: (id) => request(`/lessons/${id}`, { method: 'DELETE' }),
 
   getExams: (filters = {}) => {
     const params = new URLSearchParams();
@@ -509,6 +514,11 @@ export const api = {
   approveCourse: (id) => request(`/admin/courses/${id}/approve`, { method: 'PATCH' }),
   rejectCourse: (id, reason) => request(`/admin/courses/${id}/reject`, { method: 'PATCH', body: { reason } }),
   hideCourse: (id, reason) => request(`/admin/courses/${id}/hide`, { method: 'PATCH', body: { reason } }),
-  showCourse: (id) => request(`/admin/courses/${id}/show`, { method: 'PATCH' })
+  showCourse: (id) => request(`/admin/courses/${id}/show`, { method: 'PATCH' }),
+
+  getUserDocuments: () => request('/user-documents', { method: 'GET' }),
+  createUserDocument: (title, fileUrl, fileType) => request('/user-documents', { method: 'POST', body: { title, fileUrl, fileType } }),
+  deleteUserDocument: (id) => request(`/user-documents/${id}`, { method: 'DELETE' })
 };
+
 

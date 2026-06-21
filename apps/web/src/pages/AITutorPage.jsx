@@ -7,6 +7,7 @@ import {
 import Tesseract from 'tesseract.js';
 import { api, API_BASE } from '../api';
 import { toast } from '../utils/toast';
+import sunLogoImg from '../assets/sun_logo.png';
 
 // Default welcome mindmap to show on first load
 const WELCOME_MINDMAP = {
@@ -1417,20 +1418,12 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
               style={{
                 width: '32px',
                 height: '32px',
-                background: 'linear-gradient(135deg, #6c5ce7, #4f46e5)',
-                borderRadius: '8px',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 10px rgba(108, 92, 231, 0.25)'
+                justifyContent: 'center'
               }}
             >
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '18px', height: '18px' }}>
-                <path d="M18 6H8.5a4 4 0 100 8h8" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M14 10H8.5" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx="18" cy="6" r="1.5" fill="#FFD234" />
-                <circle cx="16.5" cy="14" r="1.5" fill="#FFD234" />
-              </svg>
+              <img src={sunLogoImg} alt="EduPath AI" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
             </div>
             <span style={{ fontWeight: 800, fontSize: '15px', color: '#fff', letterSpacing: '0.3px', fontFamily: "'Outfit', sans-serif" }}>
               EduPath <em style={{ fontStyle: 'normal', color: '#FFD234' }}>AI</em>

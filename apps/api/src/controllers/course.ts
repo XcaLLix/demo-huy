@@ -4,10 +4,16 @@ import { prisma } from '../lib/prisma.js';
 import { getSubjectGroupForSubject, getSubjectsForSubjectGroup } from '../utils/subjectClassifier.js';
 
 export async function getCourses(req: AuthRequest, res: Response) {
-  const { subject, subjectGroup, price, grade } = req.query;
+  const { subject, subjectGroup, price, grade, teacherId } = req.query;
 
   try {
-    const filters: any = { isApproved: true };
+    const filters: any = {};
+    if (teacherId) {
+      filters.teacherId = String(teacherId);
+    } else {
+      filters.isApproved = true;
+    }
+
     if (subject) {
       filters.subject = String(subject);
     } else if (subjectGroup) {
@@ -35,7 +41,8 @@ export async function getCourses(req: AuthRequest, res: Response) {
             title: true,
             order: true,
             duration: true,
-            videoUrl: true
+            videoUrl: true,
+            content: true
           }
         },
         reviews: true,
@@ -93,18 +100,19 @@ export async function createCourse(req: AuthRequest, res: Response) {
   if (!teacherId) return res.status(401).json({ success: false, error: 'Chưa xác thực!' });
 
   try {
-    // Check if TeacherProfile is approved
-    const profile = await prisma.teacherProfile.findUnique({
+    // Check if Teacher is approved
+    const teacher = await prisma.teacher.findUnique({
       where: { userId: teacherId }
     });
 
-    if (!profile || profile.status !== 'APPROVED') {
+    if (!teacher || teacher.status !== 'APPROVED') {
       return res.status(403).json({
         success: false,
         error: 'Hồ sơ Giáo viên của bạn chưa được duyệt! Bạn chỉ có thể tạo khóa học sau khi được Admin phê duyệt.'
       });
     }
 
+    const published = req.body.isPublished === 'true' || req.body.isPublished === true;
     const newCourse = await prisma.course.create({
       data: {
         title,
@@ -114,8 +122,8 @@ export async function createCourse(req: AuthRequest, res: Response) {
         discount: discount !== undefined ? Number(discount) : 0,
         thumbnailUrl,
         grade: grade ? Number(grade) : null,
-        isPublished: false,
-        isApproved: false, // Pending Admin review approval!
+        isPublished: published,
+        isApproved: published, // Auto-approve if published
         teacherId
       }
     });
@@ -153,9 +161,10 @@ export async function getCourseStats(req: AuthRequest, res: Response) {
 
 export async function updateCourse(req: AuthRequest, res: Response) {
   const courseId = Number(req.params.id);
-  const { title, description, subject, price, discount, thumbnailUrl, grade } = req.body;
+  const { title, description, subject, price, discount, thumbnailUrl, grade, isPublished } = req.body;
 
   try {
+    const published = isPublished !== undefined ? (isPublished === 'true' || isPublished === true) : undefined;
     const updated = await prisma.course.update({
       where: { id: courseId },
       data: {
@@ -165,7 +174,8 @@ export async function updateCourse(req: AuthRequest, res: Response) {
         ...(price !== undefined ? { price: Number(price) } : {}),
         ...(discount !== undefined ? { discount: Number(discount) } : {}),
         ...(thumbnailUrl !== undefined ? { thumbnailUrl } : {}),
-        ...(grade !== undefined ? { grade: grade ? Number(grade) : null } : {})
+        ...(grade !== undefined ? { grade: grade ? Number(grade) : null } : {}),
+        ...(published !== undefined ? { isPublished: published, isApproved: published } : {})
       }
     });
 
@@ -220,6 +230,27 @@ export async function deleteLesson(req: AuthRequest, res: Response) {
     });
 
     return res.status(200).json({ success: true, data: 'Đã xóa bài học thành công!' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function createLesson(req: AuthRequest, res: Response) {
+  const { courseId, title, order, videoUrl, content, duration } = req.body;
+
+  try {
+    const newLesson = await prisma.lesson.create({
+      data: {
+        courseId: Number(courseId),
+        title,
+        order: Number(order),
+        videoUrl: videoUrl || null,
+        content: content || null,
+        duration: duration || '15m'
+      }
+    });
+
+    return res.status(201).json({ success: true, data: newLesson });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }

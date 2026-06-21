@@ -1,10 +1,20 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { seedRealExamData } from '../src/utils/examImporter.js';
+import { seedAllCourses } from './seed_courses.js';
 
 const prisma = new PrismaClient();
 
 async function main() {
+  const courseCount = await prisma.course.count();
+  const userCount = await prisma.user.count();
+  const forceReset = process.argv.includes('--force') || process.argv.includes('-f');
+
+  if ((courseCount > 0 || userCount > 0) && !forceReset) {
+    console.log(`[Seed] Database already has data (Users: ${userCount}, Courses: ${courseCount}). Skipping seed to prevent data loss. Use --force or -f to override.`);
+    return;
+  }
+
   console.log('[Seed] Resetting database records...');
   
   // Wipe database tables in order of dependency
@@ -31,7 +41,6 @@ async function main() {
   await prisma.forumTag.deleteMany({});
   await prisma.forumCategory.deleteMany({});
   
-  await prisma.studentProfile.deleteMany({});
   await prisma.userBadge.deleteMany({});
   await prisma.userGamification.deleteMany({});
   await prisma.nodeProgress.deleteMany({});
@@ -47,7 +56,6 @@ async function main() {
   await prisma.roleChangeRequest.deleteMany({});
   await prisma.chatMessage.deleteMany({});
   await prisma.notification.deleteMany({});
-  await prisma.admin.deleteMany({});
   await prisma.teacher.deleteMany({});
   await prisma.student.deleteMany({});
   await prisma.user.deleteMany({});
@@ -61,8 +69,7 @@ async function main() {
       passwordHash: adminHash,
       fullName: 'EduPath Quản trị viên',
       role: 'ADMIN',
-      avatarUrl: 'AD',
-      admin: { create: {} }
+      avatarUrl: 'AD'
     }
   });
 
@@ -126,7 +133,9 @@ async function main() {
         isPro: i === 1 || i === 2,
         student: {
           create: {
-            subjectGroup: i % 2 === 0 ? 'A01' : 'D01'
+            subjectGroup: i % 2 === 0 ? 'A01' : 'D01',
+            grade: 12,
+            province: i % 2 === 0 ? 'Hà Nội' : 'Đà Nẵng'
           }
         }
       }
@@ -223,6 +232,9 @@ async function main() {
       }
     }
   });
+
+  console.log('[Seed] Seeding additional template courses from seed_courses...');
+  await seedAllCourses();
 
   console.log('[Seed] Seeding 50 multiple choice questions...');
   const questionsData = [];

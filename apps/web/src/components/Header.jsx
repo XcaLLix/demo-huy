@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from '../utils/toast';
+import sunLogoImg from '../assets/sun_logo.png';
 import { 
   HiSearch, 
   HiBell, 
@@ -186,20 +187,11 @@ export default function Header({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
-            background: 'var(--fts-purple)',
-            borderRadius: '12px',
-            width: '40px',
-            height: '40px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center'
           }}>
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '22px', height: '22px' }}>
-              <path d="M18 6H8.5a4 4 0 100 8h8" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M14 10H8.5" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-              <circle cx="18" cy="6" r="1.5" fill="#FFD234" />
-              <circle cx="16.5" cy="14" r="1.5" fill="#FFD234" />
-            </svg>
+            <img src={sunLogoImg} alt="EduPath AI" style={{ width: '38px', height: '38px', objectFit: 'contain' }} />
           </div>
           <span style={{ fontSize: '20px', fontWeight: '800', color: 'var(--fts-purple)', letterSpacing: '-0.5px' }}>
             EduPath <em style={{ color: 'var(--fts-purple-dark)', fontStyle: 'normal' }}>AI</em>

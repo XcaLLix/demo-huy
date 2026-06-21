@@ -10,12 +10,12 @@ import { prisma } from './lib/prisma.js';
 import { upload } from './lib/s3.js';
 
 import { login, logout, sendOtp, resendOtp, verifyOtpRegister, googleAuth, googleCompleteOnboarding, changePassword, forgotPassword, verifyResetOtp, resetPassword, requestRoleChange, getRoleChangeRequests, reviewRoleChange, refreshToken, getMe, registerAffiliate, updateProfile } from './controllers/auth.js';
-import { getCourses, getCourseById, createCourse, getCourseStats, updateCourse, deleteCourse, updateLesson, deleteLesson } from './controllers/course.js';
+import { getCourses, getCourseById, createCourse, getCourseStats, updateCourse, deleteCourse, updateLesson, deleteLesson, createLesson } from './controllers/course.js';
 import { getExams, getExamById, startAttempt, saveAnswer, submitAttempt, getAttempts, getExamQuestionsPublic, getAttemptById, getAttemptResult, getExamHistory, recordViolation, recordExamEvent, getExamEvents, recordViolationDetail, generateAiCoach, createSmartRetake, importExam, generateSimilarQuestion, updateExamStatus, getWrongQuestions } from './controllers/exam.js';
 import { streamAIChat, refreshRoadmap, generateAIQuestions, generateMindmap, saveMindmap, getMindmaps, getMindmapById, deleteMindmap, generateFlashcards, getPublicMindmapById, generateNodeQuiz, submitNodeQuiz, getNodeProgress, generateWeaknessMindmap, uploadExamFile, generateExamMindmap } from './controllers/ai.js';
 
 import { chatbotConsult } from './controllers/chatbot.js';
-import { getDocumentResources, getDocumentComments, addDocumentComment } from './controllers/document.js';
+import { getDocumentResources, getDocumentComments, addDocumentComment, getUserDocuments, createUserDocument, deleteUserDocument } from './controllers/document.js';
 import { createVNPayPayment, vnpayWebhook, sepayWebhook, checkEnrollmentStatus, checkUserProStatus, createDemoEnrollment } from './controllers/payment.js';
 import { authenticateJWT, requireRole } from './middleware/auth.js';
 import { ownsCourse, ownsLesson, ownsAttempt } from './middleware/ownership.js';
@@ -26,11 +26,11 @@ import { getTeacherStats, getAdminTeachers, getTeacherDetail, createTeacherAccou
 import { getAdminCoursesStats, getAdminCourses, getAdminCourseDetail, approveCourse, rejectCourse, hideCourse, showCourse } from './controllers/adminCourses.js';
 
 import { getLeaderboardRankings, getActivityHeatmap } from './controllers/gamification.js';
-import { getTeacherStats } from './controllers/teacher.js';
+import { getTeacherStats as getTeacherDashboardStats } from './controllers/teacher.js';
 
 import {
   trackClick,
-  getLeaderboard,
+  getLeaderboard as getAffiliateLeaderboard,
   getAffiliateMe,
   updateAffiliateMe,
   getMyReferrals,
@@ -71,7 +71,7 @@ import {
   getComments, createComment, acceptCommentSolution,
   getStudyGroups, createStudyGroup, joinStudyGroup, leaveStudyGroup,
   getGroupAnnouncements, createGroupAnnouncement,
-  getLeaderboard, getUserGamificationProfile,
+  getLeaderboard as getForumLeaderboard, getUserGamificationProfile,
   downloadResource, createReport, getReports, resolveReport
 } from './controllers/forum.js';
 
@@ -196,11 +196,17 @@ app.put('/courses/:id', authenticateJWT, requireRole(['TEACHER', 'ADMIN']), owns
 app.delete('/courses/:id', authenticateJWT, requireRole(['TEACHER', 'ADMIN']), ownsCourse, deleteCourse);
 app.put('/lessons/:id', authenticateJWT, requireRole(['TEACHER', 'ADMIN']), ownsLesson, updateLesson);
 app.delete('/lessons/:id', authenticateJWT, requireRole(['TEACHER', 'ADMIN']), ownsLesson, deleteLesson);
+app.post('/lessons', authenticateJWT, requireRole(['TEACHER', 'ADMIN']), createLesson);
 
 // Document Resource Routes
 app.get('/document-resources', getDocumentResources);
 app.get('/document-resources/:id/comments', getDocumentComments);
 app.post('/document-resources/:id/comments', authenticateJWT, addDocumentComment);
+
+// User Document Routes
+app.get('/user-documents', authenticateJWT, requireRole(['STUDENT', 'TEACHER', 'ADMIN']), getUserDocuments);
+app.post('/user-documents', authenticateJWT, requireRole(['STUDENT', 'TEACHER', 'ADMIN']), createUserDocument);
+app.delete('/user-documents/:id', authenticateJWT, requireRole(['STUDENT', 'TEACHER', 'ADMIN']), deleteUserDocument);
 
 // Protected Exam Routes
 app.get('/exams', getExams);
@@ -307,7 +313,7 @@ app.post('/forum/study-groups/:id/leave', authenticateJWT, leaveStudyGroup);
 app.get('/forum/study-groups/:id/announcements', authenticateJWT, getGroupAnnouncements);
 app.post('/forum/study-groups/:id/announcements', authenticateJWT, createGroupAnnouncement);
 
-app.get('/forum/leaderboard', getLeaderboard);
+app.get('/forum/leaderboard', getForumLeaderboard);
 app.get('/forum/gamification/profile', authenticateJWT, getUserGamificationProfile);
 
 app.get('/v1/leaderboard', authenticateJWT, getLeaderboardRankings);
@@ -323,7 +329,7 @@ app.put('/forum/moderation/reports/:id/resolve', authenticateJWT, requireRole(['
 // =========================================================================
 // Public
 app.get('/affiliate/track-click/:code', trackClick);
-app.get('/affiliate/leaderboard', getLeaderboard);
+app.get('/affiliate/leaderboard', getAffiliateLeaderboard);
 
 // Affiliate Portal
 app.get('/affiliate/me', authenticateJWT, requireRole(['AFFILIATE']), getAffiliateMe);
@@ -350,7 +356,7 @@ app.post('/admin/affiliates/commissions/auto-approve', authenticateJWT, requireR
 // TEACHER MATERIALS SYSTEM ROUTING
 // =========================================================================
 // Teacher side
-app.get('/teacher/stats', authenticateJWT, requireRole(['TEACHER']), getTeacherStats);
+app.get('/teacher/stats', authenticateJWT, requireRole(['TEACHER']), getTeacherDashboardStats);
 app.get('/teacher/materials', authenticateJWT, requireRole(['TEACHER']), getTeacherMaterials);
 app.post('/teacher/materials', authenticateJWT, requireRole(['TEACHER']), uploadValidation, createTeacherMaterial);
 app.put('/teacher/materials/:id', authenticateJWT, requireRole(['TEACHER']), updateTeacherMaterial);
@@ -379,7 +385,7 @@ app.post('/dev/reset', async (req, res) => {
     const { exec } = await import('child_process');
     const { promisify } = await import('util');
     const execPromise = promisify(exec);
-    const { stdout, stderr } = await execPromise('npx tsx prisma/seed.ts');
+    const { stdout, stderr } = await execPromise('npx tsx prisma/seed.ts --force');
     console.log('[Dev Seed Output]', stdout);
     if (stderr) console.error('[Dev Seed Error]', stderr);
     return res.status(200).json({ success: true, data: 'Database reset successfully!' });

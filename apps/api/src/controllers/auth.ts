@@ -51,6 +51,11 @@ function buildUserPayload(user: any) {
     isPro: user.isPro,
     emailVerified: user.emailVerified,
     subjectGroup: user.student?.subjectGroup || null,
+    grade: user.student?.grade || null,
+    province: user.student?.province || null,
+    school: user.student?.school || null,
+    targetScore: user.student?.targetScore || null,
+    targetUniversity: user.student?.targetUniversity || null,
     teacher: user.teacher || null
   };
 }
@@ -155,18 +160,9 @@ export async function updateProfile(req: Request, res: Response) {
     return res.status(401).json({ success: false, error: 'Chưa xác thực!' });
   }
 
-  const { fullName, avatarUrl, subjectGroup, phone, city, school, targetScore, targetUniversity, combo, bio } = req.body;
+  const { fullName, avatarUrl, subjectGroup, phone, city, school, targetScore, targetUniversity, combo, bio, grade, province } = req.body;
 
   try {
-    // Update teacher bio if provided first
-    if (bio !== undefined) {
-      await prisma.teacher.upsert({
-        where: { userId },
-        create: { userId, bio },
-        update: { bio }
-      });
-    }
-
     // Update base user info
     const updatedUser = await prisma.user.update({
       where: { id: userId },
@@ -187,12 +183,57 @@ export async function updateProfile(req: Request, res: Response) {
       }
     });
 
-    // Update student subjectGroup if provided (stored as extra fields in Student table)
-    if (updatedUser.student && subjectGroup) {
-      await prisma.student.update({
+    // Update teacher bio if teacher role
+    if (updatedUser.role === 'TEACHER' && bio !== undefined) {
+      await prisma.teacher.upsert({
         where: { userId },
-        data: { subjectGroup }
+        create: { userId, bio },
+        update: { bio }
       });
+    }
+
+    // Update student profile fields if student role
+    if (updatedUser.role === 'STUDENT') {
+      const finalGroup = subjectGroup || combo;
+      await prisma.student.upsert({
+        where: { userId },
+        create: {
+          userId,
+          subjectGroup: finalGroup || 'A01',
+          grade: grade ? Number(grade) : null,
+          province: province || city || null,
+          school: school || null,
+          targetScore: targetScore ? Number(targetScore) : null,
+          targetUniversity: targetUniversity || null
+        },
+        update: {
+          ...(finalGroup ? { subjectGroup: finalGroup } : {}),
+          ...(grade !== undefined ? { grade: grade ? Number(grade) : null } : {}),
+          ...(province !== undefined || city !== undefined ? { province: province || city } : {}),
+          ...(school !== undefined ? { school } : {}),
+          ...(targetScore !== undefined ? { targetScore: targetScore ? Number(targetScore) : null } : {}),
+          ...(targetUniversity !== undefined ? { targetUniversity } : {})
+        }
+      });
+    }
+
+    // Fetch the fully updated user record to build final response payload
+    const finalUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        student: {
+          include: {
+            enrollments: {
+              select: { courseId: true, paidAt: true, id: true }
+            }
+          }
+        },
+        teacher: true
+      }
+    });
+
+    if (!finalUser) {
+      return res.status(404).json({ success: false, error: 'Không tìm thấy thông tin người dùng sau khi cập nhật.' });
     }
 
     console.log(`[Profile Update] Cập nhật hồ sơ thành công cho người dùng ID: ${userId}`);
@@ -200,16 +241,8 @@ export async function updateProfile(req: Request, res: Response) {
     return res.status(200).json({
       success: true,
       data: {
-        id: updatedUser.id,
-        email: updatedUser.email,
-        fullName: updatedUser.fullName,
-        avatarUrl: updatedUser.avatarUrl,
-        phone: updatedUser.phone,
-        role: updatedUser.role,
-        isPro: updatedUser.isPro,
-        subjectGroup: subjectGroup || updatedUser.student?.subjectGroup || null,
-        enrollments: updatedUser.student?.enrollments || [],
-        teacher: updatedUser.teacher || null
+        ...buildUserPayload(finalUser),
+        enrollments: finalUser.student?.enrollments || []
       }
     });
   } catch (err: any) {
@@ -1103,7 +1136,7 @@ export async function reviewRoleChange(req: Request, res: Response) {
           // Create teacher profile
           const existingTeacher = await tx.teacher.findUnique({ where: { userId: changeReq.userId } });
           if (!existingTeacher) {
-            await tx.teacher.create({ data: { userId: changeReq.userId, isApproved: true, bio: '' } });
+            await tx.teacher.create({ data: { userId: changeReq.userId, isApproved: true, bio: '', status: 'APPROVED' } });
           }
         } else if (changeReq.requestedRole === 'STUDENT') {
           // Delete teacher profile if exists
@@ -1111,7 +1144,7 @@ export async function reviewRoleChange(req: Request, res: Response) {
           // Create student profile
           const existingStudent = await tx.student.findUnique({ where: { userId: changeReq.userId } });
           if (!existingStudent) {
-            await tx.student.create({ data: { userId: changeReq.userId, subjectGroup: 'A01' } });
+            await tx.student.create({ data: { userId: changeReq.userId, subjectGroup: 'A01', grade: 12, province: 'Chưa cập nhật' } });
           }
         }
 

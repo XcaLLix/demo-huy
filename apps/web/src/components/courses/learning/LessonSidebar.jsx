@@ -38,40 +38,8 @@ export default function LessonSidebar({
 
   return (
     <div className="lesson-sidebar">
-      <div className="lesson-sidebar__header">
-        <h4 className="lesson-sidebar__course-title" title={courseTitle}>
-          {courseTitle}
-        </h4>
-        <div className="lesson-sidebar__progress-info">
-          <span>Đã hoàn thành {completedCount}/{totalCount} bài học</span>
-          <strong>{Math.round(progressPct)}%</strong>
-        </div>
-        <div className="lesson-sidebar__progress-bar-bg">
-          <div
-            className="lesson-sidebar__progress-bar-fill"
-            style={{ width: `${progressPct}%` }}
-          />
-        </div>
-      </div>
-
-      <div className="lesson-sidebar__filters">
-        <button
-          type="button"
-          onClick={() => setFilterMode('ALL')}
-          className={`filter-btn ${filterMode === 'ALL' ? 'filter-btn--active' : ''}`}
-        >
-          Tất cả
-        </button>
-        <button
-          type="button"
-          onClick={() => setFilterMode('INCOMPLETE')}
-          className={`filter-btn ${filterMode === 'INCOMPLETE' ? 'filter-btn--active' : ''}`}
-        >
-          Chưa xong
-        </button>
-      </div>
-
-      <div className="lesson-sidebar__chapters-list">
+      {/* Sidebar header and filters are hidden to match layout screenshot */}
+      <div className="lesson-sidebar__chapters-list" style={{ flex: 1, overflowY: 'auto' }}>
         {curriculum.map((chapter, chapIdx) => {
           const isOpen = !!openChapters[chapIdx];
           const filteredLessons = (chapter.lessons || []).filter(l => {
@@ -83,17 +51,51 @@ export default function LessonSidebar({
 
           if (filteredLessons.length === 0 && filterMode !== 'ALL') return null;
 
+          const completedInChap = filteredLessons.filter(l => 
+            completedLessons.includes(Number(l.id)) || completedLessons.includes(l.id.toString())
+          ).length;
+          const totalInChap = filteredLessons.length;
+
           return (
-            <div key={chapIdx} className="sidebar-chapter">
-              <div className="sidebar-chapter__header" onClick={() => toggleChapter(chapIdx)}>
-                <span className="sidebar-chapter__title" title={chapter.title}>
-                  Chương {chapIdx + 1}: {chapter.title}
-                </span>
-                {isOpen ? <HiChevronUp /> : <HiChevronDown />}
+            <div key={chapIdx} className="sidebar-chapter" style={{ borderBottom: '1px solid #f1f5f9' }}>
+              <div 
+                className="sidebar-chapter__header" 
+                onClick={() => toggleChapter(chapIdx)}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '14px 16px',
+                  background: '#faf8f5',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  borderBottom: isOpen ? '1px solid #f1f5f9' : 'none'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: '800', color: '#000000' }}>
+                    {chapIdx + 1}
+                  </span>
+                  <span style={{ fontSize: '13px', fontWeight: '800', color: '#000000' }}>
+                    {chapter.title || `Phần ${chapIdx}`}
+                  </span>
+                </div>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '600', color: '#64748b' }}>
+                    {completedInChap}/{totalInChap}
+                  </span>
+                  <span style={{ fontSize: '11px', fontWeight: '600', color: '#64748b' }}>
+                    00:00
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', color: '#64748b' }}>
+                    {isOpen ? <HiChevronUp size={16} /> : <HiChevronDown size={16} />}
+                  </span>
+                </div>
               </div>
 
               {isOpen && (
-                <div className="sidebar-chapter__lessons animate-in">
+                <div className="sidebar-chapter__lessons animate-in" style={{ background: '#ffffff' }}>
                   {filteredLessons.map((lesson) => {
                     const isCurrent = currentLessonId?.toString() === lesson.id.toString();
                     const isCompleted = completedLessons.includes(Number(lesson.id)) || completedLessons.includes(lesson.id.toString());
@@ -104,23 +106,53 @@ export default function LessonSidebar({
                         key={lesson.id}
                         onClick={() => !isLocked && onSelectLesson && onSelectLesson(lesson)}
                         className={`sidebar-lesson-row ${isCurrent ? 'sidebar-lesson-row--current' : ''} ${isLocked ? 'sidebar-lesson-row--locked' : ''}`}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '12px 16px 12px 24px',
+                          cursor: isLocked ? 'not-allowed' : 'pointer',
+                          background: isCurrent ? '#f8fafc' : 'transparent',
+                          borderBottom: '1px solid #f8fafc',
+                          transition: 'background 0.2s'
+                        }}
                       >
-                        <div className="sidebar-lesson-row__left">
-                          <span className="sidebar-lesson-row__icon-box">
+                        <div className="sidebar-lesson-row__left" style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                          <span className="sidebar-lesson-row__icon-box" style={{ color: isCurrent ? '#3b82f6' : '#94a3b8', display: 'flex', alignItems: 'center' }}>
                             {isLocked ? (
-                              <HiLockClosed className="sidebar-lesson-icon sidebar-lesson-icon--locked" />
+                              <HiLockClosed style={{ color: '#ef4444' }} />
                             ) : isCompleted ? (
-                              <HiCheckCircle className="sidebar-lesson-icon sidebar-lesson-icon--completed" />
+                              <HiCheckCircle style={{ color: '#10b981' }} />
                             ) : (
-                              <HiPlay className="sidebar-lesson-icon" />
+                              <HiPlay size={18} style={{ color: isCurrent ? '#3b82f6' : '#94a3b8' }} />
                             )}
                           </span>
-                          <span className="sidebar-lesson-row__title" title={lesson.title}>
+                          <span 
+                            className="sidebar-lesson-row__title" 
+                            title={lesson.title}
+                            style={{
+                              fontSize: '12.5px',
+                              fontWeight: isCurrent ? '700' : '500',
+                              color: isCurrent ? '#2563eb' : '#334155',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              textAlign: 'left'
+                            }}
+                          >
                             {lesson.title}
                           </span>
                         </div>
-                        <span className="sidebar-lesson-row__duration">
-                          {lesson.durationMin || lesson.duration || 10}m
+                        <span 
+                          className="sidebar-lesson-row__duration"
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            color: '#94a3b8',
+                            marginLeft: '12px'
+                          }}
+                        >
+                          00:00
                         </span>
                       </div>
                     );
@@ -130,16 +162,6 @@ export default function LessonSidebar({
             </div>
           );
         })}
-      </div>
-
-      <div className="lesson-sidebar__footer">
-        <button
-          type="button"
-          onClick={handleDownloadMaterials}
-          className="sidebar-download-btn"
-        >
-          Tải xuống tài liệu khóa học
-        </button>
       </div>
     </div>
   );

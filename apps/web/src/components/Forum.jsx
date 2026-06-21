@@ -33,9 +33,23 @@ function renderSanitizedContent(content) {
 
 export default function Forum({ currentUser }) {
   // Global View Controls
-  const [activeTab, setActiveTab] = useState('feed'); // feed, groups, drive, leaderboard
+  const [activeTab, setActiveTab] = useState(() => {
+    const hasSavedGroup = localStorage.getItem('forum_active_group');
+    return hasSavedGroup ? 'groups' : 'feed';
+  }); // feed, groups, drive, leaderboard
   const [selectedPost, setSelectedPost] = useState(null);
-  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [selectedGroup, setSelectedGroup] = useState(() => {
+    const saved = localStorage.getItem('forum_active_group');
+    if (saved) {
+      localStorage.removeItem('forum_active_group');
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  });
   const [groupTab, setGroupTab] = useState('announcements'); // announcements, discussion, chat, members
   
   // API State data

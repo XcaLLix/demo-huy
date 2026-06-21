@@ -240,11 +240,7 @@ export async function getLeaderboardRankings(req: AuthRequest, res: Response) {
             fullName: true,
             avatarUrl: true,
             role: true,
-            student: {
-              include: {
-                profile: true
-              }
-            },
+            student: true,
             subjectStreaks: true
           }
         }
@@ -253,7 +249,7 @@ export async function getLeaderboardRankings(req: AuthRequest, res: Response) {
 
     // Custom formatting and filtering by subject statistics if requested
     let formatted = ranks.map((r) => {
-      const studentProfile = r.user.student?.profile;
+      const student = r.user.student;
       const subStreaks = r.user.subjectStreaks || [];
       const currentSubStreak = subject
         ? subStreaks.find((s) => s.subject === subject)?.currentStreak || 0
@@ -268,8 +264,8 @@ export async function getLeaderboardRankings(req: AuthRequest, res: Response) {
         xp: r.xp,
         streak: r.streakDays,
         subjectStreak: currentSubStreak,
-        grade: studentProfile?.grade || null,
-        province: studentProfile?.province || 'Chưa cập nhật'
+        grade: student?.grade || null,
+        province: student?.province || 'Chưa cập nhật'
       };
     });
 

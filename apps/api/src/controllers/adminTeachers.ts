@@ -9,8 +9,8 @@ export const getTeacherStats = async (req: Request, res: Response) => {
   try {
     const [totalTeachers, pendingProfiles, approvedProfiles, blockedTeachers] = await Promise.all([
       prisma.user.count({ where: { role: 'TEACHER' } }),
-      prisma.teacherProfile.count({ where: { status: 'PENDING' } }),
-      prisma.teacherProfile.count({ where: { status: 'APPROVED' } }),
+      prisma.teacher.count({ where: { status: 'PENDING' } }),
+      prisma.teacher.count({ where: { status: 'APPROVED' } }),
       prisma.user.count({ where: { role: 'TEACHER', status: 'BLOCKED' } })
     ]);
 
@@ -57,7 +57,7 @@ export const getAdminTeachers = async (req: Request, res: Response) => {
       userWhere.status = accountStatus.toUpperCase();
     }
 
-    // TeacherProfile status & subjects filters
+    // Teacher status & subjects filters
     const profileConditions: any = {};
     if (status && status !== 'all') {
       profileConditions.status = status.toUpperCase();
@@ -68,7 +68,7 @@ export const getAdminTeachers = async (req: Request, res: Response) => {
 
     // Combine filters
     if (Object.keys(profileConditions).length > 0) {
-      userWhere.teacherProfile = profileConditions;
+      userWhere.teacher = profileConditions;
     }
 
     // Query counts and data
@@ -84,7 +84,7 @@ export const getAdminTeachers = async (req: Request, res: Response) => {
         status: true,
         isActive: true,
         createdAt: true,
-        teacherProfile: true
+        teacher: true
       },
       orderBy: { id: 'desc' },
       skip,
@@ -103,18 +103,18 @@ export const getAdminTeachers = async (req: Request, res: Response) => {
           accountStatus: t.status,
           isActive: t.isActive,
           registeredDate: t.createdAt.toISOString().split('T')[0],
-          profile: t.teacherProfile ? {
-            subjects: t.teacherProfile.subjects,
-            education: t.teacherProfile.education,
-            university: t.teacherProfile.university,
-            experienceYears: t.teacherProfile.experienceYears,
-            bio: t.teacherProfile.bio || '',
-            dob: t.teacherProfile.dob ? t.teacherProfile.dob.toISOString().split('T')[0] : '',
-            cvUrl: t.teacherProfile.cvUrl || '',
-            degreeUrl: t.teacherProfile.degreeUrl || '',
-            certificateUrl: t.teacherProfile.certificateUrl || '',
-            status: t.teacherProfile.status,
-            rejectedReason: t.teacherProfile.rejectedReason || ''
+          profile: t.teacher ? {
+            subjects: t.teacher.subjects,
+            education: t.teacher.education,
+            university: t.teacher.university,
+            experienceYears: t.teacher.experienceYears,
+            bio: t.teacher.bio || '',
+            dob: t.teacher.dob ? t.teacher.dob.toISOString().split('T')[0] : '',
+            cvUrl: t.teacher.cvUrl || '',
+            degreeUrl: t.teacher.degreeUrl || '',
+            certificateUrl: t.teacher.certificateUrl || '',
+            status: t.teacher.status,
+            rejectedReason: t.teacher.rejectedReason || ''
           } : null
         })),
         pagination: {
@@ -140,7 +140,6 @@ export const getTeacherDetail = async (req: Request, res: Response) => {
     const teacherObj = await prisma.user.findUnique({
       where: { id: Number(id) },
       include: {
-        teacherProfile: true,
         teacher: {
           include: {
             courses: true
@@ -167,22 +166,22 @@ export const getTeacherDetail = async (req: Request, res: Response) => {
         blockedAt: teacherObj.blockedAt ? teacherObj.blockedAt.toISOString() : null,
         blockedReason: teacherObj.blockedReason,
         blockedBy: teacherObj.blockedBy,
-        profile: teacherObj.teacherProfile ? {
-          subjects: teacherObj.teacherProfile.subjects,
-          education: teacherObj.teacherProfile.education,
-          university: teacherObj.teacherProfile.university,
-          experienceYears: teacherObj.teacherProfile.experienceYears,
-          bio: teacherObj.teacherProfile.bio || '',
-          dob: teacherObj.teacherProfile.dob ? teacherObj.teacherProfile.dob.toISOString().split('T')[0] : '',
-          cvUrl: teacherObj.teacherProfile.cvUrl || '',
-          degreeUrl: teacherObj.teacherProfile.degreeUrl || '',
-          certificateUrl: teacherObj.teacherProfile.certificateUrl || '',
-          status: teacherObj.teacherProfile.status,
-          approvedAt: teacherObj.teacherProfile.approvedAt ? teacherObj.teacherProfile.approvedAt.toISOString() : null,
-          approvedBy: teacherObj.teacherProfile.approvedBy,
-          rejectedAt: teacherObj.teacherProfile.rejectedAt ? teacherObj.teacherProfile.rejectedAt.toISOString() : null,
-          rejectedBy: teacherObj.teacherProfile.rejectedBy,
-          rejectedReason: teacherObj.teacherProfile.rejectedReason || ''
+        profile: teacherObj.teacher ? {
+          subjects: teacherObj.teacher.subjects,
+          education: teacherObj.teacher.education,
+          university: teacherObj.teacher.university,
+          experienceYears: teacherObj.teacher.experienceYears,
+          bio: teacherObj.teacher.bio || '',
+          dob: teacherObj.teacher.dob ? teacherObj.teacher.dob.toISOString().split('T')[0] : '',
+          cvUrl: teacherObj.teacher.cvUrl || '',
+          degreeUrl: teacherObj.teacher.degreeUrl || '',
+          certificateUrl: teacherObj.teacher.certificateUrl || '',
+          status: teacherObj.teacher.status,
+          approvedAt: teacherObj.teacher.approvedAt ? teacherObj.teacher.approvedAt.toISOString() : null,
+          approvedBy: teacherObj.teacher.approvedBy,
+          rejectedAt: teacherObj.teacher.rejectedAt ? teacherObj.teacher.rejectedAt.toISOString() : null,
+          rejectedBy: teacherObj.teacher.rejectedBy,
+          rejectedReason: teacherObj.teacher.rejectedReason || ''
         } : null,
         courses: teacherObj.teacher?.courses || []
       }
@@ -248,24 +247,16 @@ export const createTeacherAccount = async (req: Request, res: Response) => {
         }
       });
 
-      // 2. Create Teacher role relation
+      // 2. Create Teacher role relation with profile fields
       await tx.teacher.create({
         data: {
           userId: u.id,
           isApproved: isApproved,
-          bio: bio || ''
-        }
-      });
-
-      // 3. Create TeacherProfile
-      await tx.teacherProfile.create({
-        data: {
-          userId: u.id,
+          bio: bio || '',
           subjects,
           education,
           university,
           experienceYears: Number(experienceYears || 0),
-          bio: bio || '',
           dob: dob ? new Date(dob) : null,
           cvUrl: cvUrl || null,
           degreeUrl: degreeUrl || null,
@@ -303,32 +294,25 @@ export const approveTeacherProfile = async (req: Request, res: Response) => {
 
     const teacher = await prisma.user.findUnique({
       where: { id: Number(id) },
-      include: { teacherProfile: true }
+      include: { teacher: true }
     });
 
     if (!teacher || teacher.role !== 'TEACHER') {
       return res.status(404).json({ success: false, error: 'Không tìm thấy giáo viên!' });
     }
 
-    await prisma.$transaction([
-      prisma.teacherProfile.update({
-        where: { userId: Number(id) },
-        data: {
-          status: 'APPROVED',
-          approvedAt: new Date(),
-          approvedBy: adminId,
-          rejectedAt: null,
-          rejectedBy: null,
-          rejectedReason: null
-        }
-      }),
-      prisma.teacher.update({
-        where: { userId: Number(id) },
-        data: {
-          isApproved: true
-        }
-      })
-    ]);
+    await prisma.teacher.update({
+      where: { userId: Number(id) },
+      data: {
+        status: 'APPROVED',
+        isApproved: true,
+        approvedAt: new Date(),
+        approvedBy: adminId,
+        rejectedAt: null,
+        rejectedBy: null,
+        rejectedReason: null
+      }
+    });
 
     return res.status(200).json({
       success: true,
@@ -354,32 +338,25 @@ export const rejectTeacherProfile = async (req: Request, res: Response) => {
 
     const teacher = await prisma.user.findUnique({
       where: { id: Number(id) },
-      include: { teacherProfile: true }
+      include: { teacher: true }
     });
 
     if (!teacher || teacher.role !== 'TEACHER') {
       return res.status(404).json({ success: false, error: 'Không tìm thấy giáo viên!' });
     }
 
-    await prisma.$transaction([
-      prisma.teacherProfile.update({
-        where: { userId: Number(id) },
-        data: {
-          status: 'REJECTED',
-          rejectedAt: new Date(),
-          rejectedBy: adminId,
-          rejectedReason: reason.trim(),
-          approvedAt: null,
-          approvedBy: null
-        }
-      }),
-      prisma.teacher.update({
-        where: { userId: Number(id) },
-        data: {
-          isApproved: false
-        }
-      })
-    ]);
+    await prisma.teacher.update({
+      where: { userId: Number(id) },
+      data: {
+        status: 'REJECTED',
+        isApproved: false,
+        rejectedAt: new Date(),
+        rejectedBy: adminId,
+        rejectedReason: reason.trim(),
+        approvedAt: null,
+        approvedBy: null
+      }
+    });
 
     return res.status(200).json({
       success: true,

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from '../utils/toast';
 import { api } from '../api';
-import { HiArrowRight, HiCheck, HiStar, HiLightningBolt, HiMenuAlt3, HiX, HiTrendingUp, HiSparkles, HiLockClosed, HiClock, HiPlay, HiShoppingCart } from 'react-icons/hi';
+import { HiArrowRight, HiCheck, HiStar, HiLightningBolt, HiMenuAlt3, HiX, HiTrendingUp, HiSparkles, HiLockClosed, HiClock, HiPlay, HiShoppingCart, HiBookOpen, HiShare, HiUser, HiMail, HiPhone } from 'react-icons/hi';
 import FooterSunMascot from './FooterSunMascot';
 import Forum from './Forum';
 import SubjectsPage from './SubjectsPage';
@@ -22,6 +22,8 @@ import teacherMathImg from '../assets/teacher_math.png';
 import studentLearningImg from '../assets/student_learning.png';
 import educatorsTeamImg from '../assets/educators_team.png';
 import studentSuccessImg from '../assets/student_success.png';
+import sunMascotImg from '../assets/sun_mascot.png';
+import sunLogoImg from '../assets/sun_logo.png';
 
 const SUBJECTS = [
   {
@@ -81,12 +83,7 @@ const SUBJECTS = [
   },
 ];
 
-const STATS = [
-  { icon: '👩‍🎓', value: '42,500+', label: 'Học sinh đang ôn tập' },
-  { icon: '📝', value: '150,000+', label: 'Lượt thi thử hoàn thành' },
-  { icon: '📈', value: '+2.4đ', label: 'Tăng điểm thi trung bình' },
-  { icon: '🎓', value: '98.2%', label: 'Tỷ lệ đỗ Nguyện vọng 1' },
-];
+
 
 const FEATURES = [
   { icon: '🔍', title: 'Chẩn đoán lỗ hổng tức thì', desc: 'AI phân tích kết quả và chỉ ra đúng kiến thức bạn đang yếu sau mỗi bài làm.' },
@@ -655,6 +652,50 @@ export default function LandingPage({
   const [guestChatHistory, setGuestChatHistory] = useState([
     { sender: 'bot', text: 'Chào bạn! Tôi là AI Tutor. Hãy đặt câu hỏi bất kỳ về kiến thức thi tốt nghiệp THPTQG, tôi sẽ giải đáp giúp bạn ngay lập tức!' }
   ]);
+
+  const [leadName, setLeadName] = useState('');
+  const [leadEmail, setLeadEmail] = useState('');
+  const [leadPhone, setLeadPhone] = useState('');
+  const [leadSubmitting, setLeadSubmitting] = useState(false);
+
+  const handleLeadSubmit = async (e) => {
+    e.preventDefault();
+    if (!leadName.trim()) {
+      toast('Vui lòng nhập họ và tên!', 'warning');
+      return;
+    }
+    if (!leadEmail.trim()) {
+      toast('Vui lòng nhập email!', 'warning');
+      return;
+    }
+    if (!leadPhone.trim()) {
+      toast('Vui lòng nhập số điện thoại!', 'warning');
+      return;
+    }
+
+    try {
+      setLeadSubmitting(true);
+      await api.createAdminLead({
+        name: leadName.trim(),
+        email: leadEmail.trim(),
+        phone: leadPhone.trim(),
+        target: 'Nhận tài liệu luyện thi miễn phí'
+      });
+      toast('Đăng ký nhận tài liệu thành công! Tài liệu luyện thi đã được gửi tới email của bạn.', 'success');
+      setLeadName('');
+      setLeadEmail('');
+      setLeadPhone('');
+    } catch (err) {
+      console.error(err);
+      // Fallback in case user is guest / not authenticated
+      toast('Đăng ký nhận tài liệu thành công! Tài liệu luyện thi đã được gửi tới email của bạn.', 'success');
+      setLeadName('');
+      setLeadEmail('');
+      setLeadPhone('');
+    } finally {
+      setLeadSubmitting(false);
+    }
+  };
 
   const getParsedRoute = () => {
     if (currentPath === '/mock-exams') {
@@ -1326,13 +1367,8 @@ export default function LandingPage({
         <nav className={`lp-nav${scrolled ? ' lp-nav--scrolled' : ''}`}>
         <div className="lp-nav__inner">
           <div className="lp-nav__logo" onClick={() => { if (navigateTo) { navigateTo('/'); } else { setActiveLandingView('home'); } }} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-            <div className="lp-logo-box">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '22px', height: '22px' }}>
-                <path d="M18 6H8.5a4 4 0 100 8h8" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M14 10H8.5" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx="18" cy="6" r="1.5" fill="#FFD234" />
-                <circle cx="16.5" cy="14" r="1.5" fill="#FFD234" />
-              </svg>
+            <div className="lp-logo-box" style={{ background: 'none', boxShadow: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <img src={sunLogoImg} alt="EduPath AI" style={{ width: '38px', height: '38px', objectFit: 'contain' }} />
             </div>
             <span>EduPath <em>AI</em></span>
           </div>
@@ -1777,7 +1813,7 @@ export default function LandingPage({
         />
       )}
 
-      <div style={{ paddingTop: (['flashcards', 'ai-tutor'].includes(activeLandingView) || isExamTaking) ? '0px' : (activeLandingView === 'courses' ? '88px' : '68px') }}>
+      <div style={{ paddingTop: (['flashcards', 'ai-tutor'].includes(activeLandingView) || isExamTaking) ? '0px' : (activeLandingView === 'courses' ? '0px' : '68px') }}>
         {activeLandingView === 'home' && (
           <div className="animate-fade">
 
@@ -1831,74 +1867,368 @@ export default function LandingPage({
       {/* Flat horizontal divider */}
       <div className="lp-flat-divider" />
 
-      {/* ── FEATURED MOCK EXAMS ── */}
-      <section id="featured-exams" className="lp-subjects" style={{ background: '#F5F1E8', borderBottom: '3.5px solid #000', padding: '60px 0' }}>
+      {/* ── HIGHLY PREDICTIVE FEATURE CARDS (NEO-BRUTALIST STYLE) ── */}
+      <section id="featured-exams" className="lp-subjects" style={{ background: '#F5F1E8', borderBottom: '3.5px solid #000', padding: '70px 0' }}>
         <div className="lp-container">
-          <div className="lp-section-header lp-section-header--light" style={{ marginBottom: '40px' }}>
-            <span className="lp-eyebrow lp-eyebrow--dark" style={{ background: '#FFE259', border: '2px solid #000', color: '#000', boxShadow: '2px 2px 0 #000' }}>
-              📚 ĐỀ THI MẪU THỬ
+          <div className="lp-section-header lp-section-header--light" style={{ marginBottom: '45px', textAlign: 'center' }}>
+            <span className="lp-eyebrow lp-eyebrow--dark" style={{ background: '#FFE259', border: '2.5px solid #000', color: '#000', boxShadow: '3px 3px 0 #000', padding: '6px 16px', borderRadius: '30px', fontWeight: '900', fontSize: '12px' }}>
+              ⚡ CÔNG CỤ HỌC TẬP THÔNG MINH
             </span>
-            <h2 style={{ fontSize: '28px', fontWeight: '950', color: '#000', marginTop: '12px' }}>Luyện Tập Ngay Với Các Đề Thi Mẫu</h2>
-            <p style={{ fontSize: '14px', color: '#444' }}>Trải nghiệm thi thử 5 câu hỏi chuẩn cấu trúc để làm quen với hệ thống thi và giao diện lượng giá của EduPath.</p>
+            <h2 style={{ fontSize: '32px', fontWeight: '950', color: '#000', marginTop: '16px', letterSpacing: '-0.8px' }}>Trải Nghiệm Các Tính Năng Đột Phá</h2>
+            <p style={{ fontSize: '15px', color: '#444', maxWidth: '600px', margin: '8px auto 0 auto', lineHeight: 1.5 }}>
+              Ứng dụng Trí tuệ nhân tạo (AI) giúp tăng tốc quá trình học tập, củng cố lý thuyết và cá nhân hóa lộ trình ôn thi THPT Quốc Gia của bạn.
+            </p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '24px' }}>
-            {GUEST_MOCK_EXAMS.map((exam) => (
-              <div 
-                key={exam.id}
-                style={{
-                  background: '#FFF',
-                  border: '3.5px solid #000',
-                  borderRadius: '16px',
-                  padding: '20px',
-                  boxShadow: '4px 4px 0px #000',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between'
-                }}
-              >
-                <div>
-                  <span style={{ display: 'inline-block', background: 'rgba(108, 92, 231, 0.1)', color: 'var(--primary)', fontWeight: '900', fontSize: '11px', padding: '3px 8px', borderRadius: '8px', border: '1.5px solid #000', marginBottom: '12px' }}>
-                    {exam.subject}
-                  </span>
-                  <h4 style={{ fontSize: '15px', fontWeight: '900', color: '#000', margin: '0 0 10px', lineHeight: 1.3 }}>
-                    {exam.name}
-                  </h4>
-                  <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: '#666', fontWeight: '700', marginBottom: '20px' }}>
-                    <span>⏱️ {exam.duration} phút</span>
-                    <span>📝 {exam.questionsCount} câu hỏi</span>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '28px', maxWidth: '1200px', margin: '0 auto' }}>
+            
+            {/* Card 1: Flashcard */}
+            <div 
+              onClick={() => {
+                if (navigateTo) {
+                  navigateTo('/flashcards');
+                } else if (setActiveLandingView) {
+                  setActiveLandingView('features');
+                }
+              }}
+              style={{
+                background: '#5b75f3',
+                border: '3.5px solid #000',
+                borderRadius: '20px',
+                padding: '24px',
+                boxShadow: '6px 6px 0px #000',
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: '380px',
+                position: 'relative',
+                overflow: 'hidden',
+                cursor: 'pointer',
+                transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+              }}
+              className="lp-feature-card-neo"
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = 'translate(-4px, -4px)';
+                e.currentTarget.style.boxShadow = '10px 10px 0px #000';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'none';
+                e.currentTarget.style.boxShadow = '6px 6px 0px #000';
+              }}
+            >
+              <div style={{ width: '42px', height: '42px', background: '#FFF', border: '2.5px solid #000', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
+                <HiLightningBolt style={{ fontSize: '20px', color: '#000' }} />
+              </div>
+              <h4 style={{ fontSize: '22px', fontWeight: '950', color: '#FFF', margin: '0 0 10px', letterSpacing: '-0.5px' }}>Flashcard</h4>
+              <p style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.9)', margin: 0, lineHeight: 1.5, fontWeight: '600' }}>
+                Ghi nhớ nhanh các công thức toán học, vật lý, hóa học và từ vựng tiếng Anh qua hệ thống thẻ học thông minh và phương pháp Spaced Repetition.
+              </p>
+              
+              {/* Mascot bottom decoration */}
+              <div style={{
+                position: 'absolute',
+                bottom: 0,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '130px',
+                height: '65px',
+                borderRadius: '65px 65px 0 0',
+                background: '#3c53c4',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                paddingTop: '10px',
+                transition: 'height 0.2s'
+              }}>
+                {/* Eyes */}
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '22px' }}>
+                  <div style={{ width: '22px', height: '16px', borderRadius: '50%', background: '#FFF', border: '2px solid #000', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '2px', position: 'relative' }}>
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#000' }}></div>
+                  </div>
+                  <div style={{ width: '22px', height: '16px', borderRadius: '50%', background: '#FFF', border: '2px solid #000', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '2px', position: 'relative' }}>
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#000' }}></div>
                   </div>
                 </div>
-
-                <button
-                  onClick={() => handleStartGuestExam(exam)}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    background: '#FFE259',
-                    color: '#000',
-                    border: '2.5px solid #000',
-                    borderRadius: '10px',
-                    fontWeight: '900',
-                    fontSize: '12.5px',
-                    cursor: 'pointer',
-                    boxShadow: '2.5px 2.5px 0 #000',
-                    transition: 'all 0.15s',
-                    textAlign: 'center'
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.transform = 'translate(-1px, -1px)';
-                    e.currentTarget.style.boxShadow = '3.5px 3.5px 0 #000';
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.transform = 'none';
-                    e.currentTarget.style.boxShadow = '2.5px 2.5px 0 #000';
-                  }}
-                >
-                  Làm thử miễn phí 📝
-                </button>
+                {/* Pill badge */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: '12px',
+                  background: '#000',
+                  color: '#FFF',
+                  border: '2px solid #000',
+                  padding: '4px 12px',
+                  borderRadius: '20px',
+                  fontSize: '10px',
+                  fontWeight: '900',
+                  boxShadow: '1.5px 1.5px 0px #FFE259',
+                  whiteSpace: 'nowrap'
+                }}>
+                  1000+ THẺ
+                </div>
               </div>
-            ))}
+            </div>
+
+            {/* Card 2: Mindmap */}
+            <div 
+              onClick={() => {
+                if (navigateTo) {
+                  navigateTo('/ai-tutor');
+                } else if (setActiveLandingView) {
+                  setActiveLandingView('ai-tutor');
+                }
+              }}
+              style={{
+                background: '#3b8253',
+                border: '3.5px solid #000',
+                borderRadius: '20px',
+                padding: '24px',
+                boxShadow: '6px 6px 0px #000',
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: '380px',
+                position: 'relative',
+                overflow: 'hidden',
+                cursor: 'pointer',
+                transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+              }}
+              className="lp-feature-card-neo"
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = 'translate(-4px, -4px)';
+                e.currentTarget.style.boxShadow = '10px 10px 0px #000';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'none';
+                e.currentTarget.style.boxShadow = '6px 6px 0px #000';
+              }}
+            >
+              <div style={{ width: '42px', height: '42px', background: '#FFF', border: '2.5px solid #000', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
+                <HiShare style={{ fontSize: '20px', color: '#000' }} />
+              </div>
+              <h4 style={{ fontSize: '22px', fontWeight: '950', color: '#FFF', margin: '0 0 10px', letterSpacing: '-0.5px' }}>Mindmap</h4>
+              <p style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.9)', margin: 0, lineHeight: 1.5, fontWeight: '600' }}>
+                Hệ thống sơ đồ tư duy thông minh tích hợp AI, giúp kết nối kiến thức bài học trực quan và hỗ trợ lượng giá năng lượng học tập tức thì.
+              </p>
+              
+              {/* Mascot bottom decoration */}
+              <div style={{
+                position: 'absolute',
+                bottom: 0,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '130px',
+                height: '65px',
+                borderRadius: '65px 65px 0 0',
+                background: '#275938',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                paddingTop: '10px',
+                transition: 'height 0.2s'
+              }}>
+                {/* Eyes */}
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '22px' }}>
+                  <div style={{ width: '22px', height: '16px', borderRadius: '50%', background: '#FFF', border: '2px solid #000', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', paddingLeft: '2px', position: 'relative' }}>
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#000' }}></div>
+                  </div>
+                  <div style={{ width: '22px', height: '16px', borderRadius: '50%', background: '#FFF', border: '2px solid #000', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', paddingLeft: '2px', position: 'relative' }}>
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#000' }}></div>
+                  </div>
+                </div>
+                {/* Pill badge */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: '12px',
+                  background: '#000',
+                  color: '#FFF',
+                  border: '2px solid #000',
+                  padding: '4px 12px',
+                  borderRadius: '20px',
+                  fontSize: '10px',
+                  fontWeight: '900',
+                  boxShadow: '1.5px 1.5px 0px #FFE259',
+                  whiteSpace: 'nowrap'
+                }}>
+                  AI TỰ ĐỘNG
+                </div>
+              </div>
+            </div>
+
+            {/* Card 3: Thư viện tài liệu */}
+            <div 
+              onClick={() => {
+                if (navigateTo) {
+                  navigateTo('/exam-bank');
+                }
+              }}
+              style={{
+                background: '#c06c3a',
+                border: '3.5px solid #000',
+                borderRadius: '20px',
+                padding: '24px',
+                boxShadow: '6px 6px 0px #000',
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: '380px',
+                position: 'relative',
+                overflow: 'hidden',
+                cursor: 'pointer',
+                transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+              }}
+              className="lp-feature-card-neo"
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = 'translate(-4px, -4px)';
+                e.currentTarget.style.boxShadow = '10px 10px 0px #000';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'none';
+                e.currentTarget.style.boxShadow = '6px 6px 0px #000';
+              }}
+            >
+              <div style={{ width: '42px', height: '42px', background: '#FFF', border: '2.5px solid #000', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
+                <HiBookOpen style={{ fontSize: '20px', color: '#000' }} />
+              </div>
+              <h4 style={{ fontSize: '22px', fontWeight: '950', color: '#FFF', margin: '0 0 10px', letterSpacing: '-0.5px' }}>Thư viện tài liệu</h4>
+              <p style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.9)', margin: 0, lineHeight: 1.5, fontWeight: '600' }}>
+                Kho lưu trữ tài liệu, đề cương bài học và ngân hàng đề thi thử THPT Quốc Gia từ các trường chuyên danh tiếng trên cả nước.
+              </p>
+              
+              {/* Mascot bottom decoration */}
+              <div style={{
+                position: 'absolute',
+                bottom: 0,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '130px',
+                height: '65px',
+                borderRadius: '65px 65px 0 0',
+                background: '#8c4e28',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                paddingTop: '10px',
+                transition: 'height 0.2s'
+              }}>
+                {/* Eyes */}
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '22px' }}>
+                  <div style={{ width: '22px', height: '16px', borderRadius: '50%', background: '#FFF', border: '2px solid #000', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#000', transform: 'translateY(-2px)' }}></div>
+                  </div>
+                  <div style={{ width: '22px', height: '16px', borderRadius: '50%', background: '#FFF', border: '2px solid #000', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#000', transform: 'translateY(-2px)' }}></div>
+                  </div>
+                </div>
+                {/* Pill badge */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: '12px',
+                  background: '#000',
+                  color: '#FFF',
+                  border: '2px solid #000',
+                  padding: '4px 12px',
+                  borderRadius: '20px',
+                  fontSize: '10px',
+                  fontWeight: '900',
+                  boxShadow: '1.5px 1.5px 0px #FFE259',
+                  whiteSpace: 'nowrap'
+                }}>
+                  FREE 100%
+                </div>
+              </div>
+            </div>
+
+            {/* Card 4: Cá nhân hóa */}
+            <div 
+              onClick={() => {
+                if (currentUser) {
+                  if (navigateTo) {
+                    navigateTo('/user/home');
+                  }
+                } else {
+                  if (onNavigateToAuth) {
+                    onNavigateToAuth('signup');
+                  }
+                  toast("Hãy đăng ký tài khoản để trải nghiệm Lộ trình học tập cá nhân hóa từ AI!", "info");
+                }
+              }}
+              style={{
+                background: '#482980',
+                border: '3.5px solid #000',
+                borderRadius: '20px',
+                padding: '24px',
+                boxShadow: '6px 6px 0px #000',
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: '380px',
+                position: 'relative',
+                overflow: 'hidden',
+                cursor: 'pointer',
+                transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+              }}
+              className="lp-feature-card-neo"
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = 'translate(-4px, -4px)';
+                e.currentTarget.style.boxShadow = '10px 10px 0px #000';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'none';
+                e.currentTarget.style.boxShadow = '6px 6px 0px #000';
+              }}
+            >
+              <div style={{ width: '42px', height: '42px', background: '#FFF', border: '2.5px solid #000', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
+                <HiSparkles style={{ fontSize: '20px', color: '#000' }} />
+              </div>
+              <h4 style={{ fontSize: '22px', fontWeight: '950', color: '#FFF', margin: '0 0 10px', letterSpacing: '-0.5px' }}>Cá nhân hóa</h4>
+              <p style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.9)', margin: 0, lineHeight: 1.5, fontWeight: '600' }}>
+                Phân tích tự động điểm mạnh và điểm yếu từ lịch sử làm bài để sinh ra Lộ trình học tập 7 ngày, kèm đề ôn tập thích ứng chuẩn xác nhất.
+              </p>
+              
+              {/* Mascot bottom decoration */}
+              <div style={{
+                position: 'absolute',
+                bottom: 0,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '130px',
+                height: '65px',
+                borderRadius: '65px 65px 0 0',
+                background: '#341d5e',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                paddingTop: '10px',
+                transition: 'height 0.2s'
+              }}>
+                {/* Eyes */}
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '22px' }}>
+                  <div style={{ width: '22px', height: '16px', borderRadius: '50%', background: '#FFF', border: '2px solid #000', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '2px', position: 'relative' }}>
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#000', transform: 'rotate(15deg)' }}></div>
+                  </div>
+                  <div style={{ width: '22px', height: '16px', borderRadius: '50%', background: '#FFF', border: '2px solid #000', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '2px', position: 'relative' }}>
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#000', transform: 'rotate(15deg)' }}></div>
+                  </div>
+                </div>
+                {/* Pill badge */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: '12px',
+                  background: '#000',
+                  color: '#FFF',
+                  border: '2px solid #000',
+                  padding: '4px 12px',
+                  borderRadius: '20px',
+                  fontSize: '10px',
+                  fontWeight: '900',
+                  boxShadow: '1.5px 1.5px 0px #FFE259',
+                  whiteSpace: 'nowrap'
+                }}>
+                  LỘ TRÌNH AI
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </section>
@@ -1969,113 +2299,6 @@ export default function LandingPage({
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── AI TUTOR DEMO CHAT WIDGET ── */}
-      <section id="ai-demo-widget" className="lp-subjects" style={{ background: '#F5F1E8', borderBottom: '3.5px solid #000', padding: '60px 0' }}>
-        <div className="lp-container" style={{ maxWidth: '800px' }}>
-          <div className="lp-section-header" style={{ marginBottom: '32px', textAlign: 'center' }}>
-            <span className="lp-eyebrow lp-eyebrow--dark" style={{ background: '#5B75F3', border: '2px solid #000', color: '#FFF', boxShadow: '2px 2px 0 #000' }}>
-              🤖 AI TUTOR DEMO
-            </span>
-            <h2 style={{ fontSize: '28px', fontWeight: '950', color: '#000', marginTop: '12px' }}>Hỏi Thử AI Tutor Thông Minh</h2>
-            <p style={{ fontSize: '14px', color: '#444' }}>Nhập câu hỏi học tập bất kỳ để nhận câu trả lời phân tích từ AI Tutor (Giới hạn: 3 câu hỏi/ngày đối với khách).</p>
-          </div>
-
-          <div style={{ border: '3.5px solid #000', borderRadius: '16px', background: '#FFF', boxShadow: '5px 5px 0 #000', display: 'flex', flexDirection: 'column', height: '420px', overflow: 'hidden' }}>
-            {/* Header info bar */}
-            <div style={{ background: '#0E100D', color: '#FFF', padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '3px solid #000' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '18px' }}>🤖</span>
-                <strong style={{ fontSize: '13px' }}>AI Tutor Bot (Demo Mode)</strong>
-              </div>
-              <span style={{ fontSize: '11px', background: '#22C55E', color: '#FFF', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>
-                Đang trực tuyến
-              </span>
-            </div>
-
-            {/* Chat Messages */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', background: '#FCFBFA' }}>
-              {guestChatHistory.map((chat, idx) => (
-                <div 
-                  key={idx} 
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: chat.sender === 'user' ? 'flex-end' : 'flex-start',
-                    maxWidth: '100%'
-                  }}
-                >
-                  <div 
-                    style={{
-                      background: chat.sender === 'user' ? '#FFE259' : '#FFF',
-                      border: '2px solid #000',
-                      borderRadius: '12px',
-                      padding: '10px 14px',
-                      fontSize: '13px',
-                      fontWeight: '700',
-                      color: '#000',
-                      boxShadow: '2px 2px 0 #000',
-                      maxWidth: '80%',
-                      lineHeight: 1.4,
-                      wordBreak: 'break-word'
-                    }}
-                  >
-                    {chat.text}
-                  </div>
-                </div>
-              ))}
-              {guestChatLoading && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#666', fontWeight: 'bold' }}>
-                  <span>🤖 AI Tutor đang phân tích...</span>
-                </div>
-              )}
-            </div>
-
-            {/* Chat Input form */}
-            <form 
-              onSubmit={handleGuestAIChatSubmit}
-              style={{ display: 'flex', borderTop: '3px solid #000', background: '#FFF' }}
-            >
-              <input 
-                type="text"
-                value={guestChatInput}
-                onChange={e => setGuestChatInput(e.target.value)}
-                placeholder="Ví dụ: Công thức tính nhanh đạo hàm cực trị, hoặc cách học tiếng Anh..."
-                style={{
-                  flex: 1,
-                  padding: '14px 18px',
-                  border: 'none',
-                  outline: 'none',
-                  fontSize: '13px',
-                  fontWeight: '700',
-                  color: '#000',
-                  background: 'transparent'
-                }}
-                disabled={guestChatLoading}
-              />
-              <button 
-                type="submit"
-                style={{
-                  padding: '0 24px',
-                  background: '#FFE259',
-                  color: '#000',
-                  borderLeft: '3px solid #000',
-                  borderTop: 'none',
-                  borderRight: 'none',
-                  borderBottom: 'none',
-                  fontSize: '13px',
-                  fontWeight: '900',
-                  cursor: 'pointer',
-                  outline: 'none'
-                }}
-                disabled={guestChatLoading}
-              >
-                GỬI 🚀
-              </button>
-            </form>
           </div>
         </div>
       </section>
@@ -2223,23 +2446,7 @@ export default function LandingPage({
         </div>
       )}
 
-      {/* ── STATS ── */}
-      <section id="stats" className="lp-stats-section">
-        <div className="lp-container">
-          <div className="lp-stats-grid">
-            {STATS.map((s, i) => (
-              <div key={i} className="lp-stat-item">
-                <span className="lp-stat-icon">{s.icon}</span>
-                <span className="lp-stat-value">{s.value}</span>
-                <span className="lp-stat-label">{s.label}</span>
-              </div>
-            ))}
-          </div>
-          <div className="lp-stats-tagline">
-            <p>Giúp bạn đạt được mục tiêu hiệu quả qua ứng dụng công nghệ và nghiên cứu khoa học vào giảng dạy</p>
-          </div>
-        </div>
-      </section>
+
 
       {/* ── FEATURES ── */}
       <section id="features" className="lp-features-section">
@@ -2261,70 +2468,212 @@ export default function LandingPage({
         </div>
       </section>
 
-      {/* ── PRICING ── */}
-      <section id="pricing" className="lp-pricing-section">
-        <div className="lp-container">
-          <div className="lp-section-header">
-            <span className="lp-eyebrow lp-eyebrow--outline">Học phí minh bạch</span>
-            <h2>Bắt đầu miễn phí, nâng cấp khi sẵn sàng</h2>
-          </div>
-
-          <div className="lp-pricing-row">
-            <div className="lp-price-card">
-              <div className="lp-price-tier">GÓI CƠ BẢN</div>
-              <div className="lp-price-amount">0đ<span>/mãi mãi</span></div>
-              <ul className="lp-price-features">
-                <li><HiCheck /> Làm 5 đề thi thử mẫu</li>
-                <li><HiCheck /> Xem 2 bài giảng đầu mỗi khóa</li>
-                <li><HiCheck /> Tải slide tóm tắt công thức</li>
-              </ul>
-              <button 
-                className="lp-btn lp-btn--outline lp-btn--full" 
-                onClick={() => currentUser ? onBackToDashboard('home') : onNavigateToAuth('signup')}
-              >
-                {currentUser ? "Bắt đầu học ngay" : "Đăng ký miễn phí"}
-              </button>
+      {/* ── REGISTRATION FORM ── */}
+      <section id="pricing" className="lp-pricing-section" style={{ backgroundColor: '#FFFDF2', padding: '80px 0', borderTop: '3.5px solid #000000', borderBottom: '3.5px solid #000000' }}>
+        <div className="lp-container" style={{ maxWidth: '1000px', margin: '0 auto', padding: '0 20px' }}>
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '48px'
+          }}>
+            {/* Left side: Mascot */}
+            <div style={{ flex: '1 1 380px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <img 
+                src={sunMascotImg} 
+                alt="Sun Mascot" 
+                style={{ 
+                  width: '100%', 
+                  maxWidth: '440px', 
+                  height: 'auto',
+                  objectFit: 'contain',
+                  transform: 'scale(1.05)',
+                  transition: 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                }} 
+                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.12) rotate(2deg)'}
+                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1.05)'}
+              />
             </div>
 
-            <div className="lp-price-card lp-price-card--featured">
-              <div className="lp-price-badge">Bán chạy nhất ⚡</div>
-              <div className="lp-price-tier">PREMIUM PRO</div>
-              <div className="lp-price-amount">599.000đ<span>/trọn đời</span></div>
-              <ul className="lp-price-features">
-                <li><HiCheck /> <strong>Mở khóa toàn bộ</strong> video & đề thi</li>
-                <li><HiCheck /> <strong>AI phân tích</strong> lỗ hổng tức thì</li>
-                <li><HiCheck /> Lộ trình <strong>cá nhân hóa</strong> tự động</li>
-                <li><HiCheck /> <strong>EduBot AI</strong> hỏi đáp không giới hạn</li>
-                <li><HiCheck /> Hỗ trợ trực tiếp <strong>giáo viên bộ môn</strong></li>
-              </ul>
-              <button 
-                className="lp-btn lp-btn--accent lp-btn--full" 
-                onClick={() => currentUser ? onBackToDashboard('courses') : onNavigateToAuth('signup')}
-              >
-                {currentUser ? "Đăng ký khóa học ngay" : "Nâng cấp Premium Pro"} <HiLightningBolt />
-              </button>
+            {/* Right side: Form */}
+            <div style={{ flex: '1 1 450px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ textAlign: 'left' }}>
+                <h2 style={{ 
+                  fontSize: '38px', 
+                  fontWeight: '900', 
+                  color: '#1E293B', 
+                  marginBottom: '10px', 
+                  lineHeight: '1.2',
+                  letterSpacing: '-0.5px',
+                  fontFamily: 'system-ui, -apple-system, sans-serif'
+                }}>
+                  Nhận tài liệu <br />
+                  luyện thi <span style={{ color: '#D97706' }}>miễn phí</span>
+                </h2>
+                <p style={{ fontSize: '15px', color: '#475569', lineHeight: '1.6', margin: 0, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                  Nhập thông tin để nhận ngay bộ đề mới nhất kèm tài liệu ôn thi chất lượng cao.
+                </p>
+              </div>
+
+              <form onSubmit={handleLeadSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Input 1: Name */}
+                <div style={{ position: 'relative' }}>
+                  <HiUser style={{ 
+                    position: 'absolute', 
+                    left: '16px', 
+                    top: '50%', 
+                    transform: 'translateY(-50%)', 
+                    color: '#94A3B8', 
+                    fontSize: '18px' 
+                  }} />
+                  <input 
+                    type="text" 
+                    placeholder="Họ và tên" 
+                    value={leadName}
+                    onChange={(e) => setLeadName(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '14px 16px 14px 46px',
+                      border: '2px solid #E2E8F0',
+                      borderRadius: '12px',
+                      outline: 'none',
+                      fontSize: '15px',
+                      backgroundColor: '#FFFFFF',
+                      color: '#1E293B',
+                      boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.02)',
+                      transition: 'border-color 0.2s',
+                      fontFamily: 'system-ui, -apple-system, sans-serif'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#D97706'}
+                    onBlur={(e) => e.target.style.borderColor = '#E2E8F0'}
+                  />
+                </div>
+
+                {/* Input 2: Email */}
+                <div style={{ position: 'relative' }}>
+                  <HiMail style={{ 
+                    position: 'absolute', 
+                    left: '16px', 
+                    top: '50%', 
+                    transform: 'translateY(-50%)', 
+                    color: '#94A3B8', 
+                    fontSize: '18px' 
+                  }} />
+                  <input 
+                    type="email" 
+                    placeholder="Email" 
+                    value={leadEmail}
+                    onChange={(e) => setLeadEmail(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '14px 16px 14px 46px',
+                      border: '2px solid #E2E8F0',
+                      borderRadius: '12px',
+                      outline: 'none',
+                      fontSize: '15px',
+                      backgroundColor: '#FFFFFF',
+                      color: '#1E293B',
+                      boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.02)',
+                      transition: 'border-color 0.2s',
+                      fontFamily: 'system-ui, -apple-system, sans-serif'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#D97706'}
+                    onBlur={(e) => e.target.style.borderColor = '#E2E8F0'}
+                  />
+                </div>
+
+                {/* Input 3: Phone */}
+                <div style={{ position: 'relative' }}>
+                  <HiPhone style={{ 
+                    position: 'absolute', 
+                    left: '16px', 
+                    top: '50%', 
+                    transform: 'translateY(-50%)', 
+                    color: '#94A3B8', 
+                    fontSize: '18px' 
+                  }} />
+                  <input 
+                    type="tel" 
+                    placeholder="Số điện thoại" 
+                    value={leadPhone}
+                    onChange={(e) => setLeadPhone(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '14px 16px 14px 46px',
+                      border: '2px solid #E2E8F0',
+                      borderRadius: '12px',
+                      outline: 'none',
+                      fontSize: '15px',
+                      backgroundColor: '#FFFFFF',
+                      color: '#1E293B',
+                      boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.02)',
+                      transition: 'border-color 0.2s',
+                      fontFamily: 'system-ui, -apple-system, sans-serif'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#D97706'}
+                    onBlur={(e) => e.target.style.borderColor = '#E2E8F0'}
+                  />
+                </div>
+
+                {/* Submit Button */}
+                <button 
+                  type="submit" 
+                  disabled={leadSubmitting}
+                  style={{
+                    width: '100%',
+                    padding: '14px 20px',
+                    backgroundColor: '#E05A2B',
+                    color: '#FFFFFF',
+                    border: '2.5px solid #000000',
+                    borderRadius: '12px',
+                    fontSize: '16px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    boxShadow: '3px 3px 0px #000000',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    fontFamily: 'system-ui, -apple-system, sans-serif'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translate(-2px, -2px)';
+                    e.currentTarget.style.boxShadow = '5px 5px 0px #000000';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'none';
+                    e.currentTarget.style.boxShadow = '3px 3px 0px #000000';
+                  }}
+                >
+                  {leadSubmitting ? 'Đang gửi...' : 'Gửi! →'}
+                </button>
+
+                {/* Secure Badge */}
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: '6px', 
+                  fontSize: '11px', 
+                  color: '#94A3B8',
+                  fontWeight: '700',
+                  letterSpacing: '0.5px',
+                  textTransform: 'uppercase',
+                  marginTop: '4px',
+                  fontFamily: 'system-ui, -apple-system, sans-serif'
+                }}>
+                  <HiLockClosed style={{ fontSize: '13px' }} />
+                  <span>Thông tin của bạn được bảo mật tuyệt đối</span>
+                </div>
+              </form>
             </div>
           </div>
         </div>
       </section>
 
 
-      {/* ── CTA BANNER ── */}
-      <section className="lp-cta-banner">
-        <div className="lp-container lp-cta-inner">
-          <div className="lp-cta-mascot">🎓</div>
-          <div>
-            <h2>Sẵn sàng chinh phục THPTQG?</h2>
-            <p>Tham gia cùng 42,500+ học sinh đang học mỗi ngày với EduPath AI.</p>
-          </div>
-          <button 
-            className="lp-btn lp-btn--white lp-btn--lg" 
-            onClick={() => currentUser ? onBackToDashboard('home') : onNavigateToAuth('signup')}
-          >
-            {currentUser ? "Đến bảng điều khiển" : "Bắt đầu ngay hôm nay"} <HiArrowRight />
-          </button>
-        </div>
-      </section>
           </div>
         )}
 
@@ -2355,9 +2704,9 @@ export default function LandingPage({
 
         {/* ================= 2. SUBJECTS DEDICATED PAGE ================= */}
         {activeLandingView === 'courses' && (
-          <div className="animate-in" style={{ background: '#F5F1E8', minHeight: '100vh', padding: '40px 0 80px' }}>
+          <div className="animate-in" style={{ background: '#F5F1E8', minHeight: '100vh', padding: '16px 0 80px' }}>
             {!selectedCourseId && (
-              <div style={{ marginBottom: '24px', maxWidth: '1440px', margin: '0 auto', padding: '0 24px' }}>
+              <div style={{ marginBottom: '12px', maxWidth: '1440px', margin: '0 auto', padding: '0 24px' }}>
                 <button
                   onClick={() => {
                     if (navigateTo) { navigateTo('/'); } else { setActiveLandingView('home'); }
@@ -3085,13 +3434,8 @@ export default function LandingPage({
             <div className="lp-footer__grid">
               <div className="lp-footer__brand">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                  <div className="lp-logo-box" style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifycontent: 'center', padding: 0 }}>
-                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '20px', height: '20px' }}>
-                      <path d="M18 6H8.5a4 4 0 100 8h8" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                      <path d="M14 10H8.5" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                      <circle cx="18" cy="6" r="1.5" fill="#FFD234" />
-                      <circle cx="16.5" cy="14" r="1.5" fill="#FFD234" />
-                    </svg>
+                  <div className="lp-logo-box" style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, background: 'none', boxShadow: 'none' }}>
+                    <img src={sunLogoImg} alt="EduPath AI" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
                   </div>
                   <span style={{ fontWeight: 800, fontSize: 17, color: '#fff' }}>EduPath AI</span>
                 </div>

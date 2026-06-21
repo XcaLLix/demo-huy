@@ -84,54 +84,69 @@ export default function DiscussionTab({
 
   return (
     <div className="discussion-tab animate-in">
-      <form onSubmit={handleSubmit} className="discussion-tab__form">
-        <textarea
+      <form onSubmit={handleSubmit} style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', width: '100%' }}>
+        <div style={{
+          width: '40px',
+          height: '40px',
+          borderRadius: '50%',
+          background: '#eef2ff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+          flexShrink: 0
+        }}>
+          {currentUser?.avatarUrl ? (
+            <img src={currentUser.avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            <span style={{ color: '#4f46e5', fontWeight: 'bold', fontSize: '13px' }}>
+              {currentUser?.fullName?.substring(0, 2).toUpperCase() || 'U'}
+            </span>
+          )}
+        </div>
+        
+        <input
+          type="text"
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
-          placeholder="Đặt câu hỏi hoặc chia sẻ ý kiến của em về bài học này..."
-          className="discussion-tab__textarea"
+          placeholder="Viết bình luận..."
+          style={{
+            flex: 1,
+            height: '40px',
+            borderRadius: '8px',
+            border: '1.5px solid #cbd5e1',
+            padding: '0 16px',
+            fontSize: '13.5px',
+            fontFamily: "'Outfit', sans-serif",
+            outline: 'none',
+            transition: 'border-color 0.2s'
+          }}
           required
-          rows={3}
         />
-        <div className="discussion-tab__form-actions">
-          <label className="timestamp-checkbox-label">
-            <input
-              type="checkbox"
-              checked={attachTimestamp}
-              onChange={(e) => setAttachTimestamp(e.target.checked)}
-              className="timestamp-checkbox"
-            />
-            <span>Gắn câu hỏi vào giây phát hiện tại ({formatTime(videoTime)})</span>
-          </label>
-          <button type="submit" className="discussion-tab__submit-btn">
-            Gửi câu hỏi
-          </button>
-        </div>
+
+        <button 
+          type="submit" 
+          style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: '8px',
+            background: '#9e9cf2',
+            color: '#fff',
+            border: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            fontSize: '18px',
+            transition: 'background 0.2s',
+            flexShrink: 0
+          }}
+        >
+          ↵
+        </button>
       </form>
 
-      <div className="discussion-tab__filters">
-        <button
-          type="button"
-          onClick={() => setFilterMode('ALL')}
-          className={`filter-btn ${filterMode === 'ALL' ? 'filter-btn--active' : ''}`}
-        >
-          Tất cả
-        </button>
-        <button
-          type="button"
-          onClick={() => setFilterMode('CURRENT')}
-          className={`filter-btn ${filterMode === 'CURRENT' ? 'filter-btn--active' : ''}`}
-        >
-          Quanh giây hiện tại (±30s)
-        </button>
-        <button
-          type="button"
-          onClick={() => setFilterMode('MINE')}
-          className={`filter-btn ${filterMode === 'MINE' ? 'filter-btn--active' : ''}`}
-        >
-          Của tôi
-        </button>
-      </div>
+      {/* Hidden filters for layout screenshot matching */}
 
       <div className="discussion-tab__list">
         {filteredDiscussions.length > 0 ? (
@@ -201,8 +216,8 @@ export default function DiscussionTab({
             );
           })
         ) : (
-          <div className="discussion-tab__empty">
-            Chưa có câu hỏi thảo luận nào được tìm thấy.
+          <div className="discussion-tab__empty" style={{ padding: '24px 0', textAlign: 'left', color: '#64748b', fontSize: '13px', fontWeight: '500' }}>
+            Chưa có bình luận nào. Hãy là người đầu tiên bình luận!
           </div>
         )}
       </div>

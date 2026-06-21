@@ -49,22 +49,32 @@ export function mapDbCourseToMockFormat(c) {
   if (c.lessons && c.lessons.length > 0) {
     const sortedLessons = [...c.lessons].sort((a, b) => a.order - b.order);
     
-    if (sortedLessons.length > 4) {
-      const mid = Math.ceil(sortedLessons.length / 2);
+    if (sortedLessons.length >= 3) {
       curriculumVal.push({
-        title: "Phần 1: Kiến thức nền tảng",
-        lessons: sortedLessons.slice(0, mid).map(l => ({
+        title: "Phần 0",
+        lessons: sortedLessons.slice(0, 1).map(l => ({
           id: l.id.toString(),
           title: l.title,
           type: l.videoUrl ? 'video' : 'document',
           durationMin: parseInt(l.duration?.split(':')[0], 10) || 15,
-          isPreview: l.order === 1,
+          isPreview: true,
           videoUrl: l.videoUrl
         }))
       });
       curriculumVal.push({
-        title: "Phần 2: Chuyên đề nâng cao",
-        lessons: sortedLessons.slice(mid).map(l => ({
+        title: "Phần 1",
+        lessons: sortedLessons.slice(1, sortedLessons.length - 1).map(l => ({
+          id: l.id.toString(),
+          title: l.title,
+          type: l.videoUrl ? 'video' : 'document',
+          durationMin: parseInt(l.duration?.split(':')[0], 10) || 15,
+          isPreview: false,
+          videoUrl: l.videoUrl
+        }))
+      });
+      curriculumVal.push({
+        title: "Phần 2",
+        lessons: sortedLessons.slice(sortedLessons.length - 1).map(l => ({
           id: l.id.toString(),
           title: l.title,
           type: l.videoUrl ? 'video' : 'document',
@@ -75,7 +85,7 @@ export function mapDbCourseToMockFormat(c) {
       });
     } else {
       curriculumVal.push({
-        title: "Danh sách bài giảng chuyên sâu",
+        title: "Phần 0",
         lessons: sortedLessons.map(l => ({
           id: l.id.toString(),
           title: l.title,
@@ -131,7 +141,7 @@ export function mapDbCourseToMockFormat(c) {
     grade: c.grade,
     curriculum: curriculumVal.map(c => ({
       ...c,
-      title: c.title ? c.title.replace(/^Phần\s*\d+\s*[:.-]\s*/i, '').trim() : ''
+      title: c.title
     }))
   };
 }

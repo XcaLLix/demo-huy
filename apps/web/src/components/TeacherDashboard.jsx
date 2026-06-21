@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { toast } from '../utils/toast';
+import sunLogoImg from '../assets/sun_logo.png';
 import { 
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
@@ -42,6 +43,7 @@ export default function TeacherDashboard({
   courses: initialCourses,
   onCreateCourse,
   onDeleteCourse,
+  onRefreshCourses,
   questionBank: initialQuestionBank,
   onAddQuestion,
   addLog,
@@ -59,6 +61,9 @@ export default function TeacherDashboard({
 
   const handleTabChange = (tab) => {
     setLocalTab(tab);
+    if (tab === 'materials') {
+      loadTeacherMaterials();
+    }
     if (setActiveTab) {
       if (tab === 'overview') setActiveTab('home');
       else if (tab === 'questions') setActiveTab('questions');
@@ -89,9 +94,17 @@ export default function TeacherDashboard({
           const mappedMaterials = data.recentMaterialsList.map(m => ({
             id: m.id,
             name: m.name,
+            title: m.name,
             type: m.type.toLowerCase(),
+            fileType: m.type,
             size: m.size,
-            date: m.date
+            date: m.date,
+            isPublic: m.isPublic || false,
+            isApproved: m.isApproved || false,
+            price: m.price || 0,
+            subject: m.subject || 'Toán Học',
+            grade: m.grade || '12',
+            fileUrl: m.fileUrl || ''
           }));
           setTeacherMaterials(mappedMaterials);
         }
@@ -142,6 +155,241 @@ export default function TeacherDashboard({
 
   // --- COURSES: Lesson Reorder & Student Preview ---
   const [selectedCourseId, setSelectedCourseId] = useState(null);
+
+  // --- COURSES CRUD STATES ---
+  const [courseEditMode, setCourseEditMode] = useState('view'); // view, edit, create
+  const [cTitle, setCTitle] = useState('');
+  const [cDescription, setCDescription] = useState('');
+  const [cSubject, setCSubject] = useState('Toán học');
+  const [cGrade, setCGrade] = useState('12');
+  const [cPrice, setCPrice] = useState('0');
+  const [cDiscount, setCDiscount] = useState('0');
+  const [cThumbnailUrl, setCThumbnailUrl] = useState('');
+  const [cIsPublished, setCIsPublished] = useState(false);
+  const [cThumbnailUploading, setCThumbnailUploading] = useState(false);
+
+  // --- LESSONS CRUD STATES ---
+  const [lessonEditMode, setLessonEditMode] = useState('idle'); // idle, create, edit
+  const [lTitle, setLTitle] = useState('');
+  const [lDuration, setLDuration] = useState('15m');
+  const [lVideoUrl, setLVideoUrl] = useState('');
+  const [lContent, setLContent] = useState('');
+  const [editingLessonId, setEditingLessonId] = useState(null);
+  const [lVideoUploading, setLVideoUploading] = useState(false);
+  const [lDocUploading, setLDocUploading] = useState(false);
+
+  const loadTeacherCourses = async () => {
+    try {
+      const data = await api.getCourses({ teacherId: currentUser.id });
+      if (data) {
+        setCourses(data);
+      }
+    } catch (err) {
+      console.error('Failed to load teacher courses:', err);
+    }
+  };
+
+  const handleCreateCourseClick = () => {
+    setCTitle('');
+    setCDescription('');
+    setCSubject('Toán học');
+    setCGrade('12');
+    setCPrice('0');
+    setCDiscount('0');
+    setCThumbnailUrl('');
+    setCIsPublished(false);
+    setCourseEditMode('create');
+  };
+
+  const handleEditCourseClick = (course) => {
+    setCTitle(course.title || '');
+    setCDescription(course.description || '');
+    setCSubject(course.subject || 'Toán học');
+    setCGrade(String(course.grade || '12'));
+    setCPrice(String(course.price || '0'));
+    setCDiscount(String(course.discount || '0'));
+    setCThumbnailUrl(course.thumbnailUrl || '');
+    setCIsPublished(course.isPublished || false);
+    setCourseEditMode('edit');
+  };
+
+  const handleSaveCourseSubmit = async (e) => {
+    e.preventDefault();
+    if (!cTitle.trim()) {
+      toast('Vui lòng nhập tên khóa học!', 'warning');
+      return;
+    }
+    try {
+      const payload = {
+        title: cTitle,
+        description: cDescription,
+        subject: cSubject,
+        price: Number(cPrice),
+        discount: Number(cDiscount),
+        thumbnailUrl: cThumbnailUrl,
+        grade: Number(cGrade),
+        isPublished: cIsPublished
+      };
+
+      if (courseEditMode === 'create') {
+        const res = await api.createCourse(payload);
+        toast(`Tạo khóa học "${res.title}" thành công!`, 'success');
+        if (onCreateCourse) onCreateCourse(res);
+      } else {
+        const res = await api.updateCourse(selectedCourseId, payload);
+        toast(`Cập nhật khóa học "${res.title}" thành công!`, 'success');
+      }
+
+      setCourseEditMode('view');
+      await loadTeacherCourses();
+      if (onRefreshCourses) onRefreshCourses();
+    } catch (err) {
+      console.error(err);
+      toast(err.message || 'Lưu khóa học thất bại!', 'error');
+    }
+  };
+
+  const handleDeleteCourseReal = async (courseId) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa khóa học này cùng toàn bộ bài học liên quan?')) return;
+    try {
+      await api.deleteCourse(courseId);
+      toast('Xóa khóa học thành công!', 'success');
+      if (onDeleteCourse) onDeleteCourse(courseId);
+      if (selectedCourseId === courseId) {
+        setSelectedCourseId(null);
+        setCourseEditMode('view');
+      }
+      await loadTeacherCourses();
+      if (onRefreshCourses) onRefreshCourses();
+    } catch (err) {
+      console.error(err);
+      toast('Xóa khóa học thất bại!', 'error');
+    }
+  };
+
+  const handleCourseThumbnailChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setCThumbnailUploading(true);
+      const res = await api.uploadFile(file);
+      if (res && res.url) {
+        setCThumbnailUrl(res.url);
+        toast('Tải ảnh banner lên thành công!', 'success');
+      }
+    } catch (err) {
+      console.error(err);
+      toast('Tải ảnh banner lên thất bại!', 'error');
+    } finally {
+      setCThumbnailUploading(false);
+    }
+  };
+
+  // Lessons handlers
+  const handleCreateLessonClick = () => {
+    setLTitle('');
+    setLDuration('15m');
+    setLVideoUrl('');
+    setLContent('');
+    setLessonEditMode('create');
+  };
+
+  const handleEditLessonClick = (lesson) => {
+    setLTitle(lesson.title || lesson.name || '');
+    setLDuration(lesson.duration || '15m');
+    setLVideoUrl(lesson.videoUrl || '');
+    setLContent(lesson.content || '');
+    setEditingLessonId(lesson.id);
+    setLessonEditMode('edit');
+  };
+
+  const handleSaveLessonSubmit = async (e) => {
+    e.preventDefault();
+    if (!lTitle.trim()) {
+      toast('Vui lòng nhập tên bài học!', 'warning');
+      return;
+    }
+    const currentCourse = courses.find(c => c.id === selectedCourseId);
+    const nextOrder = currentCourse ? (currentCourse.lessons?.length || 0) + 1 : 1;
+
+    try {
+      if (lessonEditMode === 'create') {
+        await api.createLesson({
+          courseId: selectedCourseId,
+          title: lTitle,
+          duration: lDuration,
+          videoUrl: lVideoUrl,
+          content: lContent,
+          order: nextOrder
+        });
+        toast('Thêm bài học mới thành công!', 'success');
+      } else {
+        await api.updateLesson(editingLessonId, {
+          title: lTitle,
+          duration: lDuration,
+          videoUrl: lVideoUrl,
+          content: lContent
+        });
+        toast('Cập nhật bài học thành công!', 'success');
+      }
+      setLessonEditMode('idle');
+      setEditingLessonId(null);
+      await loadTeacherCourses();
+      if (onRefreshCourses) onRefreshCourses();
+    } catch (err) {
+      console.error(err);
+      toast(err.message || 'Lưu bài học thất bại!', 'error');
+    }
+  };
+
+  const handleDeleteLessonReal = async (lessonId) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa bài học này?')) return;
+    try {
+      await api.deleteLesson(lessonId);
+      toast('Xóa bài học thành công!', 'success');
+      await loadTeacherCourses();
+      if (onRefreshCourses) onRefreshCourses();
+    } catch (err) {
+      console.error(err);
+      toast('Xóa bài học thất bại!', 'error');
+    }
+  };
+
+  const handleLessonVideoChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setLVideoUploading(true);
+      const res = await api.uploadFile(file);
+      if (res && res.url) {
+        setLVideoUrl(res.url);
+        toast('Tải video lên thành công!', 'success');
+      }
+    } catch (err) {
+      console.error(err);
+      toast('Tải video thất bại!', 'error');
+    } finally {
+      setLVideoUploading(false);
+    }
+  };
+
+  const handleLessonDocChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setLDocUploading(true);
+      const res = await api.uploadFile(file);
+      if (res && res.url) {
+        setLContent(res.url);
+        toast('Tải tài liệu lên thành công!', 'success');
+      }
+    } catch (err) {
+      console.error(err);
+      toast('Tải tài liệu thất bại!', 'error');
+    } finally {
+      setLDocUploading(false);
+    }
+  };
 
   // --- EXAMS: Builder & Stats ---
   const [exams, setExams] = useState([]);
@@ -205,6 +453,42 @@ export default function TeacherDashboard({
   // --- TEACHER REDESIGN STATES ---
   const [teacherMaterials, setTeacherMaterials] = useState([]);
   const [materialSearch, setMaterialSearch] = useState('');
+  const [loadingMaterials, setLoadingMaterials] = useState(false);
+  const [formTitle, setFormTitle] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [formSubject, setFormSubject] = useState('Toán Học');
+  const [formGrade, setFormGrade] = useState('12');
+  const [formPrice, setFormPrice] = useState('0');
+  const [formIsPublic, setFormIsPublic] = useState(true);
+  const [uploadingMaterial, setUploadingMaterial] = useState(false);
+  const materialFileInputRef = useRef(null);
+
+  const loadTeacherMaterials = async () => {
+    try {
+      setLoadingMaterials(true);
+      const data = await api.getTeacherMaterials();
+      if (data) {
+        const mapped = data.map(m => ({
+          ...m,
+          name: m.title,
+          type: m.fileType?.toLowerCase() || 'pdf',
+          size: m.fileSize ? (m.fileSize / (1024 * 1024)).toFixed(1) + ' MB' : m.size || '0.0 MB',
+          date: m.uploadedAt ? new Date(m.uploadedAt).toLocaleDateString('vi-VN') : m.date
+        }));
+        setTeacherMaterials(mapped);
+      }
+    } catch (err) {
+      console.error('Failed to load teacher materials:', err);
+    } finally {
+      setLoadingMaterials(false);
+    }
+  };
+
+  useEffect(() => {
+    if (localTab === 'materials') {
+      loadTeacherMaterials();
+    }
+  }, [localTab]);
   
   const [teacherClasses, setTeacherClasses] = useState([]);
   const [newClassName, setNewClassName] = useState('');
@@ -306,17 +590,69 @@ export default function TeacherDashboard({
     toast(`Tạo lớp học ${newClassName} (${newClassId.toUpperCase()}) thành công!`, 'success');
   };
 
-  const handleUploadMaterial = (e) => {
+  const handleUploadMaterialReal = async (e) => {
     e.preventDefault();
-    toast('Tải lên tài liệu thành công!', 'success');
-    const newMat = {
-      id: teacherMaterials.length + 1,
-      name: 'Tài liệu mới tải lên_' + Date.now().toString().slice(-4),
-      type: 'pdf',
-      size: '1.2 MB',
-      date: new Date().toLocaleDateString('vi-VN')
-    };
-    setTeacherMaterials([newMat, ...teacherMaterials]);
+    const file = materialFileInputRef.current?.files?.[0];
+    if (!file) {
+      toast('Vui lòng chọn tệp tài liệu để tải lên!', 'warning');
+      return;
+    }
+
+    try {
+      setUploadingMaterial(true);
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('title', formTitle);
+      formData.append('description', formDescription);
+      formData.append('subject', formSubject);
+      formData.append('grade', formGrade);
+      formData.append('price', formPrice);
+      formData.append('isPublic', formIsPublic ? 'true' : 'false');
+
+      await api.createTeacherMaterial(formData);
+      toast('Tải lên tài liệu thành công!', 'success');
+      
+      // Reset form
+      setFormTitle('');
+      setFormDescription('');
+      setFormPrice('0');
+      if (materialFileInputRef.current) {
+        materialFileInputRef.current.value = '';
+      }
+
+      // Reload materials
+      await loadTeacherMaterials();
+      await loadTeacherStats();
+    } catch (err) {
+      console.error('[Upload Material Error]', err);
+      toast(err.message || 'Tải lên tài liệu thất bại!', 'error');
+    } finally {
+      setUploadingMaterial(false);
+    }
+  };
+
+  const handleToggleMaterialPublic = async (id, isPublic) => {
+    try {
+      await api.updateTeacherMaterial(id, { isPublic });
+      toast(isPublic ? 'Đã công khai tài liệu!' : 'Đã chuyển tài liệu sang chế độ nháp!', 'success');
+      await loadTeacherMaterials();
+    } catch (err) {
+      console.error('[Toggle Public Error]', err);
+      toast('Không thể thay đổi trạng thái tài liệu!', 'error');
+    }
+  };
+
+  const handleDeleteMaterial = async (id) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa tài liệu này khỏi hệ thống?')) return;
+    try {
+      await api.deleteTeacherMaterial(id);
+      toast('Xóa tài liệu thành công!', 'success');
+      await loadTeacherMaterials();
+      await loadTeacherStats();
+    } catch (err) {
+      console.error('[Delete Material Error]', err);
+      toast('Không thể xóa tài liệu!', 'error');
+    }
   };
 
   // --- HANDLERS ---
@@ -388,6 +724,8 @@ export default function TeacherDashboard({
   useEffect(() => {
     loadTeacherStats();
     loadExamsList();
+    loadTeacherMaterials();
+    loadTeacherCourses();
   }, []);
 
   const excelPct = dbStats?.scoreDistribution?.excelPct ?? 18;
@@ -595,14 +933,9 @@ export default function TeacherDashboard({
     <div className="teacher-dashboard-layout">
       {/* LEFT SIDEBAR */}
       <aside className="tdb-left-sidebar">
-        <div className="tdb-logo-section">
-          <div className="tdb-logo-icon">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '20px', height: '20px' }}>
-              <path d="M18 6H8.5a4 4 0 100 8h8" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M14 10H8.5" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-              <circle cx="18" cy="6" r="1.5" fill="#FFD234" />
-              <circle cx="16.5" cy="14" r="1.5" fill="#FFD234" />
-            </svg>
+        <div className="tdb-logo-section" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <img src={sunLogoImg} alt="EduPath AI" style={{ width: '36px', height: '36px', objectFit: 'contain' }} />
           </div>
           <span className="tdb-logo-text">EduPath <em>AI</em></span>
         </div>
@@ -707,15 +1040,7 @@ export default function TeacherDashboard({
           </ul>
         </nav>
 
-        {/* Upgrade Card */}
-        <div className="tdb-upgrade-card">
-          <span className="tdb-upgrade-cap">🎓</span>
-          <h4 className="tdb-upgrade-title">Nâng cấp tài khoản</h4>
-          <p className="tdb-upgrade-desc">Trải nghiệm đầy đủ tính năng dành cho giáo viên.</p>
-          <button className="tdb-upgrade-btn" onClick={() => toast('Tính năng nâng cấp tài khoản đang được phát triển!', 'info')}>
-            Nâng cấp ngay 🌟
-          </button>
-        </div>
+
       </aside>
 
       {/* RIGHT PANE: CONTENT AREA */}
@@ -1164,100 +1489,500 @@ export default function TeacherDashboard({
 
         {/* ================= TAB 2: COURSES ================= */}
         {localTab === 'courses' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '24px', textAlign: 'left' }}>
-            <div className="tdb-card">
-              <h3 className="tdb-card-title" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '14px', marginBottom: '10px' }}>
-                📚 Các khóa học của bạn
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {courses.map((course) => (
-                  <div 
-                    key={course.id} 
-                    style={{ 
-                      padding: '16px', border: '1px solid #e2e8f0', borderRadius: '16px', background: '#f8fafc',
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                    }}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'left' }}>
+            
+            {/* If Edit/Create mode is active, display the Course configuration form */}
+            {(courseEditMode === 'create' || courseEditMode === 'edit') ? (
+              <div className="tdb-card animate-in" style={{ border: '3px solid #000000', borderRadius: '20px', boxShadow: '6px 6px 0px #000000', background: '#ffffff', padding: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2.5px solid #000000', paddingBottom: '16px', marginBottom: '20px' }}>
+                  <h3 style={{ fontSize: '18px', fontWeight: '950', color: '#000000', margin: 0 }}>
+                    {courseEditMode === 'create' ? '➕ TẠO KHÓA HỌC MỚI' : '✏️ CHỈNH SỬA KHÓA HỌC'}
+                  </h3>
+                  <button 
+                    onClick={() => setCourseEditMode('view')} 
+                    style={{ border: '2px solid #000000', borderRadius: '8px', padding: '6px 12px', background: '#f1f5f9', fontWeight: 'bold', cursor: 'pointer' }}
                   >
-                    <div>
-                      <span className="tdb-exam-pill">{course.subject}</span>
-                      <h4 style={{ fontSize: '15px', fontWeight: '800', margin: '8px 0 4px 0', color: '#0f172a' }}>{course.title}</h4>
-                      <div style={{ display: 'flex', gap: '12px', fontSize: '11.5px', fontWeight: '600', color: '#64748b' }}>
-                        <span>Bài học: {course.lessons?.length || 0} bài</span>
-                        <span>Học viên: {course.enrollments?.length || 12} học sinh</span>
-                        <span style={{ color: '#10b981' }}>Trạng thái: Đã kích hoạt</span>
-                      </div>
+                    Quay lại danh sách
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveCourseSubmit} style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '24px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '12.5px', fontWeight: 'bold', color: '#0f172a' }}>Tên khóa học:</label>
+                      <input 
+                        type="text" 
+                        className="tdb-search-input"
+                        style={{ width: '100%', borderRadius: '10px', border: '2px solid #000000' }}
+                        placeholder="Ví dụ: Khóa học Hóa học hữu cơ Este - Lipit chuyên sâu..."
+                        value={cTitle}
+                        onChange={e => setCTitle(e.target.value)}
+                        required
+                      />
                     </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button 
-                        onClick={() => setSelectedCourseId(course.id)}
-                        className="tdb-upgrade-btn" 
-                        style={{ padding: '8px 12px', background: '#ffffff', color: '#6366f1', border: '1px solid #6366f1', boxShadow: 'none' }}
-                      >
-                        Chi tiết
-                      </button>
-                      <button 
-                        onClick={() => setActiveCoursePreview(course.id)}
-                        className="tdb-upgrade-btn" 
-                        style={{ padding: '8px 12px', background: '#6366f1', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: 'none' }}
-                      >
-                        <HiEye /> Xem thử
-                      </button>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '12.5px', fontWeight: 'bold', color: '#0f172a' }}>Mô tả chi tiết khóa học:</label>
+                      <textarea 
+                        className="tdb-search-input"
+                        rows="6"
+                        style={{ width: '100%', height: '140px', borderRadius: '10px', border: '2px solid #000000', padding: '12px', boxSizing: 'border-box' }}
+                        placeholder="Mô tả nội dung, mục tiêu đầu ra và đối tượng học sinh của khóa học..."
+                        value={cDescription}
+                        onChange={e => setCDescription(e.target.value)}
+                        required
+                      />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '12.5px', fontWeight: 'bold', color: '#0f172a' }}>Bộ môn:</label>
+                        <select 
+                          className="tdb-search-input"
+                          style={{ width: '100%', borderRadius: '10px', border: '2px solid #000000', height: '40px' }}
+                          value={cSubject}
+                          onChange={e => setCSubject(e.target.value)}
+                        >
+                          <option value="Toán học">Toán học</option>
+                          <option value="Vật lý">Vật lý</option>
+                          <option value="Hóa học">Hóa học</option>
+                          <option value="Tiếng Anh">Tiếng Anh</option>
+                          <option value="Ngữ văn">Ngữ văn</option>
+                          <option value="Sinh học">Sinh học</option>
+                          <option value="Lịch sử">Lịch sử</option>
+                          <option value="Địa lý">Địa lý</option>
+                        </select>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '12.5px', fontWeight: 'bold', color: '#0f172a' }}>Khối lớp học:</label>
+                        <select 
+                          className="tdb-search-input"
+                          style={{ width: '100%', borderRadius: '10px', border: '2px solid #000000', height: '40px' }}
+                          value={cGrade}
+                          onChange={e => setCGrade(e.target.value)}
+                        >
+                          <option value="10">Lớp 10</option>
+                          <option value="11">Lớp 11</option>
+                          <option value="12">Lớp 12</option>
+                          <option value="0">Sinh viên / Đại cương</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            <div className="tdb-card" style={{ background: '#fffbeb' }}>
-              <h3 className="tdb-card-title" style={{ borderBottom: '1px solid #fcd34d', paddingBottom: '14px', marginBottom: '10px' }}>
-                📝 Quản lý bài học (Thay đổi thứ tự)
-              </h3>
-              {selectedCourseId ? (
-                (() => {
-                  const course = courses.find(c => c.id === selectedCourseId);
-                  return (
-                    <div>
-                      <h4 style={{ fontSize: '13.5px', fontWeight: '800', color: '#1e293b', marginBottom: '12px' }}>{course.title}</h4>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {course.lessons.map((lesson, idx) => (
-                          <div 
-                            key={lesson.id}
-                            style={{ 
-                              padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '10px', background: '#fff',
-                              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                            }}
-                          >
-                            <span style={{ fontSize: '12.5px', fontWeight: '600', color: '#0f172a' }}>
-                              {idx + 1}. {lesson.name || lesson.title}
-                            </span>
-                            <div style={{ display: 'flex', gap: '4px' }}>
-                              <button 
-                                onClick={() => moveLesson(course.id, idx, -1)}
-                                disabled={idx === 0}
-                                style={{ padding: '2px 6px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', opacity: idx === 0 ? 0.3 : 1 }}
-                              >
-                                <HiArrowUp />
-                              </button>
-                              <button 
-                                onClick={() => moveLesson(course.id, idx, 1)}
-                                disabled={idx === course.lessons.length - 1}
-                                style={{ padding: '2px 6px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', opacity: idx === course.lessons.length - 1 ? 0.3 : 1 }}
-                              >
-                                <HiArrowDown />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '2px solid #000000' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '12px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#0f172a' }}>Giá bán gốc (đ):</label>
+                        <input 
+                          type="number" 
+                          className="tdb-search-input"
+                          style={{ width: '100%', borderRadius: '10px', border: '2px solid #000000' }}
+                          min="0"
+                          value={cPrice}
+                          onChange={e => setCPrice(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#0f172a' }}>Giảm giá (%):</label>
+                        <input 
+                          type="number" 
+                          className="tdb-search-input"
+                          style={{ width: '100%', borderRadius: '10px', border: '2px solid #000000' }}
+                          min="0"
+                          max="100"
+                          value={cDiscount}
+                          onChange={e => setCDiscount(e.target.value)}
+                        />
                       </div>
                     </div>
-                  );
-                })()
-              ) : (
-                <div style={{ fontSize: '13.5px', color: '#64748b', padding: '30px', textAlign: 'center' }}>
-                  💡 Hãy chọn một khóa học ở cột bên trái để quản lý và thay đổi thứ tự các bài giảng học tập.
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#0f172a' }}>Banner/Thumbnail ảnh khóa học:</label>
+                      <div style={{ 
+                        border: '2px dashed #000000', borderRadius: '12px', background: '#ffffff', padding: '16px', 
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                        minHeight: '110px'
+                      }}>
+                        {cThumbnailUrl ? (
+                          <div style={{ position: 'relative', width: '100%' }}>
+                            <img src={cThumbnailUrl} alt="Thumbnail Preview" style={{ width: '100%', height: '90px', objectFit: 'cover', borderRadius: '8px', border: '1.5px solid #000000' }} />
+                            <button 
+                              type="button" 
+                              onClick={() => setCThumbnailUrl('')}
+                              style={{ position: 'absolute', top: '4px', right: '4px', border: '1.5px solid #000000', background: '#fee2e2', color: '#ef4444', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px' }}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <span style={{ fontSize: '28px' }}>🖼️</span>
+                            <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600', margin: '4px 0 8px 0' }}>Hỗ trợ JPG, PNG (Tối đa 2MB)</span>
+                            <button 
+                              type="button" 
+                              disabled={cThumbnailUploading}
+                              onClick={() => document.getElementById('course-thumbnail-upload').click()}
+                              className="tdb-upgrade-btn"
+                              style={{ width: 'auto', background: '#fff', color: '#000', border: '2px solid #000', padding: '6px 12px', boxShadow: 'none' }}
+                            >
+                              {cThumbnailUploading ? '⏳ Đang tải...' : 'Tải ảnh từ máy'}
+                            </button>
+                            <input 
+                              type="file" 
+                              id="course-thumbnail-upload" 
+                              accept="image/*" 
+                              onChange={handleCourseThumbnailChange} 
+                              style={{ display: 'none' }} 
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 'bold', color: '#1e293b', marginTop: '8px', background: '#fff', padding: '10px 14px', borderRadius: '10px', border: '2px solid #000000' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={cIsPublished}
+                        onChange={e => setCIsPublished(e.target.checked)}
+                        style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                      />
+                      Đăng bán khóa học này (Công khai)
+                    </label>
+
+                    <button 
+                      type="submit" 
+                      className="tdb-upgrade-btn"
+                      style={{ background: '#6366f1', color: '#fff', border: '2px solid #000', boxShadow: '3px 3px 0px #000', fontWeight: 'bold', fontSize: '13px', padding: '12px 14px', marginTop: '10px' }}
+                    >
+                      💾 Lưu thông tin khóa học
+                    </button>
+                  </div>
+                </form>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '24px' }}>
+                
+                {/* Course List Left Column */}
+                <div className="tdb-card" style={{ border: '2px solid #000000', boxShadow: '4px 4px 0px #000000' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #cbd5e1', paddingBottom: '14px', marginBottom: '10px' }}>
+                    <h3 className="tdb-card-title">
+                      📚 Khóa học của tôi ({courses.length})
+                    </h3>
+                    <button 
+                      onClick={handleCreateCourseClick}
+                      className="tdb-upgrade-btn"
+                      style={{ 
+                        width: 'auto', background: '#d1fae5', color: '#065f46', border: '2px solid #000', 
+                        boxShadow: '3px 3px 0px #000', fontWeight: 'bold', padding: '8px 14px' 
+                      }}
+                    >
+                      ➕ Tạo khóa học mới
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    {courses.map((course) => {
+                      const isSelected = course.id === selectedCourseId;
+                      return (
+                        <div 
+                          key={course.id} 
+                          style={{ 
+                            padding: '14px', 
+                            border: isSelected ? '3px solid #6366f1' : '2px solid #000000', 
+                            borderRadius: '16px', 
+                            background: isSelected ? '#f5f3ff' : '#ffffff',
+                            boxShadow: isSelected ? '4px 4px 0px #6366f1' : '3px 3px 0px #000000',
+                            display: 'flex', gap: '14px'
+                          }}
+                        >
+                          <img 
+                            src={course.thumbnailUrl || course.thumbnail || "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=500&auto=format&fit=crop&q=60"} 
+                            alt="Course Banner" 
+                            style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '10px', border: '1.5px solid #000' }} 
+                          />
+                          
+                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                            <div>
+                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                <span className="tdb-exam-pill" style={{ background: '#e0e7ff', color: '#4f46e5', border: '1.5px solid #000', padding: '2px 8px', borderRadius: '6px' }}>{course.subject}</span>
+                                {course.grade && <span className="tdb-exam-pill" style={{ background: '#fef3c7', color: '#d97706', border: '1.5px solid #000', padding: '2px 8px', borderRadius: '6px' }}>Lớp {course.grade}</span>}
+                                
+                                <span 
+                                  style={{ 
+                                    fontSize: '9px', fontWeight: 'bold', padding: '2px 6px', borderRadius: '6px', border: '1.5px solid #000', marginLeft: 'auto',
+                                    backgroundColor: course.isPublished ? '#d1fae5' : '#f1f5f9',
+                                    color: course.isPublished ? '#065f46' : '#475569'
+                                  }}
+                                >
+                                  {course.isPublished ? '✓ ĐANG BÁN' : '🔒 BẢN NHÁP'}
+                                </span>
+                              </div>
+                              <h4 style={{ fontSize: '14px', fontWeight: '800', margin: '8px 0 4px 0', color: '#0f172a' }}>{course.title}</h4>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed #e2e8f0', paddingTop: '8px', marginTop: '4px' }}>
+                              <div style={{ display: 'flex', gap: '8px', fontSize: '11px', fontWeight: '700', color: '#64748b' }}>
+                                <span>📖 {course.lessons?.length || 0} bài học</span>
+                                <span>•</span>
+                                <span>💰 {course.price > 0 ? `${Number(course.price).toLocaleString('vi-VN')}đ` : 'Miễn phí'}</span>
+                              </div>
+
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                <button 
+                                  onClick={() => {
+                                    setSelectedCourseId(course.id);
+                                    setCourseEditMode('view');
+                                  }}
+                                  className="tdb-upgrade-btn" 
+                                  style={{ padding: '4px 8px', fontSize: '11px', background: isSelected ? '#6366f1' : '#ffffff', color: isSelected ? '#fff' : '#000', border: '1.5px solid #000', boxShadow: 'none' }}
+                                >
+                                  Bài giảng
+                                </button>
+                                <button 
+                                  onClick={() => {
+                                    setSelectedCourseId(course.id);
+                                    handleEditCourseClick(course);
+                                  }}
+                                  className="tdb-upgrade-btn" 
+                                  style={{ padding: '4px 8px', fontSize: '11px', background: '#fffbeb', color: '#b45309', border: '1.5px solid #000', boxShadow: 'none' }}
+                                >
+                                  Sửa
+                                </button>
+                                <button 
+                                  onClick={() => handleDeleteCourseReal(course.id)}
+                                  className="tdb-upgrade-btn" 
+                                  style={{ padding: '4px 8px', fontSize: '11px', background: '#fee2e2', color: '#ef4444', border: '1.5px solid #000', boxShadow: 'none' }}
+                                >
+                                  Xóa
+                                </button>
+                                <button 
+                                  onClick={() => setActiveCoursePreview(course.id)}
+                                  className="tdb-upgrade-btn" 
+                                  style={{ padding: '4px 6px', fontSize: '11px', background: '#ffffff', color: '#0f172a', border: '1.5px solid #000', boxShadow: 'none' }}
+                                  title="Xem thử học sinh"
+                                >
+                                  <HiEye />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              )}
-            </div>
+
+                {/* Lesson list & CRUD right column */}
+                <div className="tdb-card" style={{ background: '#fffbeb', border: '2px solid #000000', boxShadow: '4px 4px 0px #000000' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2.5px solid #fcd34d', paddingBottom: '14px', marginBottom: '12px' }}>
+                    <h3 className="tdb-card-title">
+                      📝 Quản lý bài giảng học tập
+                    </h3>
+                    {selectedCourseId && lessonEditMode === 'idle' && (
+                      <button 
+                        onClick={handleCreateLessonClick}
+                        className="tdb-upgrade-btn"
+                        style={{ width: 'auto', background: '#fff', color: '#000', border: '2px solid #000', padding: '6px 12px', fontSize: '11.5px', boxShadow: 'none' }}
+                      >
+                        ➕ Thêm bài học mới
+                      </button>
+                    )}
+                  </div>
+
+                  {selectedCourseId ? (
+                    (() => {
+                      const course = courses.find(c => c.id === selectedCourseId);
+                      if (!course) return null;
+                      const lessons = course.lessons || [];
+
+                      if (lessonEditMode === 'create' || lessonEditMode === 'edit') {
+                        return (
+                          <div style={{ background: '#ffffff', padding: '16px', borderRadius: '12px', border: '2px solid #000' }}>
+                            <h4 style={{ fontSize: '13.5px', fontWeight: 'bold', margin: '0 0 12px 0', borderBottom: '1px dashed #cbd5e1', paddingBottom: '8px' }}>
+                              {lessonEditMode === 'create' ? '➕ THÊM BÀI HỌC MỚI' : '✏️ CHỈNH SỬA BÀI HỌC'}
+                            </h4>
+
+                            <form onSubmit={handleSaveLessonSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <label style={{ fontSize: '11.5px', fontWeight: 'bold' }}>Tên tiêu đề bài học:</label>
+                                <input 
+                                  type="text" 
+                                  className="tdb-search-input" 
+                                  style={{ width: '100%', borderRadius: '8px', border: '1.5px solid #000' }} 
+                                  placeholder="Ví dụ: Bài 1: Este hóa và cấu trúc phân tử..."
+                                  value={lTitle}
+                                  onChange={e => setLTitle(e.target.value)}
+                                  required
+                                />
+                              </div>
+
+                              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '10px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <label style={{ fontSize: '11.5px', fontWeight: 'bold' }}>Thời lượng (phút):</label>
+                                  <input 
+                                    type="text" 
+                                    className="tdb-search-input" 
+                                    style={{ width: '100%', borderRadius: '8px', border: '1.5px solid #000' }} 
+                                    placeholder="Ví dụ: 15m hoặc 25 phút"
+                                    value={lDuration}
+                                    onChange={e => setLDuration(e.target.value)}
+                                    required
+                                  />
+                                </div>
+                              </div>
+
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <label style={{ fontSize: '11.5px', fontWeight: 'bold' }}>Tải lên video bài giảng:</label>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <input 
+                                    type="text" 
+                                    className="tdb-search-input" 
+                                    style={{ flex: 1, borderRadius: '8px', border: '1.5px solid #000' }} 
+                                    placeholder="Link video phát học..."
+                                    value={lVideoUrl}
+                                    onChange={e => setLVideoUrl(e.target.value)}
+                                  />
+                                  <button 
+                                    type="button" 
+                                    disabled={lVideoUploading}
+                                    onClick={() => document.getElementById('lesson-video-upload').click()}
+                                    className="tdb-upgrade-btn"
+                                    style={{ width: 'auto', background: '#f8fafc', color: '#000', border: '1.5px solid #000', padding: '6px 12px', boxShadow: 'none' }}
+                                  >
+                                    {lVideoUploading ? '⏳ Đang tải...' : 'Upload Video'}
+                                  </button>
+                                  <input 
+                                    type="file" 
+                                    id="lesson-video-upload" 
+                                    accept="video/*" 
+                                    onChange={handleLessonVideoChange} 
+                                    style={{ display: 'none' }} 
+                                  />
+                                </div>
+                              </div>
+
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <label style={{ fontSize: '11.5px', fontWeight: 'bold' }}>Tài liệu đính kèm (URL file hoặc Nội dung):</label>
+                                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                                  <input 
+                                    type="text" 
+                                    className="tdb-search-input" 
+                                    style={{ flex: 1, borderRadius: '8px', border: '1.5px solid #000' }} 
+                                    placeholder="Link tài liệu đính kèm..."
+                                    value={lContent}
+                                    onChange={e => setLContent(e.target.value)}
+                                  />
+                                  <button 
+                                    type="button" 
+                                    disabled={lDocUploading}
+                                    onClick={() => document.getElementById('lesson-doc-upload').click()}
+                                    className="tdb-upgrade-btn"
+                                    style={{ width: 'auto', background: '#f8fafc', color: '#000', border: '1.5px solid #000', padding: '6px 12px', boxShadow: 'none' }}
+                                  >
+                                    {lDocUploading ? '⏳ Đang tải...' : 'Upload File'}
+                                  </button>
+                                  <input 
+                                    type="file" 
+                                    id="lesson-doc-upload" 
+                                    accept=".pdf,.doc,.docx,.zip,.rar" 
+                                    onChange={handleLessonDocChange} 
+                                    style={{ display: 'none' }} 
+                                  />
+                                </div>
+                              </div>
+
+                              <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                                <button type="submit" className="tdb-upgrade-btn" style={{ flex: 1, background: '#10b981', color: '#fff', border: '1.5px solid #000', boxShadow: 'none' }}>
+                                  💾 Lưu bài học
+                                </button>
+                                <button type="button" onClick={() => setLessonEditMode('idle')} className="tdb-upgrade-btn" style={{ flex: 1, background: '#ffffff', color: '#ef4444', border: '1.5px solid #000', boxShadow: 'none' }}>
+                                  Hủy bỏ
+                                </button>
+                              </div>
+                            </form>
+                          </div>
+                        );
+                      }
+
+                      if (lessons.length === 0) {
+                        return (
+                          <div style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
+                            📭 Khóa học này chưa có bài học nào. Nhấp "+ Thêm bài học mới" để tạo bài học đầu tiên!
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div>
+                          <h4 style={{ fontSize: '13.5px', fontWeight: '800', color: '#1e293b', marginBottom: '12px' }}>{course.title}</h4>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {lessons.map((lesson, idx) => (
+                              <div 
+                                key={lesson.id}
+                                style={{ 
+                                  padding: '10px 14px', border: '1.5px solid #000000', borderRadius: '10px', background: '#fff',
+                                  display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                                }}
+                              >
+                                <div style={{ textAlign: 'left' }}>
+                                  <span style={{ fontSize: '12.5px', fontWeight: '800', color: '#0f172a', display: 'block' }}>
+                                    {idx + 1}. {lesson.name || lesson.title}
+                                  </span>
+                                  <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>
+                                    Thời lượng: {lesson.duration || '15m'} 
+                                    {lesson.videoUrl && ' • 🎥 Có video'}
+                                    {lesson.content && ' • 📄 Có tài liệu'}
+                                  </span>
+                                </div>
+                                <div style={{ display: 'flex', gap: '4px' }}>
+                                  <button 
+                                    onClick={() => moveLesson(course.id, idx, -1)}
+                                    disabled={idx === 0}
+                                    style={{ padding: '4px 6px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', opacity: idx === 0 ? 0.3 : 1 }}
+                                    title="Di chuyển lên"
+                                  >
+                                    <HiArrowUp />
+                                  </button>
+                                  <button 
+                                    onClick={() => moveLesson(course.id, idx, 1)}
+                                    disabled={idx === lessons.length - 1}
+                                    style={{ padding: '4px 6px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', opacity: idx === lessons.length - 1 ? 0.3 : 1 }}
+                                    title="Di chuyển xuống"
+                                  >
+                                    <HiArrowDown />
+                                  </button>
+                                  <button 
+                                    onClick={() => handleEditLessonClick(lesson)}
+                                    style={{ padding: '4px 6px', background: '#fffbeb', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', color: '#d97706' }}
+                                    title="Chỉnh sửa bài học"
+                                  >
+                                    <HiPencil />
+                                  </button>
+                                  <button 
+                                    onClick={() => handleDeleteLessonReal(lesson.id)}
+                                    style={{ padding: '4px 6px', background: '#fee2e2', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', color: '#ef4444' }}
+                                    title="Xóa bài học"
+                                  >
+                                    <HiTrash />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <div style={{ fontSize: '13.5px', color: '#64748b', padding: '30px', textAlign: 'center' }}>
+                      💡 Hãy chọn một khóa học ở cột bên trái để quản lý, chỉnh sửa, thêm mới hoặc thay đổi thứ tự các bài giảng học tập.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1819,19 +2544,17 @@ export default function TeacherDashboard({
 
         {/* ================= NEW TAB: MATERIALS ================= */}
         {localTab === 'materials' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'left' }}>
+          <div className="tdb-materials-container" style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '24px', textAlign: 'left' }}>
+            
+            {/* LEFT COLUMN: MATERIAL DIRECTORY */}
             <div className="tdb-card">
-              <div className="tdb-card-title-row" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '14px', marginBottom: '10px' }}>
-                <h3 className="tdb-card-title">📚 Kho tài liệu giảng dạy của tôi</h3>
-                <form onSubmit={handleUploadMaterial} style={{ display: 'flex', gap: '10px' }}>
-                  <button type="submit" className="tdb-upgrade-btn" style={{ width: 'auto', background: '#6366f1' }}>
-                    + Tải lên tài liệu mới
-                  </button>
-                </form>
+              <div className="tdb-card-title-row" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '14px', marginBottom: '16px' }}>
+                <h3 className="tdb-card-title">📚 Kho tài liệu giảng dạy của tôi ({teacherMaterials.length})</h3>
               </div>
 
-              <div style={{ display: 'flex', gap: '12px', margin: '10px 0 14px 0' }}>
-                <div className="tdb-search-wrap" style={{ width: '100%', maxWidth: '400px' }}>
+              {/* Search Bar */}
+              <div style={{ display: 'flex', gap: '12px', margin: '0 0 16px 0' }}>
+                <div className="tdb-search-wrap" style={{ width: '100%' }}>
                   <span className="tdb-search-icon"><HiSearch /></span>
                   <input 
                     type="text" 
@@ -1843,25 +2566,282 @@ export default function TeacherDashboard({
                 </div>
               </div>
 
-              <div className="tdb-material-list" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                {teacherMaterials.filter(m => m.name.toLowerCase().includes(materialSearch.toLowerCase())).map(m => (
-                  <div key={m.id} className="tdb-material-item" style={{ padding: '16px', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
-                    <span className={`tdb-material-icon ${m.type}`} style={{ width: '42px', height: '42px', fontSize: '12px' }}>{m.type.toUpperCase()}</span>
-                    <div className="tdb-material-info" style={{ padding: '0 16px' }}>
-                      <h5 className="tdb-material-name" style={{ fontSize: '14px' }}>{m.name}</h5>
-                      <span className="tdb-material-meta">{m.size} • Đăng ngày {m.date}</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button className="tdb-action-icon-btn" onClick={() => toast('Đang tải tài liệu...', 'success')} title="Tải xuống"><HiDownload /></button>
-                      <button className="tdb-action-icon-btn" onClick={() => {
-                        setTeacherMaterials(teacherMaterials.filter(item => item.id !== m.id));
-                        toast('Đã xóa tài liệu khỏi hệ thống!', 'info');
-                      }} title="Xóa" style={{ color: '#ef4444' }}><HiTrash /></button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              {/* Loading Indicator */}
+              {loadingMaterials ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: '#6366f1', fontWeight: 600 }}>
+                  <span style={{ display: 'inline-block', marginRight: '8px' }}>🔄</span> Đang tải tài liệu...
+                </div>
+              ) : teacherMaterials.length === 0 ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: '#64748b', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                  📂 Chưa có tài liệu nào được tải lên. Hãy dùng form bên phải để tải lên tài liệu đầu tiên!
+                </div>
+              ) : (
+                <div className="tdb-material-list" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {teacherMaterials
+                    .filter(m => (m.title || m.name || '').toLowerCase().includes(materialSearch.toLowerCase()))
+                    .map(m => {
+                      const type = m.fileType?.toLowerCase() || 'pdf';
+                      const title = m.title || m.name;
+                      const size = m.fileSize ? (m.fileSize / (1024 * 1024)).toFixed(2) + ' MB' : m.size || '0.0 MB';
+                      const formattedDate = m.uploadedAt ? new Date(m.uploadedAt).toLocaleDateString('vi-VN') : m.date;
+                      return (
+                        <div 
+                          key={m.id} 
+                          style={{ 
+                            padding: '16px', 
+                            border: '2px solid #000000', 
+                            borderRadius: '16px', 
+                            background: '#ffffff',
+                            boxShadow: '4px 4px 0px #000000',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '12px'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                              <span 
+                                className={`tdb-material-icon ${type}`} 
+                                style={{ 
+                                  width: '42px', 
+                                  height: '42px', 
+                                  fontSize: '12px', 
+                                  borderRadius: '10px',
+                                  border: '2px solid #000',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontWeight: 'bold',
+                                  backgroundColor: type === 'pdf' ? '#fee2e2' : '#e0f2fe',
+                                  color: type === 'pdf' ? '#ef4444' : '#0284c7'
+                                }}
+                              >
+                                {type.toUpperCase()}
+                              </span>
+                              <div>
+                                <h5 className="tdb-material-name" style={{ fontSize: '14.5px', fontWeight: 'bold', margin: '0 0 4px 0', color: '#0f172a' }}>
+                                  {title}
+                                </h5>
+                                <span className="tdb-material-meta" style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>
+                                  Môn: {m.subject} • Lớp: {m.grade} • {size}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            <span 
+                              style={{ 
+                                fontSize: '10.5px', 
+                                fontWeight: 'bold', 
+                                padding: '4px 10px', 
+                                borderRadius: '20px',
+                                border: '2px solid #000',
+                                backgroundColor: m.isPublic ? (m.isApproved ? '#d1fae5' : '#fef3c7') : '#f1f5f9',
+                                color: m.isPublic ? (m.isApproved ? '#065f46' : '#b45309') : '#475569'
+                              }}
+                            >
+                              {m.isPublic ? (m.isApproved ? '✓ ĐÃ PHÁT HÀNH' : '⏱ CHỜ PHÊ DUYỆT') : '🔒 LƯU NHÁP'}
+                            </span>
+                          </div>
+
+                          <div 
+                            style={{ 
+                              display: 'flex', 
+                              justifyContent: 'space-between', 
+                              alignItems: 'center', 
+                              borderTop: '1px dashed #cbd5e1', 
+                              paddingTop: '10px',
+                              fontSize: '12.5px' 
+                            }}
+                          >
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 'bold', color: '#1e293b' }}>
+                              <input 
+                                type="checkbox" 
+                                checked={m.isPublic}
+                                onChange={(e) => handleToggleMaterialPublic(m.id, e.target.checked)}
+                                style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                              />
+                              Công khai trên thư viện
+                            </label>
+
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              {m.fileUrl && (
+                                <a 
+                                  href={m.fileUrl} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="tdb-action-icon-btn" 
+                                  title="Tải xuống / Xem thử"
+                                  style={{ 
+                                    display: 'inline-flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center',
+                                    width: '32px',
+                                    height: '32px',
+                                    border: '2px solid #000',
+                                    borderRadius: '8px',
+                                    backgroundColor: '#fff',
+                                    color: '#000',
+                                    textDecoration: 'none'
+                                  }}
+                                >
+                                  <HiDownload />
+                                </a>
+                              )}
+                              <button 
+                                className="tdb-action-icon-btn" 
+                                onClick={() => handleDeleteMaterial(m.id)}
+                                title="Xóa tài liệu" 
+                                style={{ 
+                                  width: '32px', 
+                                  height: '32px', 
+                                  border: '2px solid #000',
+                                  borderRadius: '8px',
+                                  backgroundColor: '#fee2e2',
+                                  color: '#ef4444' 
+                                }}
+                              >
+                                <HiTrash />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
             </div>
+
+            {/* RIGHT COLUMN: UPLOAD FORM */}
+            <div className="tdb-card" style={{ background: '#fffbeb', border: '3px solid #000', boxShadow: '6px 6px 0px #000' }}>
+              <h3 className="tdb-card-title" style={{ borderBottom: '2px solid #000', paddingBottom: '14px', marginBottom: '14px' }}>
+                ➕ Tải lên tài liệu mới
+              </h3>
+
+              <form onSubmit={handleUploadMaterialReal} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Tên tài liệu / Tiêu đề:</label>
+                  <input 
+                    type="text" 
+                    className="tdb-search-input" 
+                    style={{ width: '100%', borderRadius: '8px', border: '2px solid #000' }} 
+                    placeholder="Ví dụ: Đề cương ôn tập Học kì II môn Toán 12..."
+                    value={formTitle}
+                    onChange={e => setFormTitle(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Mô tả chi tiết:</label>
+                  <textarea 
+                    className="tdb-search-input" 
+                    style={{ width: '100%', height: '60px', borderRadius: '8px', border: '2px solid #000', padding: '8px', boxSizing: 'border-box' }} 
+                    placeholder="Tóm tắt nội dung tài liệu, cách ôn tập..."
+                    value={formDescription}
+                    onChange={e => setFormDescription(e.target.value)}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Môn học:</label>
+                    <select 
+                      className="tdb-search-input" 
+                      style={{ width: '100%', borderRadius: '8px', border: '2px solid #000', height: '38px' }}
+                      value={formSubject}
+                      onChange={e => setFormSubject(e.target.value)}
+                    >
+                      <option value="Toán Học">Toán Học</option>
+                      <option value="Vật Lý">Vật Lý</option>
+                      <option value="Hóa Học">Hóa Học</option>
+                      <option value="Tiếng Anh">Tiếng Anh</option>
+                      <option value="Ngữ Văn">Ngữ Văn</option>
+                      <option value="Sinh Học">Sinh Học</option>
+                      <option value="Lịch Sử">Lịch Sử</option>
+                      <option value="Địa Lý">Địa Lý</option>
+                      <option value="Toeic & Ielts">Toeic & Ielts</option>
+                      <option value="SAT">SAT</option>
+                      <option value="TOEIC">TOEIC</option>
+                      <option value="ĐGNL">ĐGNL</option>
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Khối lớp:</label>
+                    <select 
+                      className="tdb-search-input" 
+                      style={{ width: '100%', borderRadius: '8px', border: '2px solid #000', height: '38px' }}
+                      value={formGrade}
+                      onChange={e => setFormGrade(e.target.value)}
+                    >
+                      <option value="10">Lớp 10</option>
+                      <option value="11">Lớp 11</option>
+                      <option value="12">Lớp 12</option>
+                      <option value="Sinh viên">Sinh viên</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '12px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Giá bán (đ):</label>
+                    <input 
+                      type="number" 
+                      min="0" 
+                      className="tdb-search-input" 
+                      style={{ width: '100%', borderRadius: '8px', border: '2px solid #000' }} 
+                      value={formPrice}
+                      onChange={e => setFormPrice(e.target.value)}
+                    />
+                  </div>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 'bold', marginTop: '16px', color: '#1e293b' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={formIsPublic}
+                      onChange={e => setFormIsPublic(e.target.checked)}
+                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                    />
+                    Công khai ngay
+                  </label>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Chọn tệp từ máy tính:</label>
+                  <input 
+                    type="file" 
+                    ref={materialFileInputRef}
+                    required 
+                    style={{ 
+                      fontSize: '12.5px', 
+                      background: '#fff', 
+                      padding: '8px', 
+                      borderRadius: '8px', 
+                      border: '2px dashed #000', 
+                      width: '100%',
+                      boxSizing: 'border-box'
+                    }} 
+                  />
+                </div>
+
+                <button 
+                  type="submit" 
+                  disabled={uploadingMaterial}
+                  className="tdb-upgrade-btn" 
+                  style={{ 
+                    background: '#6366f1', 
+                    color: '#fff', 
+                    border: '2px solid #000', 
+                    boxShadow: uploadingMaterial ? 'none' : '4px 4px 0px #000',
+                    marginTop: '10px',
+                    cursor: uploadingMaterial ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {uploadingMaterial ? '⏳ Đang tải tài liệu lên...' : '🚀 Bắt đầu tải lên'}
+                </button>
+              </form>
+            </div>
+            
           </div>
         )}
 

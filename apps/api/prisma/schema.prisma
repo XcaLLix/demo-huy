@@ -28,7 +28,6 @@ model User {
   isPro              Boolean             @default(false)
   emailVerified      Boolean             @default(false)
   onboardingComplete Boolean             @default(true)
-  admin              Admin?
   notifications      Notification[]
   roleChangeRequests RoleChangeRequest[]
   student            Student?
@@ -38,7 +37,6 @@ model User {
   referredUsers      User[]               @relation("UserReferral")
   asReferral         Referral?            @relation("ReferredUser")
   affiliate          Affiliate?
-  teacherProfile     TeacherProfile?
 
   // Forum Relations
   forumPosts         ForumPost[]
@@ -66,6 +64,7 @@ model User {
   uploadedExamFiles    UploadedExamFile[]
   weaknessMindmaps     WeaknessMindmap[]
   apiAuditLogs         AuditLog[]
+  userDocuments        UserDocument[]
 }
 
 
@@ -78,23 +77,40 @@ model Student {
   roadmap      Roadmap?
   user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   testAttempts TestAttempt[]
-  profile      StudentProfile?
   totalAiQuestions Int             @default(0)
+  grade        Int?
+  province     String?
+  school       String?
+  targetScore      Float?
+  targetUniversity String?
 }
 
 model Teacher {
-  userId     Int      @id
-  isApproved Boolean  @default(false)
-  bio        String?
-  courses    Course[]
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  materials  TeacherMaterial[]
+  userId          Int              @id
+  isApproved      Boolean          @default(false)
+  bio             String?          @db.Text
+  courses         Course[]
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  materials       TeacherMaterial[]
+  subjects        String?
+  education       String?
+  university      String?
+  experienceYears Int              @default(0)
+  dob             DateTime?
+  cvUrl           String?
+  degreeUrl       String?
+  certificateUrl  String?
+  status          RequestStatus    @default(PENDING)
+  approvedAt      DateTime?
+  approvedBy      Int?
+  rejectedAt      DateTime?
+  rejectedBy      Int?
+  rejectedReason  String?          @db.Text
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @default(now()) @updatedAt
 }
 
-model Admin {
-  userId Int  @id
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
+
 
 model Course {
   id             Int              @id @default(autoincrement())
@@ -295,6 +311,17 @@ model Document {
   uploadedBy Int
   createdAt  DateTime @default(now())
   lesson     Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+}
+
+model UserDocument {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  fileUrl   String
+  fileType  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum Role {
@@ -715,35 +742,6 @@ model FeatureFlag {
   name      String
   isEnabled Boolean  @default(true)
   updatedAt DateTime @updatedAt
-}
-
-model StudentProfile {
-  studentId  Int      @id
-  grade      Int      // 10, 11, 12
-  province   String   // "Hà Nội", "Đà Nẵng", etc.
-  student    Student  @relation(fields: [studentId], references: [userId], onDelete: Cascade)
-}
-
-model TeacherProfile {
-  userId          Int            @id
-  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  subjects        String         // Môn giảng dạy
-  education       String         // Trình độ học vấn
-  university      String         // Trường đào tạo
-  experienceYears Int            // Số năm kinh nghiệm
-  bio             String?        @db.Text // Giới thiệu bản thân
-  dob             DateTime?      // Ngày sinh
-  cvUrl           String?        // CV
-  degreeUrl       String?        // Bằng tốt nghiệp
-  certificateUrl  String?        // Chứng chỉ chuyên môn
-  status          RequestStatus  @default(PENDING) // Trạng thái duyệt
-  approvedAt      DateTime?
-  approvedBy      Int?
-  rejectedAt      DateTime?
-  rejectedBy      Int?
-  rejectedReason  String?        @db.Text
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
 }
 
 

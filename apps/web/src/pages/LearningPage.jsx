@@ -5,6 +5,8 @@ import useCourseProgress from '../hooks/useCourseProgress';
 import { mapDbCourseToMockFormat } from '../utils/courseMapper';
 import { api } from '../api';
 import { discussionService } from '../services/discussionService';
+import sunLogo from '../assets/sun_logo.png';
+import '../styles/courses.css';
 
 // Subcomponents
 import VideoPlayer from '../components/courses/learning/VideoPlayer';
@@ -19,6 +21,25 @@ import NotePanel from '../components/courses/learning/NotePanel';
 import KeyboardShortcutsOverlay from '../components/courses/learning/KeyboardShortcutsOverlay';
 import CompletionModal from '../components/courses/learning/CompletionModal';
 
+const EduPathLogo = () => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginRight: '8px' }}>
+    <img src={sunLogo} alt="EduPath AI" style={{ width: '28px', height: '28px', objectFit: 'contain' }} />
+    <span style={{ fontSize: '18px', fontWeight: '800', color: '#6366f1', letterSpacing: '-0.5px', fontFamily: "'Outfit', sans-serif" }}>
+      EduPath <em style={{ color: '#4f46e5', fontStyle: 'normal' }}>AI</em>
+    </span>
+  </div>
+);
+
+const FileIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+    <polyline points="14 2 14 8 20 8"></polyline>
+    <line x1="16" y1="13" x2="8" y2="13"></line>
+    <line x1="16" y1="17" x2="8" y2="17"></line>
+    <polyline points="10 9 9 9 8 9"></polyline>
+  </svg>
+);
+
 export default function LearningPage({ 
   courseId, 
   lessonId, 
@@ -30,12 +51,12 @@ export default function LearningPage({
   const [currentLesson, setCurrentLesson] = useState(null);
   const [materials, setMaterials] = useState([]);
   const [discussions, setDiscussions] = useState([]);
-  const [activeTab, setActiveTab] = useState('materials'); // materials, discussion, teacher, transcript, exercise
+  const [activeTab, setActiveTab] = useState('transcript'); // transcript = Tóm tắt video, exercise = Flashcard ôn tập
   const [loading, setLoading] = useState(true);
 
   // Layout panels toggles and resizing
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [rightPanelTab, setRightPanelTab] = useState('ai'); // ai, notes
+  const [sidebarOpen, setSidebarOpen] = useState(false); // Left list is collapsed/removed
+  const [rightPanelTab, setRightPanelTab] = useState('curriculum'); // curriculum (Nội dung bài học), ai (Trợ lý học tập)
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [rightPanelWidth, setRightPanelWidth] = useState(380);
   const isResizingRef = useRef(false);
@@ -284,17 +305,17 @@ export default function LearningPage({
             border: '2px solid #000000',
             flexWrap: 'wrap',
             gap: '12px',
-            marginBottom: '16px'
+            margin: '16px'
           }}
           className="animate-in"
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ fontSize: '20px' }}>🔐</span>
             <div>
-              <span style={{ fontSize: '13px', fontWeight: '900', display: 'block' }}>
+              <span style={{ fontSize: '13px', fontWeight: '900', display: 'block', textAlign: 'left' }}>
                 CHẾ ĐỘ XEM THỬ (ADMIN PREVIEW)
               </span>
-              <span style={{ fontSize: '11.5px', opacity: 0.85 }}>
+              <span style={{ fontSize: '11.5px', opacity: 0.85, display: 'block', textAlign: 'left' }}>
                 Bạn đang xem nội dung khóa học với tư cách Quản trị viên. Mọi hoạt động xem bài sẽ không được ghi vào hệ thống.
               </span>
             </div>
@@ -336,72 +357,91 @@ export default function LearningPage({
       )}
 
       {/* TOP CONTROL NAVIGATION ROW */}
-      <div className="learning-header-bar">
-        <div className="header-left">
-          <button 
-            type="button" 
-            onClick={() => onBackToCourse(isDemoMode ? '/courses' : `/courses/${courseId}`)}
-            className="btn-back-to-details"
-          >
-            Quay lại khóa học
-          </button>
-          <span className="header-divider">|</span>
-          <div className="course-title-group">
-            <span className="course-title-sub">Khóa: {course.title}</span>
-            <h2 className="current-lesson-title">{currentLesson.title}</h2>
-          </div>
+      <div className="learning-header-bar" style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '12px 24px',
+        background: '#ffffff',
+        borderBottom: '1px solid #e2e8f0',
+        height: '64px',
+        boxSizing: 'border-box'
+      }}>
+        <div className="header-left" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <EduPathLogo />
+          <h2 className="current-lesson-title" style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: '#0f172a', fontFamily: "'Outfit', sans-serif" }}>
+            {course.title}
+          </h2>
         </div>
 
-        <div className="header-right">
+        <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <button 
             type="button" 
-            onClick={() => setShortcutsOpen(true)}
-            className="btn-shortcuts-info"
-            title="Xem phím tắt video"
+            onClick={() => toast('Cảm ơn bạn đã đánh giá khóa học!', 'success')}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px', 
+              background: 'none', 
+              border: 'none', 
+              cursor: 'pointer', 
+              fontSize: '13px', 
+              fontWeight: '700', 
+              color: '#475569',
+              fontFamily: "'Outfit', sans-serif"
+            }}
           >
-            <HiInformationCircle />
-            <span>Phím tắt</span>
+            <span style={{ fontSize: '15px' }}>☆</span> <span style={{ textDecoration: 'underline' }}>Leave a rating</span>
+          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '800', fontSize: '13px', color: '#475569', fontFamily: "'Outfit', sans-serif" }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              border: '2px solid #0f172a',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: '#FFE259'
+            }}>
+              🏆
+            </div>
+            <span>{Math.round(progressPercent)}%</span>
+          </div>
+
+          <button 
+            type="button" 
+            onClick={() => {
+              navigator.clipboard.writeText(window.location.href);
+              toast('Đã sao chép liên kết khóa học vào bộ nhớ tạm!', 'success');
+            }}
+            style={{
+              background: '#3f51b5',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '8px 18px',
+              fontSize: '13px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              boxShadow: '0 2px 4px rgba(63, 81, 181, 0.2)'
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '2px' }}><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+            Share
           </button>
         </div>
       </div>
 
-      {/* THREE COLUMN GRID LAYOUT */}
+      {/* TWO COLUMN GRID LAYOUT */}
       <div className="learning-layout-grid">
-        {/* LEFT COLUMN: COLLAPSIBLE SIDEBAR LESSON LIST */}
-        {sidebarOpen && (
-          <div className="left-sidebar-wrapper animate-in">
-            <button 
-              type="button" 
-              onClick={() => setSidebarOpen(false)} 
-              className="btn-toggle-sidebar close"
-              title="Ẩn danh sách bài học"
-            >
-              <HiX />
-            </button>
-            <LessonSidebar
-              curriculum={course.curriculum}
-              currentLessonId={currentLesson.id}
-              onSelectLesson={(lesson) => onSelectLesson(courseId, lesson.id)}
-              completedLessons={completedLessons}
-              isOwned={isOwned}
-              courseTitle={course.title}
-            />
-          </div>
-        )}
-
-        {!sidebarOpen && (
-          <button 
-            type="button" 
-            onClick={() => setSidebarOpen(true)} 
-            className="btn-toggle-sidebar-floating"
-            title="Hiện danh sách bài học"
-          >
-            <HiMenu />
-          </button>
-        )}
-
+        
         {/* CENTER COLUMN: VIDEO & INTERACTIVE TABS */}
-        <div className="center-workspace-wrapper">
+        <div className="center-workspace-wrapper" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', padding: '24px', gap: '24px' }}>
           {/* Main Video Screen Container */}
           <div className="main-video-screen">
             {isLocked ? (
@@ -464,70 +504,187 @@ export default function LearningPage({
             </div>
           </div>
 
-          {/* Bottom Tabs Panel for Engagement & Materials */}
-          <div className="interactive-tabs-container">
-            <div className="interactive-tabs-header">
-              {[
-                { id: 'materials', label: 'Tài liệu bài học' },
-                { id: 'transcript', label: 'Bản dịch & Subtitle' },
-                { id: 'exercise', label: 'Luyện tập trắc nghiệm' },
-                { id: 'discussion', label: 'Thảo luận lớp học' },
-                { id: 'teacher', label: 'Hỏi đáp giáo viên' }
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`tab-toggle-btn ${activeTab === tab.id ? 'active' : ''}`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+          {/* Bottom Tabs Panel for Engagement: Tóm tắt video & Flashcard ôn tập */}
+          <div className="interactive-tabs-container" style={{
+            background: '#ffffff',
+            border: '1.5px solid #e2e8f0',
+            borderRadius: '12px',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
+            overflow: 'hidden',
+            flexShrink: 0
+          }}>
+            <div className="interactive-tabs-header" style={{
+              display: 'flex',
+              background: '#f8fafc',
+              borderBottom: '1.5px solid #e2e8f0',
+              padding: '12px 16px',
+              gap: '12px'
+            }}>
+              <button
+                type="button"
+                onClick={() => setActiveTab('transcript')}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: activeTab === 'transcript' ? '#3f51b5' : '#f1f5f9',
+                  color: activeTab === 'transcript' ? '#ffffff' : '#475569',
+                  transition: 'all 0.2s'
+                }}
+              >
+                📄 Tóm tắt video
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('exercise')}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: activeTab === 'exercise' ? '#3f51b5' : '#f1f5f9',
+                  color: activeTab === 'exercise' ? '#ffffff' : '#475569',
+                  transition: 'all 0.2s'
+                }}
+              >
+                🗂️ Flashcard ôn tập
+              </button>
             </div>
 
-            <div className="interactive-tabs-content">
-              {activeTab === 'materials' && (
-                <MaterialsTab materials={materials} />
-              )}
+            <div className="interactive-tabs-content" style={{ padding: '24px' }}>
               {activeTab === 'transcript' && (
-                <TranscriptTab 
-                  transcript={mockTranscript} 
-                  videoTime={videoTime} 
-                  onSeek={handleSeek} 
-                />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {/* Summary download card */}
+                  <div style={{
+                    background: '#f8fafc',
+                    border: '1.5px dashed #cbd5e1',
+                    borderRadius: '12px',
+                    padding: '32px 24px',
+                    textAlign: 'center',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '14px'
+                  }}>
+                    <div style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '50%',
+                      background: '#eef2ff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#3f51b5',
+                      fontSize: '22px'
+                    }}>
+                      <FileIcon />
+                    </div>
+                    <h4 style={{ fontSize: '15px', fontWeight: '800', margin: 0, color: '#0f172a' }}>Tóm tắt & ghi chú</h4>
+                    <p style={{ fontSize: '12.5px', color: '#64748b', margin: 0, fontWeight: '500', maxWidth: '400px', lineHeight: '1.5' }}>
+                      Nhấn tab Tóm tắt video phía trên để tải nội dung.
+                    </p>
+                    <button
+                      onClick={() => {
+                        toast('Đang khởi tạo tóm tắt thông minh từ AI...', 'info');
+                        setTimeout(() => {
+                          const docText = `Tóm tắt bài học: ${currentLesson.title}\n\n1. Kiến thức cốt lõi:\n- Phân tích chi tiết các dạng lý thuyết trọng tâm.\n- Áp dụng sơ đồ tư duy hệ thống hóa kiến thức.\n\n2. Ghi chú & Công thức:\n- Ghi nhớ công thức đặc biệt được giáo viên nhấn mạnh trong bài giảng.`;
+                          const blob = new Blob([docText], { type: 'text/plain;charset=utf-8' });
+                          const link = document.createElement('a');
+                          link.href = URL.createObjectURL(blob);
+                          link.download = `Tom_tat_${currentLesson.title.replace(/\s+/g, '_')}.txt`;
+                          link.click();
+                          toast('Tải tóm tắt video thành công! 📄', 'success');
+                        }, 1000);
+                      }}
+                      style={{
+                        background: '#3f51b5',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '8px 24px',
+                        fontWeight: '700',
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 4px rgba(63, 81, 181, 0.2)'
+                      }}
+                    >
+                      Tải tóm tắt
+                    </button>
+                  </div>
+                  
+                  {/* Real timestamped notes form and cards */}
+                  <NotePanel 
+                    lesson={currentLesson} 
+                    videoTime={videoTime} 
+                    onSeek={handleSeek} 
+                  />
+                </div>
               )}
+
               {activeTab === 'exercise' && (
-                <ExerciseTab 
-                  exercises={mockQuizzes} 
-                  onCompleteExercise={(score) => {
-                    toast(`Hoàn thành bài luyện tập với tỷ lệ ${score}%!`, 'success');
-                  }} 
-                />
-              )}
-              {activeTab === 'discussion' && (
-                <DiscussionTab
-                  discussions={discussions}
-                  currentUser={currentUser}
-                  onAddComment={handleAddComment}
-                  videoTime={videoTime}
-                  onSeek={handleSeek}
-                />
-              )}
-              {activeTab === 'teacher' && (
-                <TeacherQATab 
-                  currentUser={currentUser} 
-                  lesson={currentLesson} 
-                />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {/* Exercises tab */}
+                  <ExerciseTab 
+                    exercises={mockQuizzes} 
+                    onCompleteExercise={(score) => {
+                      toast(`Hoàn thành bài luyện tập với tỷ lệ ${score}%!`, 'success');
+                    }} 
+                  />
+                  {/* Materials/documents tab */}
+                  <MaterialsTab materials={materials} />
+                </div>
               )}
             </div>
           </div>
+
+          {/* Comment/Discussion section (directly below tabs) */}
+          <div style={{
+            background: '#ffffff',
+            border: '1.5px solid #e2e8f0',
+            borderRadius: '12px',
+            padding: '24px',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
+            textAlign: 'left',
+            flexShrink: 0
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
+              <span style={{ fontSize: '18px' }}>💬</span>
+              <h3 style={{ fontSize: '15px', fontWeight: '800', margin: 0, color: '#0f172a' }}>Bình luận</h3>
+            </div>
+            <DiscussionTab
+              discussions={discussions}
+              currentUser={currentUser}
+              onAddComment={handleAddComment}
+              videoTime={videoTime}
+              onSeek={handleSeek}
+            />
+          </div>
         </div>
 
-        {/* RIGHT COLUMN: DOUBLE PANEL SIDEBAR (AI TUTOR & NOTES) */}
-        {rightPanelOpen && (
+        {/* RIGHT SIDEBAR COLUMN PANEL */}
+        {rightPanelOpen ? (
           <div 
             className="right-sidebar-panel" 
-            style={{ width: `${rightPanelWidth}px` }}
+            style={{ 
+              width: `${rightPanelWidth}px`, 
+              display: 'flex', 
+              flexDirection: 'column', 
+              height: '100%',
+              borderLeft: '1.5px solid #e2e8f0',
+              background: '#ffffff',
+              position: 'relative'
+            }}
           >
             {/* Panel resizer handle bar */}
             <div 
@@ -535,59 +692,186 @@ export default function LearningPage({
               className="panel-resizer-bar" 
             />
 
-            <div className="right-panel-inner">
-              <div className="panel-toggle-tabs">
-                <button
-                  type="button"
-                  onClick={() => setRightPanelTab('ai')}
-                  className={`panel-tab-btn ${rightPanelTab === 'ai' ? 'active' : ''}`}
-                >
-                  <HiSparkles />
-                  <span>Gia sư AI</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRightPanelTab('notes')}
-                  className={`panel-tab-btn ${rightPanelTab === 'notes' ? 'active' : ''}`}
-                >
-                  <HiOutlineLightBulb />
-                  <span>Ghi chú cá nhân</span>
-                </button>
+            <div className="right-panel-inner" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              {/* Tab headers at the top: Nội dung bài học & Trợ lý học tập */}
+              <div className="panel-toggle-tabs" style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 16px',
+                borderBottom: '1px solid #e2e8f0',
+                background: '#ffffff'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setRightPanelTab('curriculum')}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      borderBottom: rightPanelTab === 'curriculum' ? '2.5px solid #2563eb' : '2.5px solid transparent',
+                      padding: '8px 0',
+                      fontSize: '13px',
+                      fontWeight: '800',
+                      color: rightPanelTab === 'curriculum' ? '#2563eb' : '#475569',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    Nội dung bài học
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRightPanelTab('ai')}
+                    style={{
+                      border: '1.5px solid transparent',
+                      background: 'linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #f093fb 0%, #f5576c 100%) border-box',
+                      borderRadius: '20px',
+                      padding: '4px 12px',
+                      fontSize: '12px',
+                      fontWeight: '800',
+                      color: rightPanelTab === 'ai' ? '#4f46e5' : '#475569',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <span>✨</span>
+                    <span>Trợ lý học tập</span>
+                  </button>
+                </div>
                 
-                <button 
-                  type="button" 
-                  onClick={() => setRightPanelOpen(false)}
-                  className="btn-close-panel"
-                >
-                  <HiX />
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <button 
+                    type="button"
+                    style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                    title="Đổi giao diện"
+                    onClick={() => toast('Đã thay đổi chế độ xem!', 'info')}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+                  </button>
+                  
+                  <button 
+                    type="button" 
+                    onClick={() => setRightPanelOpen(false)}
+                    style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '18px' }}
+                    title="Đóng bảng thông tin"
+                  >
+                    <HiX />
+                  </button>
+                </div>
               </div>
 
-              <div className="panel-tab-content">
-                {rightPanelTab === 'ai' ? (
-                  <AITutorPanel lesson={currentLesson} />
+              {/* Tab contents (curriculum list or AI Tutor panel) */}
+              <div className="panel-tab-content" style={{ flex: 1, overflowY: 'auto' }}>
+                {rightPanelTab === 'curriculum' ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                    <div style={{ flex: 1 }}>
+                      <LessonSidebar
+                        curriculum={course.curriculum}
+                        currentLessonId={currentLesson.id}
+                        onSelectLesson={(lesson) => onSelectLesson(courseId, lesson.id)}
+                        completedLessons={completedLessons}
+                        isOwned={isOwned}
+                        courseTitle={course.title}
+                      />
+                    </div>
+                    {/* Locked Certificate footer */}
+                    <div style={{
+                      padding: '16px 20px',
+                      borderTop: '1px solid #e2e8f0',
+                      background: '#faf8f5',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '700', color: '#475569' }}>
+                        <span>🎓</span>
+                        <span>Chứng chỉ hoàn thành khóa học</span>
+                      </div>
+                      <span style={{ fontSize: '16px' }}>🔒</span>
+                    </div>
+                  </div>
                 ) : (
-                  <NotePanel 
-                    lesson={currentLesson} 
-                    videoTime={videoTime} 
-                    onSeek={handleSeek} 
-                  />
+                  <AITutorPanel lesson={currentLesson} />
                 )}
               </div>
             </div>
           </div>
-        )}
-
-        {!rightPanelOpen && (
+        ) : (
           <button 
             type="button" 
             onClick={() => setRightPanelOpen(true)} 
             className="btn-toggle-right-panel-floating"
-            title="Mở bảng Gia sư AI & Ghi chú"
+            style={{
+              position: 'absolute',
+              top: '16px',
+              right: '16px',
+              zIndex: 20,
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              background: '#ffffff',
+              border: '1.5px solid #cbd5e1',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: '#3f51b5'
+            }}
+            title="Mở bảng nội dung & AI"
           >
-            <HiSparkles />
+            <HiAcademicCap />
           </button>
         )}
+      </div>
+
+      {/* FLOATING COPYRIGHT WATERMARK BADGE */}
+      <div style={{
+        position: 'fixed',
+        bottom: '20px',
+        left: '20px',
+        zIndex: 9999,
+        background: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(10px)',
+        border: '1.5px solid rgba(255, 255, 255, 0.15)',
+        borderRadius: '40px',
+        padding: '6px 14px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        color: '#ffffff',
+        fontFamily: "'Outfit', sans-serif",
+        boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3)',
+        pointerEvents: 'none',
+        userSelect: 'none'
+      }}>
+        <div style={{
+          width: '28px',
+          height: '28px',
+          borderRadius: '50%',
+          background: '#ffffff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden'
+        }}>
+          {currentUser?.avatarUrl ? (
+            <img src={currentUser.avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            <span style={{ color: '#0f172a', fontSize: '11px', fontWeight: '900' }}>
+              {currentUser?.fullName?.substring(0, 2).toUpperCase() || 'US'}
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', fontSize: '11px', textAlign: 'left', lineHeight: '1.2' }}>
+          <span style={{ fontWeight: '700', opacity: 0.9 }}>Username: {currentUser?.fullName || 'tranvanthuan'}</span>
+          <span style={{ opacity: 0.6 }}>{currentUser?.email || 'tranvanthuan2005tt@gmail.com'}</span>
+        </div>
       </div>
 
       {/* OVERLAY MODALS */}

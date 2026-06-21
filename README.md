@@ -1,5 +1,15 @@
 # 🚀 EduPath AI — Hệ Thống Học Tập Sơ Đồ Tư Duy Thông Minh (AI Mindmap Learning System)
 
+## ⚠️ QUY TẮC PHÁT TRIỂN QUAN TRỌNG (CRITICAL DEVELOPMENT RULE)
+
+> [!WARNING]
+> **CẤM XÓA DỮ LIỆU KHÓA HỌC TRONG DATABASE (DO NOT WIPE COURSE DATA)**
+> * Tuyệt đối **không được tự ý xóa hoặc reset bảng `Course` và `Lesson`** trong Database khi thực hiện các yêu cầu prompt tiếp theo.
+> * Tiến trình seeder cơ sở dữ liệu (`prisma/seed.ts` và `prisma/seed_courses.ts`) đã được cấu hình **bảo vệ chống ghi đè**. Nó sẽ tự động bỏ qua (skip) nếu phát hiện DB đã có dữ liệu.
+> * Chỉ được chạy seeder ghi đè khi truyền tham số `--force` hoặc `-f` một cách tường minh: `npx tsx prisma/seed.ts --force`.
+
+---
+
 Chào mừng bạn đến với hệ thống **EduPath AI**. Đây là nền tảng hỗ trợ ôn thi THPT Quốc gia thông qua Sơ đồ tư duy thông minh tích hợp AI (AI-Powered Mindmap Learning System). Hệ thống kết hợp trực quan hóa kiến thức bản đồ tư duy với các công cụ lượng giá, phân tích điểm yếu và tối ưu lộ trình ôn tập.
 
 ---

@@ -4,6 +4,46 @@ import { prisma } from '../lib/prisma.js';
 import fs from 'fs';
 import path from 'path';
 
+// Helper to sync material to public DocumentResource catalog
+async function syncMaterialToPublic(material: any) {
+  if (material.isPublic && material.isApproved) {
+    const existing = await prisma.documentResource.findFirst({
+      where: { driveUrl: material.fileUrl }
+    });
+
+    const docData = {
+      title: material.title,
+      description: material.description || null,
+      subject: material.subject,
+      level: material.grade || '12',
+      price: Math.round(material.price || 0),
+      isFree: !material.price || material.price === 0,
+      isActive: true,
+      isDeleted: false
+    };
+
+    if (existing) {
+      await prisma.documentResource.update({
+        where: { id: existing.id },
+        data: docData
+      });
+    } else {
+      await prisma.documentResource.create({
+        data: {
+          ...docData,
+          driveUrl: material.fileUrl
+        }
+      });
+    }
+  } else {
+    // If not public or not approved, ensure it does not exist in the public library
+    await prisma.documentResource.deleteMany({
+      where: { driveUrl: material.fileUrl }
+    });
+  }
+}
+
+
 // ==========================================
 // 1. TEACHER ENDPOINTS
 // ==========================================
@@ -59,9 +99,12 @@ export async function createTeacherMaterial(req: AuthRequest, res: Response) {
         tags: parsedTags,
         price: price ? Number(price) : 0,
         isPublic: isPublic === 'true' || isPublic === true,
-        isApproved: false // Awaiting admin approval
+        isApproved: isPublic === 'true' || isPublic === true // Auto-approve if public
       }
     });
+
+    // Sync to public library
+    await syncMaterialToPublic(material);
 
     return res.status(201).json({ success: true, data: material });
   } catch (err: any) {
@@ -98,9 +141,12 @@ export async function updateTeacherMaterial(req: AuthRequest, res: Response) {
         ...(parsedTags ? { tags: parsedTags } : {}),
         ...(price !== undefined ? { price: Number(price) } : {}),
         ...(isPublic !== undefined ? { isPublic: isPublic === 'true' || isPublic === true } : {}),
-        isApproved: false // Re-moderation required if updated
+        isApproved: isPublic !== undefined ? (isPublic === 'true' || isPublic === true) : material.isApproved
       }
     });
+
+    // Sync changes to public library
+    await syncMaterialToPublic(updated);
 
     return res.status(200).json({ success: true, data: updated });
   } catch (err: any) {
@@ -130,6 +176,11 @@ export async function deleteTeacherMaterial(req: AuthRequest, res: Response) {
         fs.unlinkSync(filePath);
       }
     } catch (e) {}
+
+    // Remove from public library before deleting record
+    await prisma.documentResource.deleteMany({
+      where: { driveUrl: material.fileUrl }
+    });
 
     await prisma.teacherMaterial.delete({ where: { id } });
 
@@ -326,6 +377,9 @@ export async function approveMaterial(req: AuthRequest, res: Response) {
       data: { isApproved: true }
     });
 
+    // Sync to public library
+    await syncMaterialToPublic(updated);
+
     return res.status(200).json({ success: true, data: { message: 'Duyệt tài liệu thành công!', data: updated } });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
@@ -350,6 +404,11 @@ export async function rejectMaterial(req: AuthRequest, res: Response) {
         fs.unlinkSync(filePath);
       }
     } catch (e) {}
+
+    // Remove from public library as well
+    await prisma.documentResource.deleteMany({
+      where: { driveUrl: material.fileUrl }
+    });
 
     await prisma.teacherMaterial.delete({ where: { id } });
 

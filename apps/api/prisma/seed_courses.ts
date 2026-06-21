@@ -2,14 +2,15 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
-
-async function main() {
+export async function seedAllCourses() {
   console.log('[Seed Courses] Starting course seeder...');
 
-  // 1. Clean existing course records to prevent duplicates and keep DB clean
-  console.log('[Seed Courses] Cleaning existing courses...');
-  await prisma.course.deleteMany({});
-
+  // 1. Clean existing course records to prevent duplicates and keep DB clean if run directly
+  const isDirectRun = process.argv[1]?.includes('seed_courses');
+  if (isDirectRun) {
+    console.log('[Seed Courses] Cleaning existing courses...');
+    await prisma.course.deleteMany({});
+  }
   // 2. Ensure teachers exist (retrieve if existing, create if not)
   console.log('[Seed Courses] Ensuring teachers exist...');
   const teacherHash = await bcrypt.hash('teacher123', 12);
@@ -700,14 +701,48 @@ async function main() {
     });
   }
 
+  // Post-process lessons to add videoUrls
+  console.log('[Seed Courses] Adding default embeddable videos to all lessons...');
+  const allLessons = await prisma.lesson.findMany({
+    where: { videoUrl: null }
+  });
+  
+  const YOUTUBE_IDS = [
+    'V1y3_Tz1Gf4',
+    '3Q90uJdSpXo',
+    '537bNfX-i64',
+    'F91V6c_yO50',
+    'bM7SZ5SBzyY',
+    'HGeUpeCjSbg',
+    '01GzX1S6_sM',
+    'W6NZfCO5SIk',
+    '5_b7s1kGEXQ',
+    '7Qn6Xf5nF7M'
+  ];
+
+  for (let i = 0; i < allLessons.length; i++) {
+    const lesson = allLessons[i];
+    const id = YOUTUBE_IDS[i % YOUTUBE_IDS.length];
+    await prisma.lesson.update({
+      where: { id: lesson.id },
+      data: { videoUrl: `https://www.youtube.com/embed/${id}` }
+    });
+  }
+
   console.log('[Seed Courses] Seeding completed successfully!');
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+async function main() {
+  await seedAllCourses();
+}
+
+if (process.argv[1]?.includes('seed_courses')) {
+  main()
+    .catch((e) => {
+      console.error(e);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

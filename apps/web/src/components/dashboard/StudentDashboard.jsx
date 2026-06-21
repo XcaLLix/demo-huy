@@ -19,16 +19,19 @@ import {
   HiSparkles,
   HiLightningBolt,
   HiFolderOpen,
-  HiClipboardList
+  HiClipboardList,
+  HiLogout,
+  HiUserGroup
 } from 'react-icons/hi';
 import { HiTrophy } from 'react-icons/hi2';
 import { api } from '../../api';
 import { toast } from '../../utils/toast';
+import sunLogoImg from '../../assets/sun_logo.png';
 import '../../styles/studentDashboard.css';
 
-export default function StudentDashboard({ currentUser, setActiveTab, navigateTo, onUpdateUser, activeTab, children }) {
+export default function StudentDashboard({ currentUser, setActiveTab, navigateTo, onUpdateUser, activeTab, currentTab: passedCurrentTab, onLogout, children }) {
   // --- STATES & STORES ---
-  const currentTab = activeTab || 'home';
+  const currentTab = activeTab || passedCurrentTab || 'home';
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [onboardingData, setOnboardingData] = useState(() => {
     const saved = localStorage.getItem('student_onboarding_data');
@@ -72,6 +75,8 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
   });
 
   const [documents, setDocuments] = useState([]);
+  const [studyGroups, setStudyGroups] = useState([]);
+  const [userDocuments, setUserDocuments] = useState([]);
   const [docSearchQuery, setDocSearchQuery] = useState('');
   const [progresses, setProgresses] = useState({});
 
@@ -89,11 +94,13 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
     async function loadDashboardResources() {
       setLoading(true);
       try {
-        const [coursesRes, attemptsRes, gamiRes, docsRes] = await Promise.allSettled([
+        const [coursesRes, attemptsRes, gamiRes, docsRes, userDocsRes, groupsRes] = await Promise.allSettled([
           api.getCourses(), // Fetch all courses to correctly filter owned ones
           api.getExamHistory().catch(() => api.getAttempts()),
           api.getUserGamificationProfile(),
-          api.getDocumentResources()
+          api.getDocumentResources(),
+          api.getUserDocuments(),
+          api.getStudyGroups()
         ]);
 
         const courses = coursesRes.status === 'fulfilled' ? coursesRes.value : [];
@@ -110,6 +117,8 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
           ]
         };
         const docs = docsRes.status === 'fulfilled' ? docsRes.value : [];
+        const userDocs = userDocsRes.status === 'fulfilled' ? userDocsRes.value : [];
+        const groups = groupsRes.status === 'fulfilled' ? groupsRes.value : [];
 
         // Calculate progress for courses
         const progressMap = {};
@@ -163,6 +172,8 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
           recentActivities
         });
         setDocuments(docs);
+        setStudyGroups(groups);
+        setUserDocuments(userDocs);
       } catch (err) {
         console.error('Lỗi khi tải tài nguyên dashboard:', err);
       } finally {
@@ -378,7 +389,76 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
     doc.desc.toLowerCase().includes(docSearchQuery.toLowerCase())
   );
 
-  const hasRightSidebar = currentTab === 'home';
+  const filteredUserDocs = userDocuments.filter(doc => 
+    doc.title.toLowerCase().includes(docSearchQuery.toLowerCase()) ||
+    (doc.fileType && doc.fileType.toLowerCase().includes(docSearchQuery.toLowerCase()))
+  );
+
+  const handleUploadDocument = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Check size limit: 20MB
+    if (file.size > 20 * 1024 * 1024) {
+      toast('Kích thước tệp tối đa là 20MB!', 'warning');
+      return;
+    }
+
+    try {
+      toast(`Đang tải tài liệu "${file.name}" lên...`, 'info');
+      const uploadRes = await api.uploadFile(file);
+      if (uploadRes && uploadRes.url) {
+        const fileType = file.name.split('.').pop()?.toUpperCase() || 'PDF';
+        const savedDoc = await api.createUserDocument(file.name, uploadRes.url, fileType);
+        setUserDocuments(prev => [savedDoc, ...prev]);
+        toast(`Tải lên tài liệu "${file.name}" thành công!`, 'success');
+      }
+    } catch (err) {
+      console.error(err);
+      toast(err.message || 'Tải lên tài liệu thất bại!', 'error');
+    }
+  };
+
+  const handleDeleteDocument = async (docId, docTitle) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa tài liệu "${docTitle}"?`)) {
+      return;
+    }
+    try {
+      await api.deleteUserDocument(docId);
+      setUserDocuments(prev => prev.filter(d => d.id !== docId));
+      toast('Xóa tài liệu thành công!', 'success');
+    } catch (err) {
+      console.error(err);
+      toast(err.message || 'Xóa tài liệu thất bại!', 'error');
+    }
+  };
+
+  const handleJoinClassroom = async (groupId) => {
+    try {
+      await api.joinStudyGroup(groupId);
+      const updated = await api.getStudyGroups();
+      setStudyGroups(updated);
+      toast('Tham gia lớp học thành công! 🎓', 'success');
+    } catch (err) {
+      toast(err.message || 'Không thể tham gia lớp học!', 'error');
+    }
+  };
+
+  const handleLeaveClassroom = async (groupId, groupName) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn rời lớp học "${groupName}"?`)) {
+      return;
+    }
+    try {
+      await api.leaveStudyGroup(groupId);
+      const updated = await api.getStudyGroups();
+      setStudyGroups(updated);
+      toast('Đã rời khỏi lớp học!', 'success');
+    } catch (err) {
+      toast(err.message || 'Không thể rời lớp học!', 'error');
+    }
+  };
+
+  const hasRightSidebar = false;
 
   return (
     <div 
@@ -391,8 +471,8 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
          LEFT SIDEBAR
          ========================================================================== */}
       <aside className="sdb-left-sidebar">
-        <div className="sdb-logo-section">
-          <div className="sdb-logo-icon">E</div>
+        <div className="sdb-logo-section" style={{ cursor: 'pointer' }} onClick={() => navigateTo('/')}>
+          <img src={sunLogoImg} alt="EduPath AI" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
           <span>EduPath AI</span>
         </div>
 
@@ -426,97 +506,55 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
 
         {/* Sidebar Tabs Menu */}
         <ul className="sdb-menu-list">
+          {/* TRANG CHỦ */}
+          <div className="sdb-menu-category-title">Trang chủ</div>
           <button 
             className={`sdb-menu-item ${currentTab === 'home' ? 'active' : ''}`}
-            onClick={() => navigateTo('/dashboard/home')}
+            onClick={() => navigateTo('/user/home')}
           >
             <span className="sdb-menu-icon"><HiHome /></span>
             <span>Tổng quan</span>
           </button>
 
+          {/* HỌC TẬP CỦA TÔI */}
+          <div className="sdb-menu-category-title">Học tập của tôi</div>
           <button 
-            className={`sdb-menu-item ${currentTab === 'courses' ? 'active' : ''}`}
-            onClick={() => navigateTo('/dashboard/courses')}
+            className={`sdb-menu-item ${currentTab === 'my-courses' ? 'active' : ''}`}
+            onClick={() => navigateTo('/user/my-courses')}
           >
-            <span className="sdb-menu-icon"><HiAcademicCap /></span>
-            <span>Kho khóa học</span>
+            <span className="sdb-menu-icon"><HiBookOpen /></span>
+            <span>Khóa học của tôi</span>
           </button>
 
           <button 
-            className={`sdb-menu-item ${currentTab === 'tests' ? 'active' : ''}`}
-            onClick={() => navigateTo('/dashboard/mock-exams')}
+            className={`sdb-menu-item ${currentTab === 'classrooms' ? 'active' : ''}`}
+            onClick={() => navigateTo('/user/classrooms')}
           >
-            <span className="sdb-menu-icon"><HiClipboardList /></span>
-            <span>Luyện thi thử</span>
-          </button>
-
-          <button 
-            className={`sdb-menu-item ${currentTab === 'ai-qa' ? 'active' : ''}`}
-            onClick={() => navigateTo('/dashboard/ai-tutor')}
-          >
-            <span className="sdb-menu-icon"><HiSparkles /></span>
-            <span>Hỏi đáp AI</span>
-          </button>
-
-          <button 
-            className={`sdb-menu-item ${currentTab === 'path' ? 'active' : ''}`}
-            onClick={() => navigateTo('/dashboard/flashcards')}
-          >
-            <span className="sdb-menu-icon"><HiLightningBolt /></span>
-            <span>Flashcard</span>
-          </button>
-
-          <button 
-            className={`sdb-menu-item ${currentTab === 'library' ? 'active' : ''}`}
-            onClick={() => navigateTo('/dashboard/exam-bank')}
-          >
-            <span className="sdb-menu-icon"><HiFolderOpen /></span>
-            <span>Ngân hàng tài liệu</span>
+            <span className="sdb-menu-icon"><HiUserGroup /></span>
+            <span>Lớp học của tôi</span>
           </button>
 
           <button 
             className={`sdb-menu-item ${currentTab === 'documents' ? 'active' : ''}`}
-            onClick={() => navigateTo('/dashboard/documents')}
+            onClick={() => navigateTo('/user/documents')}
           >
-            <span className="sdb-menu-icon"><HiBookOpen /></span>
+            <span className="sdb-menu-icon"><HiStar /></span>
             <span>Tài liệu của tôi</span>
           </button>
 
           <button 
-            className={`sdb-menu-item ${currentTab === 'forum' ? 'active' : ''}`}
-            onClick={() => navigateTo('/dashboard/forum')}
-          >
-            <span className="sdb-menu-icon"><HiChatAlt2 /></span>
-            <span>Cộng đồng</span>
-          </button>
-
-          <button 
-            className={`sdb-menu-item ${currentTab === 'leaderboard' ? 'active' : ''}`}
-            onClick={() => navigateTo('/dashboard/leaderboard')}
-          >
-            <span className="sdb-menu-icon"><HiTrophy /></span>
-            <span>Bảng xếp hạng</span>
-          </button>
-
-          <button 
-            className={`sdb-menu-item ${currentTab === 'rewards' ? 'active' : ''}`}
-            onClick={() => navigateTo('/dashboard/rewards')}
-          >
-            <span className="sdb-menu-icon"><HiStar /></span>
-            <span>Điểm thưởng</span>
-          </button>
-
-          <button 
             className={`sdb-menu-item ${currentTab === 'streak' ? 'active' : ''}`}
-            onClick={() => navigateTo('/dashboard/streak')}
+            onClick={() => navigateTo('/user/streak')}
           >
             <span className="sdb-menu-icon"><HiFire /></span>
             <span>Chuỗi học tập</span>
           </button>
 
+          {/* CÁ NHÂN */}
+          <div className="sdb-menu-category-title">Cá nhân</div>
           <button 
             className={`sdb-menu-item ${currentTab === 'settings' || currentTab === 'profile' ? 'active' : ''}`}
-            onClick={() => navigateTo('/dashboard/settings')}
+            onClick={() => navigateTo('/user/settings')}
           >
             <span className="sdb-menu-icon"><HiUser /></span>
             <span>Thông tin cá nhân</span>
@@ -543,54 +581,119 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
                   className="sdb-search-btn" 
                   title="Tìm kiếm"
                   onClick={() => {
-                    navigateTo('/dashboard/documents');
+                    navigateTo('/user/documents');
                   }}
                 >
                   <HiSearch />
                 </button>
                 <button 
                   className="sdb-action-btn"
-                  onClick={() => navigateTo('/dashboard/mock-exams')}
+                  onClick={() => navigateTo('/user/mock-exams')}
                 >
                   Làm đề thi mới
                 </button>
               </div>
             </div>
 
-            {/* Courses list cards */}
+            {/* Courses list table format */}
             {coursesToRender.length > 0 ? (
-              <div className="sdb-courses-grid animate-in">
-                {coursesToRender.map((course) => (
-                  <div 
-                    key={course.id} 
-                    className={`sdb-course-card ${course.colorClass}`}
-                    onClick={() => {
-                      if (course.id && !String(course.id).startsWith('def')) {
-                        navigateTo(`/courses/${course.id}`);
-                      } else {
-                        navigateTo('/dashboard/courses');
-                      }
-                    }}
+              <div 
+                className="animate-in"
+                style={{
+                  background: '#ffffff',
+                  border: '3px solid #000000',
+                  borderRadius: '16px',
+                  padding: '20px',
+                  boxShadow: '4px 4px 0px #000000',
+                  marginBottom: '12px',
+                  textAlign: 'left'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <h3 className="sdb-card-title" style={{ fontSize: '15px' }}>Khóa học của tôi</h3>
+                  <button 
+                    onClick={() => navigateTo('/user/my-courses')} 
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '900', color: '#8b5cf6' }}
                   >
-                    <button className="sdb-course-menu-btn">⋮</button>
-                    
-                    <div className="sdb-course-avatars">
-                      <div className="sdb-course-avatar-bubble">AI</div>
-                      <div className="sdb-course-avatar-bubble" style={{ backgroundColor: '#10b981' }}>+7</div>
-                    </div>
+                    Xem tất cả
+                  </button>
+                </div>
 
-                    <h3 className="sdb-course-title">{course.title}</h3>
-
-                    <div className="sdb-course-info">
-                      <span>{course.lessons?.length || course.lessonsCount || 10} bài học</span>
-                      <span>{course.progress}%</span>
-                    </div>
-
-                    <div className="sdb-course-progress-track">
-                      <div className="sdb-course-progress-bar" style={{ width: `${course.progress}%` }}></div>
-                    </div>
-                  </div>
-                ))}
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '2.5px solid #000000' }}>
+                        <th style={{ padding: '10px 8px', fontSize: '12px', fontWeight: '900', color: '#64748b', textTransform: 'uppercase' }}>Tên khóa học</th>
+                        <th style={{ padding: '10px 8px', fontSize: '12px', fontWeight: '900', color: '#64748b', textTransform: 'uppercase', width: '120px' }}>Môn học</th>
+                        <th style={{ padding: '10px 8px', fontSize: '12px', fontWeight: '900', color: '#64748b', textTransform: 'uppercase', width: '110px', textAlign: 'center' }}>Số bài học</th>
+                        <th style={{ padding: '10px 8px', fontSize: '12px', fontWeight: '900', color: '#64748b', textTransform: 'uppercase', width: '220px' }}>Tiến độ</th>
+                        <th style={{ padding: '10px 8px', fontSize: '12px', fontWeight: '900', color: '#64748b', textTransform: 'uppercase', width: '120px', textAlign: 'right' }}>Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {coursesToRender.map((course) => (
+                        <tr 
+                          key={course.id} 
+                          style={{ borderBottom: '1.5px solid #e2e8f0', transition: 'background 0.1s' }}
+                          className="sdb-table-row"
+                        >
+                          <td style={{ padding: '12px 8px', fontSize: '13.5px', fontWeight: '900', color: '#000000' }}>
+                            {course.title}
+                          </td>
+                          <td style={{ padding: '12px 8px', fontSize: '12.5px', fontWeight: '800' }}>
+                            <span style={{
+                              background: course.subject === 'Toán' || course.subject === 'Toán học' ? '#f3e8ff' : course.subject === 'Vật lý' ? '#ccfbf1' : course.subject === 'Hóa học' ? '#dbeafe' : '#ffedd5',
+                              color: course.subject === 'Toán' || course.subject === 'Toán học' ? '#7c3aed' : course.subject === 'Vật lý' ? '#0d9488' : course.subject === 'Hóa học' ? '#2563eb' : '#ea580c',
+                              padding: '2px 8px',
+                              borderRadius: '12px',
+                              border: '1.5px solid #000',
+                              fontSize: '11px',
+                              fontWeight: '800'
+                            }}>
+                              {course.subject}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 8px', fontSize: '13px', fontWeight: '800', textAlign: 'center', color: '#334155' }}>
+                            {course.lessons?.length || course.lessonsCount || 10} bài
+                          </td>
+                          <td style={{ padding: '12px 8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div style={{ flex: 1, height: '8px', background: '#f1f5f9', border: '1.5px solid #000', borderRadius: '4px', overflow: 'hidden' }}>
+                                <div style={{ width: `${course.progress}%`, height: '100%', background: 'linear-gradient(90deg, #8b5cf6, #6366f1)' }}></div>
+                              </div>
+                              <span style={{ fontSize: '12px', fontWeight: '900', color: '#7c3aed', minWidth: '35px', textAlign: 'right' }}>{course.progress}%</span>
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px 8px', textAlign: 'right' }}>
+                            <button
+                              onClick={() => {
+                                if (course.id && !String(course.id).startsWith('def')) {
+                                  navigateTo(`/courses/${course.id}`);
+                                } else {
+                                  navigateTo('/user/courses');
+                                }
+                              }}
+                              style={{
+                                background: '#7c3aed',
+                                color: '#ffffff',
+                                border: '2px solid #000000',
+                                borderRadius: '6px',
+                                padding: '4px 10px',
+                                fontWeight: '900',
+                                fontSize: '11.5px',
+                                cursor: 'pointer',
+                                boxShadow: '1.5px 1.5px 0px #000000',
+                                transition: 'all 0.1s'
+                              }}
+                            >
+                              Vào học
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             ) : (
               <div style={{
@@ -608,7 +711,7 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
                   Hãy đăng ký khóa học Premium để mở khóa bài học và bắt đầu lộ trình học cá nhân hóa ngay nhé!
                 </p>
                 <button
-                  onClick={() => navigateTo('/dashboard/courses')}
+                  onClick={() => navigateTo('/user/courses')}
                   style={{
                     background: '#FFE259',
                     color: '#000',
@@ -638,37 +741,106 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
             {/* Bottom split: Checklist documents & Stats widgets */}
             <div className="sdb-bottom-split">
               {/* Documents card */}
-              <div className="sdb-documents-card">
-                <div className="sdb-card-title-row">
-                  <h3 className="sdb-card-title">Tài liệu học tập gần đây</h3>
-                  <button 
-                    onClick={() => navigateTo('/dashboard/documents')} 
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '900', color: '#8b5cf6' }}
-                  >
-                    Xem tất cả
-                  </button>
+                <div className="sdb-documents-card">
+                  <div className="sdb-card-title-row">
+                    <h3 className="sdb-card-title">Tài liệu học tập gần đây</h3>
+                    <button 
+                      onClick={() => navigateTo('/user/documents')} 
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '900', color: '#8b5cf6' }}
+                    >
+                      Xem tất cả
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {userDocuments.length > 0 ? (
+                      userDocuments.slice(0, 3).map((doc, idx) => {
+                        const tagClass = idx % 4 === 0 ? 'purple-tag' : idx % 4 === 1 ? 'teal-tag' : idx % 4 === 2 ? 'orange-tag' : 'blue-tag';
+                        return (
+                          <div key={doc.id} className={`sdb-doc-item ${tagClass}`}>
+                            <div className="sdb-doc-info" onClick={() => window.open(doc.fileUrl, '_blank')} style={{ cursor: 'pointer', flex: 1 }}>
+                              <h4 className="sdb-doc-title">{doc.title}</h4>
+                              <p className="sdb-doc-desc">Định dạng: {doc.fileType} • {new Date(doc.createdAt).toLocaleDateString('vi-VN')}</p>
+                            </div>
+                            <a 
+                              href={doc.fileUrl} 
+                              download
+                              target="_blank"
+                              rel="noreferrer"
+                              className="sdb-doc-action-btn"
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}
+                            >
+                              <HiDownload />
+                            </a>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: '24px', border: '2px dashed var(--border)', borderRadius: '12px' }}>
+                        <span style={{ fontSize: '28px' }}>📂</span>
+                        <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: '8px 0 0 0', fontWeight: 'bold' }}>Chưa có tài liệu tải lên gần đây</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {docsToRender.slice(0, 3).map((doc) => (
-                    <div key={doc.id} className={`sdb-doc-item ${doc.tagClass}`}>
-                      <div className="sdb-doc-info">
-                        <h4 className="sdb-doc-title">{doc.title}</h4>
-                        <p className="sdb-doc-desc">{doc.desc}</p>
+                {/* Joined Classrooms Quick Widget */}
+                <div className="sdb-documents-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div className="sdb-card-title-row">
+                    <h3 className="sdb-card-title">Lớp học trực tuyến</h3>
+                    <button 
+                      onClick={() => navigateTo('/user/classrooms')} 
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '900', color: '#8b5cf6' }}
+                    >
+                      Xem tất cả
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {studyGroups.filter(g => g.isMember).length > 0 ? (
+                      studyGroups.filter(g => g.isMember).slice(0, 3).map((group, idx) => {
+                        const tagClass = idx % 4 === 0 ? 'purple-tag' : idx % 4 === 1 ? 'teal-tag' : idx % 4 === 2 ? 'orange-tag' : 'blue-tag';
+                        return (
+                          <div 
+                            key={group.id} 
+                            className={`sdb-doc-item ${tagClass}`}
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => {
+                              localStorage.setItem('forum_active_group', JSON.stringify(group));
+                              navigateTo('/user/forum');
+                            }}
+                          >
+                            <div className="sdb-doc-info" style={{ flex: 1 }}>
+                              <h4 className="sdb-doc-title">👥 {group.name}</h4>
+                              <p className="sdb-doc-desc">{group.memberCount} thành viên • Trao đổi học tập</p>
+                            </div>
+                            <span style={{ fontSize: '14px', color: '#8b5cf6', fontWeight: '900' }}>Vào lớp →</span>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: '24px', border: '2px dashed var(--border)', borderRadius: '12px' }}>
+                        <span style={{ fontSize: '28px' }}>🏫</span>
+                        <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: '8px 0 12px 0', fontWeight: 'bold' }}>Chưa tham gia lớp học nào</p>
+                        <button
+                          onClick={() => navigateTo('/user/classrooms')}
+                          style={{
+                            background: '#FFE259',
+                            color: '#000000',
+                            border: '1.5px solid #000',
+                            borderRadius: '6px',
+                            padding: '4px 12px',
+                            fontWeight: '900',
+                            fontSize: '11px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Khám phá lớp học
+                        </button>
                       </div>
-                      <button 
-                        className="sdb-doc-action-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toast(`Đang mở tải tài liệu: ${doc.title}...`, 'info');
-                        }}
-                      >
-                        <HiDownload />
-                      </button>
-                    </div>
-                  ))}
+                    )}
+                  </div>
                 </div>
-              </div>
 
               {/* Stats column with widgets and Pro banner */}
               <div className="sdb-stats-column">
@@ -683,14 +855,9 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
                     <h3 className="sdb-stat-value">{dashboardData.gamification?.streakDays ?? 7} ngày</h3>
                   </div>
 
-                  <div className="sdb-stat-box">
-                    <span className="sdb-stat-label">Điểm tích lũy</span>
-                    <h3 className="sdb-stat-value">{currentUser?.rewardPoints ?? 0} đ</h3>
-                  </div>
-
                   <div 
                     className="sdb-stat-box dashed"
-                    onClick={() => navigateTo('/dashboard/ai-tutor')}
+                    onClick={() => navigateTo('/user/ai-tutor')}
                   >
                     <div className="sdb-stat-add-icon"><HiPlus /></div>
                     <span className="sdb-stat-label" style={{ color: '#000000', fontWeight: '900' }}>Hỏi AI Tutor</span>
@@ -721,6 +888,146 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
               </div>
             </div>
           </>
+        )}
+
+        {/* TAB: KHÓA HỌC CỦA TÔI */}
+        {currentTab === 'my-courses' && (
+          <div className="sdb-my-courses-view animate-in">
+            <div className="sdb-docs-header" style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ textAlign: 'left' }}>
+                <h3 className="sdb-card-title" style={{ fontSize: '20px', margin: 0 }}>Khóa học của tôi</h3>
+                <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0', fontWeight: '700' }}>
+                  Tiến độ học tập và lộ trình các khóa học bạn đã mua thực tế.
+                </p>
+              </div>
+              <button 
+                className="sdb-action-btn"
+                onClick={() => navigateTo('/user/courses')}
+                style={{ background: '#FFE259', color: '#000000', border: '2.5px solid #000', padding: '8px 16px', borderRadius: '8px', fontWeight: '900', boxShadow: '2px 2px 0px #000', cursor: 'pointer' }}
+              >
+                Mua thêm khóa học
+              </button>
+            </div>
+
+            {coursesToRender.length > 0 ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+                {coursesToRender.map((course) => (
+                  <div 
+                    key={course.id} 
+                    style={{
+                      background: '#ffffff',
+                      border: '3px solid #000000',
+                      borderRadius: '16px',
+                      padding: '20px',
+                      boxShadow: '5px 5px 0px #000000',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      position: 'relative',
+                      minHeight: '220px',
+                      transition: 'all 0.15s'
+                    }}
+                    className="sdb-my-course-card-item"
+                  >
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                        <span style={{
+                          background: course.subject === 'Toán' || course.subject === 'Toán học' ? '#f3e8ff' : course.subject === 'Vật lý' ? '#ccfbf1' : course.subject === 'Hóa học' ? '#dbeafe' : '#ffedd5',
+                          color: course.subject === 'Toán' || course.subject === 'Toán học' ? '#7c3aed' : course.subject === 'Vật lý' ? '#0d9488' : course.subject === 'Hóa học' ? '#2563eb' : '#ea580c',
+                          padding: '4px 10px',
+                          borderRadius: '20px',
+                          fontSize: '11px',
+                          fontWeight: '800',
+                          border: '1.5px solid #000'
+                        }}>
+                          {course.subject}
+                        </span>
+                        <span style={{ fontSize: '12px', fontWeight: '800', color: '#64748b' }}>
+                          {course.lessons?.length || 10} bài học
+                        </span>
+                      </div>
+                      
+                      <h4 style={{ fontSize: '16px', fontWeight: '950', color: '#000', margin: '0 0 8px 0', textAlign: 'left', lineHeight: '1.4' }}>
+                        {course.title}
+                      </h4>
+                      <p style={{ fontSize: '12px', color: '#4b5563', margin: '0 0 16px 0', textAlign: 'left', fontWeight: '500', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {course.description || 'Khóa học ôn thi THPT Quốc Gia toàn diện thiết kế theo phương pháp AI adaptive.'}
+                      </p>
+                    </div>
+
+                    <div>
+                      {/* Progress section */}
+                      <div style={{ marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: '12px', fontWeight: '800' }}>
+                          <span style={{ color: '#4b5563' }}>Tiến độ hoàn thành:</span>
+                          <span style={{ color: '#7c3aed' }}>{course.progress}%</span>
+                        </div>
+                        <div style={{ height: '12px', background: '#f1f5f9', border: '2px solid #000', borderRadius: '6px', overflow: 'hidden' }}>
+                          <div style={{ width: `${course.progress}%`, height: '100%', background: 'linear-gradient(90deg, #8b5cf6, #6366f1)' }}></div>
+                        </div>
+                      </div>
+
+                      {/* Action buttons */}
+                      <button
+                        onClick={() => navigateTo(`/learn/${course.id}`)}
+                        style={{
+                          width: '100%',
+                          background: '#7c3aed',
+                          color: '#ffffff',
+                          border: '2.5px solid #000000',
+                          borderRadius: '10px',
+                          padding: '10px',
+                          fontWeight: '900',
+                          fontSize: '13px',
+                          cursor: 'pointer',
+                          boxShadow: '3px 3px 0px #000000',
+                          transition: 'all 0.1s'
+                        }}
+                      >
+                        Vào học ngay 🚀
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{
+                background: '#fff',
+                border: '3px solid #000',
+                borderRadius: '16px',
+                padding: '48px 32px',
+                textAlign: 'center',
+                boxShadow: '6px 6px 0px #000',
+                maxWidth: '600px',
+                margin: '40px auto'
+              }}>
+                <span style={{ fontSize: '48px' }}>📚</span>
+                <h3 style={{ fontSize: '18px', fontWeight: '950', margin: '16px 0 8px 0', color: '#000' }}>
+                  Bạn chưa sở hữu khóa học thực tế nào
+                </h3>
+                <p style={{ fontSize: '13.5px', color: '#4b5563', margin: '0 0 24px 0', fontWeight: '700', lineHeight: '1.5' }}>
+                  Hãy đăng ký các khóa học chất lượng cao từ EduPath AI để bắt đầu bài học, luyện đề, và chinh phục kỳ thi của mình nhé!
+                </p>
+                <button
+                  onClick={() => navigateTo('/user/courses')}
+                  style={{
+                    background: '#FFE259',
+                    color: '#000',
+                    border: '2.5px solid #000',
+                    borderRadius: '8px',
+                    padding: '10px 24px',
+                    fontWeight: '900',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    boxShadow: '3px 3px 0px #000',
+                    transition: 'all 0.1s'
+                  }}
+                >
+                  Khám phá kho khóa học
+                </button>
+              </div>
+            )}
+          </div>
         )}
 
         {/* TAB 2: THÔNG TIN CÁ NHÂN */}
@@ -836,35 +1143,29 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
           <div className="sdb-docs-view">
             <div className="sdb-docs-header">
               <div style={{ textAlign: 'left' }}>
-                <h3 className="sdb-card-title" style={{ fontSize: '20px' }}>Kho tài liệu & Tóm tắt bài học</h3>
-                <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0', fontWeight: '700' }}>Tìm kiếm bài giảng, sơ đồ tư duy AI đã lưu, đề cương tự luyện.</p>
+                <h3 className="sdb-card-title" style={{ fontSize: '20px' }}>Kho tài liệu của tôi</h3>
+                <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0', fontWeight: '700' }}>Tải lên các tài liệu ôn tập cá nhân dạng PDF, DOCX hoặc ảnh để lưu trữ.</p>
               </div>
 
-              <button 
+              <label 
                 className="sdb-action-btn"
-                style={{ background: '#ffffff', color: '#000000' }}
-                onClick={() => {
-                  const fileInput = document.createElement('input');
-                  fileInput.type = 'file';
-                  fileInput.accept = '.pdf,.png,.jpg,.jpeg';
-                  fileInput.onchange = (e) => {
-                    const file = e.target.files[0];
-                    if (file) {
-                      toast(`Tải lên tài liệu "${file.name}" thành công!`, 'success');
-                    }
-                  };
-                  fileInput.click();
-                }}
+                style={{ background: '#ffffff', color: '#000000', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
               >
                 <HiUpload /> Tải tài liệu lên
-              </button>
+                <input 
+                  type="file"
+                  accept=".pdf,.docx,.doc,.png,.jpg,.jpeg"
+                  onChange={handleUploadDocument}
+                  style={{ display: 'none' }}
+                />
+              </label>
             </div>
 
             <div className="sdb-search-input-wrap">
               <span className="sdb-search-input-icon"><HiSearch /></span>
               <input 
                 type="text" 
-                placeholder="Tìm tài liệu, sơ đồ tư duy..." 
+                placeholder="Tìm kiếm tài liệu đã tải lên..." 
                 className="sdb-search-input"
                 value={docSearchQuery}
                 onChange={(e) => setDocSearchQuery(e.target.value)}
@@ -872,29 +1173,47 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
             </div>
 
             <div className="sdb-docs-grid">
-              {filteredDocs.length > 0 ? (
-                filteredDocs.map((doc) => (
-                  <div key={doc.id} className={`sdb-doc-item ${doc.tagClass}`} style={{ cursor: 'pointer' }}>
-                    <div className="sdb-doc-info">
-                      <h4 className="sdb-doc-title" style={{ fontSize: '15px' }}>{doc.title}</h4>
-                      <p className="sdb-doc-desc" style={{ fontSize: '12px', marginTop: '4px' }}>{doc.desc}</p>
+              {filteredUserDocs.length > 0 ? (
+                filteredUserDocs.map((doc, idx) => {
+                  const tagClass = idx % 4 === 0 ? 'purple-tag' : idx % 4 === 1 ? 'teal-tag' : idx % 4 === 2 ? 'orange-tag' : 'blue-tag';
+                  return (
+                    <div key={doc.id} className={`sdb-doc-item ${tagClass}`} style={{ cursor: 'pointer', position: 'relative' }}>
+                      <div className="sdb-doc-info" style={{ marginRight: '50px' }} onClick={() => window.open(doc.fileUrl, '_blank')}>
+                        <h4 className="sdb-doc-title" style={{ fontSize: '15px' }}>{doc.title}</h4>
+                        <p className="sdb-doc-desc" style={{ fontSize: '12px', marginTop: '4px' }}>
+                          Định dạng: {doc.fileType} • Đã tải lên: {new Date(doc.createdAt).toLocaleDateString('vi-VN')}
+                        </p>
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)' }}>
+                        <a 
+                          href={doc.fileUrl} 
+                          download
+                          target="_blank"
+                          rel="noreferrer"
+                          className="sdb-doc-action-btn"
+                          style={{ fontSize: '18px', padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <HiDownload />
+                        </a>
+                        <button 
+                          className="sdb-doc-action-btn"
+                          style={{ fontSize: '16px', padding: '6px', color: '#ef4444', border: 'none', background: 'none', cursor: 'pointer' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteDocument(doc.id, doc.title);
+                          }}
+                        >
+                          🗑️
+                        </button>
+                      </div>
                     </div>
-                    <button 
-                      className="sdb-doc-action-btn"
-                      style={{ fontSize: '20px', padding: '6px' }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toast(`Tải tài liệu "${doc.title}" xuống thiết bị của bạn...`, 'success');
-                      }}
-                    >
-                      <HiDownload />
-                    </button>
-                  </div>
-                ))
+                  );
+                })
               ) : (
-                <div style={{ padding: '40px', textAlign: 'center', border: '2px dashed #cbd5e1', borderRadius: '12px' }}>
+                <div style={{ padding: '40px', textAlign: 'center', border: '2px dashed #cbd5e1', borderRadius: '12px', gridColumn: 'span 2' }}>
                   <span style={{ fontSize: '32px' }}>📂</span>
-                  <p style={{ fontSize: '13px', fontWeight: '800', color: '#64748b', marginTop: '12px' }}>Không tìm thấy tài liệu phù hợp!</p>
+                  <p style={{ fontSize: '13px', fontWeight: '800', color: '#64748b', marginTop: '12px' }}>Không có tài liệu nào phù hợp!</p>
                 </div>
               )}
             </div>
@@ -1028,6 +1347,218 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
           </div>
         )}
 
+        {/* TAB: LỚP HỌC CỦA TÔI */}
+        {currentTab === 'classrooms' && (
+          <div className="sdb-classrooms-view animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Header info */}
+            <div className="sdb-docs-header" style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ textAlign: 'left' }}>
+                <h3 className="sdb-card-title" style={{ fontSize: '20px', margin: 0 }}>Lớp học của tôi</h3>
+                <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0', fontWeight: '700' }}>
+                  Tham gia vào các lớp học online thực tế để trao đổi bài học, làm đề ôn tập và thảo luận nhóm cùng các bạn học.
+                </p>
+              </div>
+              <button 
+                className="sdb-action-btn"
+                onClick={() => navigateTo('/user/forum')}
+                style={{ background: '#FFE259', color: '#000000', border: '2.5px solid #000', padding: '8px 16px', borderRadius: '8px', fontWeight: '900', boxShadow: '2px 2px 0px #000', cursor: 'pointer' }}
+              >
+                Vào cộng đồng chung
+              </button>
+            </div>
+
+            {/* Statistics summary row */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '8px' }}>
+              <div style={{ background: '#f8fafc', border: '2.5px solid #000', borderRadius: '16px', padding: '20px', boxShadow: '3px 3px 0px #000', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <span style={{ fontSize: '32px' }}>🏫</span>
+                <div style={{ textAlign: 'left' }}>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#64748b', fontWeight: '900', textTransform: 'uppercase' }}>Đã tham gia</h4>
+                  <strong style={{ fontSize: '22px', fontWeight: '950', color: '#000' }}>
+                    {studyGroups.filter(g => g.isMember).length} lớp học
+                  </strong>
+                </div>
+              </div>
+
+              <div style={{ background: '#f8fafc', border: '2.5px solid #000', borderRadius: '16px', padding: '20px', boxShadow: '3px 3px 0px #000', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <span style={{ fontSize: '32px' }}>👥</span>
+                <div style={{ textAlign: 'left' }}>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#64748b', fontWeight: '900', textTransform: 'uppercase' }}>Tổng số lớp khả dụng</h4>
+                  <strong style={{ fontSize: '22px', fontWeight: '950', color: '#000' }}>
+                    {studyGroups.length} nhóm học
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Main grid split */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+              {/* Joined classrooms section */}
+              <div style={{ textAlign: 'left' }}>
+                <h4 className="sdb-card-title" style={{ fontSize: '15px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>✓</span> LỚP HỌC ĐANG HỌC TẬP ({studyGroups.filter(g => g.isMember).length})
+                </h4>
+
+                {studyGroups.filter(g => g.isMember).length > 0 ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>
+                    {studyGroups.filter(g => g.isMember).map(group => (
+                      <div 
+                        key={group.id} 
+                        style={{
+                          background: '#ffffff',
+                          border: '3px solid #000000',
+                          borderRadius: '16px',
+                          padding: '20px',
+                          boxShadow: '4px 4px 0px #000000',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          minHeight: '190px'
+                        }}
+                      >
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                            <h4 style={{ fontSize: '16.5px', fontWeight: '950', color: '#000', margin: 0, textAlign: 'left' }}>
+                              {group.name}
+                            </h4>
+                            <span style={{ background: '#dbeafe', color: '#1d4ed8', border: '1.5px solid #000', fontSize: '10.5px', padding: '2px 8px', borderRadius: '12px', fontWeight: '800' }}>
+                              Đã tham gia
+                            </span>
+                          </div>
+                          <p style={{ fontSize: '12px', color: '#4b5563', margin: '0 0 16px 0', lineHeight: '1.4', textAlign: 'left' }}>
+                            {group.description || 'Chưa có mô tả chi tiết cho lớp học này. Thảo luận cùng bạn bè ngay để trao đổi thông tin.'}
+                          </p>
+                        </div>
+
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#64748b', fontWeight: '700', borderTop: '2px solid #f1f5f9', paddingTop: '12px', marginBottom: '12px' }}>
+                            <span>Thành viên lớp: {group.memberCount} học sinh</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '10px' }}>
+                            <button
+                              onClick={() => {
+                                localStorage.setItem('forum_active_group', JSON.stringify(group));
+                                navigateTo('/user/forum');
+                              }}
+                              style={{
+                                flex: 1,
+                                background: '#7c3aed',
+                                color: '#ffffff',
+                                border: '2.5px solid #000',
+                                borderRadius: '8px',
+                                padding: '8px',
+                                fontSize: '12.5px',
+                                fontWeight: '900',
+                                boxShadow: '2px 2px 0px #000',
+                                cursor: 'pointer',
+                                transition: 'all 0.1s'
+                              }}
+                            >
+                              Vào thảo luận nhóm ⚡
+                            </button>
+                            <button
+                              onClick={() => handleLeaveClassroom(group.id, group.name)}
+                              style={{
+                                background: '#ffffff',
+                                color: '#ef4444',
+                                border: '2.5px solid #000',
+                                borderRadius: '8px',
+                                padding: '8px 12px',
+                                fontSize: '12.5px',
+                                fontWeight: '900',
+                                boxShadow: '2px 2px 0px #000',
+                                cursor: 'pointer',
+                                transition: 'all 0.1s'
+                              }}
+                            >
+                              Rời lớp
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ padding: '36px', textAlign: 'center', border: '2.5px dashed #cbd5e1', borderRadius: '16px', background: '#ffffff' }}>
+                    <span style={{ fontSize: '36px' }}>🎒</span>
+                    <h5 style={{ fontSize: '15px', fontWeight: '900', color: '#000', margin: '12px 0 6px 0' }}>Bạn chưa tham gia lớp học nào</h5>
+                    <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 16px 0', fontWeight: '700' }}>
+                      Tham khảo danh sách lớp học khả dụng bên dưới để cùng kết nối nhé!
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Browse available classrooms */}
+              <div style={{ textAlign: 'left' }}>
+                <h4 className="sdb-card-title" style={{ fontSize: '15px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>🌐</span> DANH SÁCH LỚP HỌC KHÁC ({studyGroups.filter(g => !g.isMember).length})
+                </h4>
+
+                {studyGroups.filter(g => !g.isMember).length > 0 ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>
+                    {studyGroups.filter(g => !g.isMember).map(group => (
+                      <div 
+                        key={group.id} 
+                        style={{
+                          background: '#ffffff',
+                          border: '3px solid #000000',
+                          borderRadius: '16px',
+                          padding: '20px',
+                          boxShadow: '4px 4px 0px #000000',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          minHeight: '190px'
+                        }}
+                      >
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                            <h4 style={{ fontSize: '16.5px', fontWeight: '950', color: '#000', margin: 0, textAlign: 'left' }}>
+                              {group.name}
+                            </h4>
+                          </div>
+                          <p style={{ fontSize: '12px', color: '#4b5563', margin: '0 0 16px 0', lineHeight: '1.4', textAlign: 'left' }}>
+                            {group.description || 'Chưa có mô tả chi tiết cho lớp học này.'}
+                          </p>
+                        </div>
+
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#64748b', fontWeight: '700', borderTop: '2px solid #f1f5f9', paddingTop: '12px', marginBottom: '12px' }}>
+                            <span>Thành viên lớp: {group.memberCount} học sinh</span>
+                          </div>
+                          <button
+                            onClick={() => handleJoinClassroom(group.id)}
+                            style={{
+                              width: '100%',
+                              background: '#FFE259',
+                              color: '#000000',
+                              border: '2.5px solid #000',
+                              borderRadius: '8px',
+                              padding: '10px',
+                              fontSize: '12.5px',
+                              fontWeight: '900',
+                              boxShadow: '2px 2px 0px #000',
+                              cursor: 'pointer',
+                              transition: 'all 0.1s'
+                            }}
+                          >
+                            Tham gia lớp học 🤝
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ padding: '24px', textAlign: 'center', border: '2px dashed #cbd5e1', borderRadius: '12px', background: '#ffffff' }}>
+                    <span style={{ fontSize: '24px' }}>✨</span>
+                    <p style={{ fontSize: '12.5px', color: '#64748b', margin: '8px 0 0 0', fontWeight: '800' }}>Tất cả các lớp học hiện tại đều đã được tham gia!</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Render children passed from App.jsx for other subpages */}
         {children}
       </main>
@@ -1035,68 +1566,7 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
       {/* ==========================================================================
          RIGHT SIDEBAR (ONLY VISIBLE ON COURSES OVERVIEW)
          ========================================================================== */}
-      {currentTab === 'home' && (
-        <aside className="sdb-right-sidebar">
-          <div className="sdb-right-title-row">
-            <h3 className="sdb-right-title">Lịch học & Sự kiện</h3>
-            <button className="sdb-bell-btn" onClick={() => toast('Hệ thống chưa có thông báo mới!', 'info')}>
-              <HiBell />
-            </button>
-          </div>
 
-          {/* Timeline widgets */}
-          <div className="sdb-timeline-wrapper">
-            {/* Group 1 */}
-            <div className="sdb-date-group">
-              <div className="sdb-date-header-row">
-                <span className="sdb-date-title">Hôm nay, {new Date().toLocaleDateString('vi-VN', { day: 'numeric', month: 'numeric' })}</span>
-                <span className="sdb-date-dots">•••</span>
-              </div>
-
-              <div className="sdb-timeline-list">
-                <div className="sdb-timeline-item">
-                  <div className="sdb-timeline-bullet active-bullet"></div>
-                  <span className="sdb-time-tag">10:00</span>
-                  <div className="sdb-timeline-info">
-                    <h5 className="sdb-timeline-title">Luyện tập trắc nghiệm</h5>
-                    <p className="sdb-timeline-desc">Chuyên đề Hàm số & Cực trị</p>
-                  </div>
-                </div>
-
-                <div className="sdb-timeline-item">
-                  <div className="sdb-timeline-bullet"></div>
-                  <span className="sdb-time-tag">13:20</span>
-                  <div className="sdb-timeline-info">
-                    <h5 className="sdb-timeline-title">Học bài cùng AI Tutor</h5>
-                    <p className="sdb-timeline-desc">Lý thuyết Dao động điều hòa 12</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Group 2 */}
-            <div className="sdb-date-group">
-              <div className="sdb-date-header-row">
-                <span className="sdb-date-title">Hoạt động gần đây</span>
-                <span className="sdb-date-dots">•••</span>
-              </div>
-
-              <div className="sdb-timeline-list" style={{ borderLeft: '2px solid #e2e8f0' }}>
-                {dashboardData.recentActivities.slice(0, 3).map((act, index) => (
-                  <div key={act.id} className="sdb-timeline-item">
-                    <div className="sdb-timeline-bullet" style={{ backgroundColor: index === 0 ? '#10b981' : '#cbd5e1' }}></div>
-                    <span className="sdb-time-tag" style={{ fontSize: '10.5px', color: '#64748b' }}>{act.time}</span>
-                    <div className="sdb-timeline-info">
-                      <h5 className="sdb-timeline-title" style={{ fontSize: '12px' }}>{act.title}</h5>
-                      <p className="sdb-timeline-desc" style={{ fontSize: '10px' }}>{act.detail}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </aside>
-      )}
 
       {/* ==========================================================================
          ONBOARDING WIZARD MODAL

@@ -175,29 +175,16 @@ async function main() {
       });
     }
 
-    // Upsert Teacher
+    // Upsert Teacher with all profile fields
     await prisma.teacher.upsert({
       where: { userId: user.id },
       update: {
         isApproved: data.status === 'APPROVED',
-        bio: data.bio
-      },
-      create: {
-        userId: user.id,
-        isApproved: data.status === 'APPROVED',
-        bio: data.bio
-      }
-    });
-
-    // Upsert TeacherProfile
-    await prisma.teacherProfile.upsert({
-      where: { userId: user.id },
-      update: {
+        bio: data.bio,
         subjects: data.subjects,
         education: data.education,
         university: data.university,
         experienceYears: data.experienceYears,
-        bio: data.bio,
         dob: data.dob,
         cvUrl: data.cvUrl,
         degreeUrl: data.degreeUrl,
@@ -211,11 +198,12 @@ async function main() {
       },
       create: {
         userId: user.id,
+        isApproved: data.status === 'APPROVED',
+        bio: data.bio,
         subjects: data.subjects,
         education: data.education,
         university: data.university,
         experienceYears: data.experienceYears,
-        bio: data.bio,
         dob: data.dob,
         cvUrl: data.cvUrl,
         degreeUrl: data.degreeUrl,

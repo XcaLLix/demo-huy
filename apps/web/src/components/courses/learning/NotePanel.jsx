@@ -121,7 +121,7 @@ export default function NotePanel({
                 <textarea
                   value={newNoteText}
                   onChange={(e) => setNewNoteText(e.target.value)}
-                  placeholder="Nhập ghi chú quan trọng tại đây..."
+                  placeholder="Nhập ghi chú quan trọng tại đây... (Mốc thời gian sẽ tự động lưu theo video)"
                   className="note-textarea"
                   rows={2}
                   required
@@ -129,7 +129,7 @@ export default function NotePanel({
               </div>
               <div className="add-note-actions">
                 <button type="submit" className="submit-note-btn">
-                  <HiPlus /> Lưu ghi chú
+                  <HiPlus /> Lưu ghi chú tại {formatTime(noteTime > 0 ? noteTime : Math.floor(videoTime))}
                 </button>
               </div>
             </form>
