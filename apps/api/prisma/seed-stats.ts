@@ -10,6 +10,9 @@
  * KHÔNG dùng prisma db seed (seed.ts gốc có deleteMany xóa database).
  */
 
+import dotenv from 'dotenv';
+dotenv.config({ path: 'D:/SU2026/Edu Path/swp391-rbl-project-team-1/apps/api/.env' });
+
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -19,12 +22,12 @@ const prisma = new PrismaClient();
 // ────────────────────────────────────────────────────────────
 
 const MONTHLY_DATA = [
-  { month: 1, year: 2026, newUsers: 45,  totalAttempts: 320, totalAiQuestions: 1850, revenue: 2100000 },
-  { month: 2, year: 2026, newUsers: 62,  totalAttempts: 410, totalAiQuestions: 2100, revenue: 2850000 },
-  { month: 3, year: 2026, newUsers: 58,  totalAttempts: 390, totalAiQuestions: 1980, revenue: 2600000 },
-  { month: 4, year: 2026, newUsers: 71,  totalAttempts: 520, totalAiQuestions: 2750, revenue: 3400000 },
-  { month: 5, year: 2026, newUsers: 83,  totalAttempts: 610, totalAiQuestions: 3200, revenue: 4150000 },
-  { month: 6, year: 2026, newUsers: 94,  totalAttempts: 680, totalAiQuestions: 3580, revenue: 5200000 },
+  { month: 1, year: 2026, newUsers: 45,  totalAttempts: 320, totalAiQuestions: 1850, revenue: 2100000, totalUsers: 45 },
+  { month: 2, year: 2026, newUsers: 62,  totalAttempts: 410, totalAiQuestions: 2100, revenue: 2850000, totalUsers: 107 },
+  { month: 3, year: 2026, newUsers: 58,  totalAttempts: 390, totalAiQuestions: 1980, revenue: 2600000, totalUsers: 165 },
+  { month: 4, year: 2026, newUsers: 71,  totalAttempts: 520, totalAiQuestions: 2750, revenue: 3400000, totalUsers: 236 },
+  { month: 5, year: 2026, newUsers: 83,  totalAttempts: 610, totalAiQuestions: 3200, revenue: 4150000, totalUsers: 319 },
+  { month: 6, year: 2026, newUsers: 94,  totalAttempts: 680, totalAiQuestions: 3580, revenue: 5200000, totalUsers: 413 },
 ];
 
 // ────────────────────────────────────────────────────────────

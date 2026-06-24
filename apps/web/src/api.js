@@ -318,6 +318,22 @@ export const api = {
   resolveForumReport: (id, status, notes) =>
     request(`/forum/moderation/reports/${id}/resolve`, { method: 'PUT', body: { status, notes } }),
 
+  getAdminReports: (filters = {}) => {
+    const query = new URLSearchParams();
+    Object.entries(filters).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') {
+        query.append(k, String(v));
+      }
+    });
+    return request(`/admin/reports?${query.toString()}`);
+  },
+  getAdminReportById: (id) => request(`/admin/reports/${id}`),
+  approveAdminReport: (id) => request(`/admin/reports/${id}/approve`, { method: 'PATCH' }),
+  rejectAdminReport: (id, reason) => request(`/admin/reports/${id}/reject`, { method: 'PATCH', body: { reason } }),
+  closeAdminReport: (id, notes) => request(`/admin/reports/${id}/close`, { method: 'PATCH', body: { notes } }),
+  createAdminReportWarning: (id, message) => request(`/admin/reports/${id}/warning`, { method: 'POST', body: { message } }),
+  getAdminReportStatistics: () => request('/admin/reports/statistics'),
+
   importExam: (examData) =>
     request('/exams/import', { method: 'POST', body: examData }),
 

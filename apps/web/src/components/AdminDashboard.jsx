@@ -769,6 +769,34 @@ export default function AdminDashboard({
   // Moderation Reports states
   const [reports, setReports] = useState([]);
   const [loadingReports, setLoadingReports] = useState(false);
+  const [modStats, setModStats] = useState({
+    totalReports: 0,
+    pendingReports: 0,
+    approvedReports: 0,
+    closedReports: 0,
+    warnedUsers: 0
+  });
+  const [modSearch, setModSearch] = useState('');
+  const [modStatusFilter, setModStatusFilter] = useState('ALL');
+  const [modTargetTypeFilter, setModTargetTypeFilter] = useState('ALL');
+  const [modPage, setModPage] = useState(1);
+  const [modPagination, setModPagination] = useState({ total: 0, page: 1, limit: 10, totalPages: 1 });
+  const [selectedReport, setSelectedReport] = useState(null);
+  const [reportDetailLoading, setReportDetailLoading] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+
+  const [showRejectReportModal, setShowRejectReportModal] = useState(false);
+  const [rejectReportReason, setRejectReportReason] = useState('');
+  const [reportToReject, setReportToReject] = useState(null);
+
+  const [showCloseReportModal, setShowCloseReportModal] = useState(false);
+  const [closeReportNotes, setCloseReportNotes] = useState('');
+  const [reportToClose, setReportToClose] = useState(null);
+
+  const [showWarningModal, setShowWarningModal] = useState(false);
+  const [warningMessage, setWarningMessage] = useState('');
+  const [reportToWarn, setReportToWarn] = useState(null);
+
   const [aiWeightDifficulty, setAiWeightDifficulty] = useState(70);
   const [aiWeightWeakness, setAiWeightWeakness] = useState(85);
   const [aiWeightRoadmap, setAiWeightRoadmap] = useState(90);
@@ -824,32 +852,136 @@ export default function AdminDashboard({
     if (activeTab === 'roles') {
       fetchRoleRequests();
     }
-  }, [activeTab]);
+  }, [activeTab, modSearch, modStatusFilter, modTargetTypeFilter, modPage]);
 
   const fetchReports = async () => {
     setLoadingReports(true);
     try {
-      const data = await api.getForumReports();
-      setReports(data || []);
+      const [statsData, res] = await Promise.all([
+        api.getAdminReportStatistics(),
+        api.getAdminReports({
+          search: modSearch,
+          status: modStatusFilter,
+          targetType: modTargetTypeFilter,
+          page: modPage,
+          limit: 10
+        })
+      ]);
+      if (statsData) {
+        setModStats(statsData);
+      }
+      setReports(res || []);
     } catch (err) {
       console.error('Lỗi tải báo cáo kiểm duyệt:', err);
+      toast(err.message || 'Lỗi tải danh sách báo cáo', 'error');
     } finally {
       setLoadingReports(false);
     }
   };
 
-  const handleResolveReport = async (reportId, action) => {
-    const status = action === 'approve' ? 'RESOLVED' : 'DISMISSED';
-    const notes = action === 'approve' 
-      ? 'Quản trị viên phê duyệt báo cáo, nội dung vi phạm bị xử lý.' 
-      : 'Quản trị viên từ chối báo cáo vi phạm.';
-    
+  const handleApproveReportSubmit = async (reportId) => {
+    if (!window.confirm('Bạn có chắc chắn phê duyệt báo cáo này không? (Nội dung vi phạm liên quan sẽ bị ẩn)')) return;
     try {
-      await api.resolveForumReport(reportId, status, notes);
-      toast('Đã xử lý báo cáo thành công!', 'success');
+      await api.approveAdminReport(reportId);
+      toast('Phê duyệt báo cáo thành công!', 'success');
+      addLog(`Phê duyệt báo cáo ID ${reportId}`, 'sys');
       fetchReports();
+      if (selectedReport && selectedReport.id === reportId) {
+        handleViewReportDetail(reportId);
+      }
     } catch (err) {
-      toast(err.message || 'Lỗi xử lý báo cáo!', 'error');
+      toast(err.message || 'Phê duyệt thất bại', 'error');
+    }
+  };
+
+  const handleOpenRejectReportModal = (report) => {
+    setReportToReject(report);
+    setRejectReportReason('');
+    setShowRejectReportModal(true);
+  };
+
+  const handleRejectReportSubmit = async (e) => {
+    if (e) e.preventDefault();
+    if (!rejectReportReason.trim()) {
+      toast('Vui lòng nhập lý do từ chối!', 'error');
+      return;
+    }
+    try {
+      await api.rejectAdminReport(reportToReject.id, rejectReportReason);
+      toast('Từ chối báo cáo thành công!', 'success');
+      addLog(`Từ chối báo cáo ID ${reportToReject.id}. Lý do: ${rejectReportReason}`, 'sys');
+      setShowRejectReportModal(false);
+      fetchReports();
+      if (selectedReport && selectedReport.id === reportToReject.id) {
+        handleViewReportDetail(reportToReject.id);
+      }
+    } catch (err) {
+      toast(err.message || 'Thao tác thất bại', 'error');
+    }
+  };
+
+  const handleOpenCloseReportModal = (report) => {
+    setReportToClose(report);
+    setCloseReportNotes('');
+    setShowCloseReportModal(true);
+  };
+
+  const handleCloseReportSubmit = async (e) => {
+    if (e) e.preventDefault();
+    try {
+      await api.closeAdminReport(reportToClose.id, closeReportNotes);
+      toast('Đóng báo cáo thành công!', 'success');
+      addLog(`Đóng báo cáo ID ${reportToClose.id}. Ghi chú: ${closeReportNotes}`, 'sys');
+      setShowCloseReportModal(false);
+      fetchReports();
+      if (selectedReport && selectedReport.id === reportToClose.id) {
+        handleViewReportDetail(reportToClose.id);
+      }
+    } catch (err) {
+      toast(err.message || 'Thao tác thất bại', 'error');
+    }
+  };
+
+  const handleOpenWarningModal = (report) => {
+    setReportToWarn(report);
+    setWarningMessage('');
+    setShowWarningModal(true);
+  };
+
+  const handleWarningSubmit = async (e) => {
+    if (e) e.preventDefault();
+    if (!warningMessage.trim()) {
+      toast('Vui lòng nhập tin nhắn cảnh báo!', 'error');
+      return;
+    }
+    try {
+      await api.createAdminReportWarning(reportToWarn.id, warningMessage);
+      toast('Đã gửi cảnh báo thành công!', 'success');
+      addLog(`Gửi cảnh báo đến người dùng bị báo cáo trong báo cáo ID ${reportToWarn.id}. Nội dung: ${warningMessage}`, 'sys');
+      setShowWarningModal(false);
+      fetchReports();
+      if (selectedReport && selectedReport.id === reportToWarn.id) {
+        handleViewReportDetail(reportToWarn.id);
+      }
+    } catch (err) {
+      toast(err.message || 'Thao tác thất bại', 'error');
+    }
+  };
+
+  const handleViewReportDetail = async (reportId) => {
+    try {
+      setReportDetailLoading(true);
+      setShowReportModal(true);
+      setSelectedReport(null);
+      const data = await api.getAdminReportById(reportId);
+      if (data) {
+        setSelectedReport(data);
+      }
+    } catch (err) {
+      toast(err.message || 'Lỗi tải chi tiết báo cáo', 'error');
+      setShowReportModal(false);
+    } finally {
+      setReportDetailLoading(false);
     }
   };
 
@@ -3424,100 +3556,148 @@ export default function AdminDashboard({
           )}
 
           {activeTab === 'moderation' && (
-            <div className="admin-card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                <div>
-                  <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '8px' }}>
-                    🛡️ KIỂM DUYỆT BÁO CÁO NỘI DUNG VI PHẠM
-                  </h2>
-                  <p style={{ fontSize: '13px', color: '#666', fontWeight: '600' }}>
-                    Dưới đây là danh sách các báo cáo từ học viên gửi về các bài viết hoặc bình luận vi phạm quy chuẩn cộng đồng.
-                  </p>
-                </div>
-                <button 
-                  className="admin-back-btn" 
-                  onClick={fetchReports} 
-                  style={{ padding: '8px 16px', width: 'auto', boxShadow: 'none' }}
-                >
-                  Tải lại
-                </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Thống kê Báo cáo */}
+              <div className="stats-row-5col" style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px', marginBottom: '0' }}>
+                {renderKpiCard('Tổng số báo cáo', <HiShieldCheck />, { value: modStats.totalReports || 0, change: 0, description: 'Báo cáo vi phạm' }, 'blue')}
+                {renderKpiCard('Chờ xử lý', <HiClipboardCheck />, { value: modStats.pendingReports || 0, change: 0, description: 'Chưa kiểm duyệt' }, 'amber')}
+                {renderKpiCard('Đã duyệt', <HiPlus />, { value: modStats.approvedReports || 0, change: 0, description: 'Vi phạm đã xử lý' }, 'green')}
+                {renderKpiCard('Đã đóng', <HiUsers />, { value: modStats.closedReports || 0, change: 0, description: 'Báo cáo đã đóng' }, 'purple')}
+                {renderKpiCard('Đã cảnh báo', <HiUsers />, { value: modStats.warnedUsers || 0, change: 0, description: 'Người dùng nhận cảnh báo' }, 'amber')}
               </div>
 
-              {loadingReports ? (
-                <div style={{ textAlign: 'center', padding: '30px', fontWeight: '700' }}>Đang tải báo cáo vi phạm...</div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {reports.length > 0 ? (
-                    reports.map(rep => (
-                      <div 
-                        key={rep.id} 
-                        style={{ 
-                          padding: '20px', 
-                          border: '3px solid #000000', 
-                          borderRadius: '12px', 
-                          background: '#FCFBFA', 
-                          display: 'flex', 
-                          flexDirection: 'column', 
-                          gap: '12px',
-                          boxShadow: '4px 4px 0px #000000'
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2.5px dashed #000000', paddingBottom: '12px' }}>
-                          <span style={{ fontSize: '13px', fontWeight: '900', color: '#000000' }}>
-                            Báo cáo #{rep.id} bởi: <strong style={{ color: '#6c5ce7' }}>{rep.reporter?.fullName}</strong>
-                          </span>
-                          <span style={{ fontSize: '12px', color: '#7A7A7A', fontWeight: '700' }}>
-                            Gửi lúc: {new Date(rep.createdAt).toLocaleString()}
-                          </span>
-                        </div>
+              {/* Bộ lọc & Tìm kiếm */}
+              <div className="admin-card" style={{ marginBottom: '0' }}>
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  {/* Search input */}
+                  <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
+                    <HiSearch style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#7A7A7A' }} />
+                    <input
+                      type="text"
+                      className="admin-form-input"
+                      placeholder="Tìm theo mã, người báo cáo, đối tượng, lý do..."
+                      value={modSearch}
+                      onChange={(e) => { setModSearch(e.target.value); setModPage(1); }}
+                      style={{ paddingLeft: '32px' }}
+                    />
+                  </div>
 
-                        <div style={{ fontSize: '14px', color: '#000000', margin: '4px 0', fontWeight: '700' }}>
-                          <strong>Lý do tố cáo: </strong>
-                          <span style={{ color: '#EF4444', fontWeight: '900' }}>{rep.reason}</span>
-                        </div>
+                  {/* Filter by Status */}
+                  <div style={{ width: '180px' }}>
+                    <select
+                      className="admin-filter-select"
+                      value={modStatusFilter}
+                      onChange={(e) => { setModStatusFilter(e.target.value); setModPage(1); }}
+                      style={{ width: '100%', height: '100%', minHeight: '38px' }}
+                    >
+                      <option value="ALL">Trạng thái: Tất cả</option>
+                      <option value="PENDING">Chờ xử lý</option>
+                      <option value="APPROVED">Đã duyệt (APPROVED)</option>
+                      <option value="REJECTED">Bị từ chối (REJECTED)</option>
+                      <option value="CLOSED">Đã đóng (CLOSED)</option>
+                    </select>
+                  </div>
 
-                        {rep.post && (
-                          <div style={{ padding: '12px 16px', background: '#FFFFFF', border: '2px solid #000000', borderLeft: '8px solid #6c5ce7', borderRadius: '8px', fontSize: '13px', fontWeight: '700' }}>
-                            <strong>Bài viết bị tố cáo:</strong> "{rep.post.title}" (ID: {rep.post.id})
-                          </div>
-                        )}
-
-                        {rep.comment && (
-                          <div style={{ padding: '12px 16px', background: '#FFFFFF', border: '2px solid #000000', borderLeft: '8px solid #00D2FC', borderRadius: '8px', fontSize: '13px', fontWeight: '700' }}>
-                            <strong>Bình luận bị tố cáo:</strong> "{rep.comment.content}" (ID: {rep.comment.id})
-                          </div>
-                        )}
-
-                        <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                          <button
-                            className="admin-back-btn"
-                            style={{ padding: '8px 16px', width: 'auto', background: '#EF4444', color: '#FFFFFF', borderColor: '#000000', boxShadow: 'none' }}
-                            onClick={() => {
-                              if (window.confirm('Bạn có chắc chắn muốn xử lý nội dung bị tố cáo này? (Bài viết/Bình luận liên quan sẽ bị ẩn)')) {
-                                handleResolveReport(rep.id, 'approve');
-                              }
-                            }}
-                          >
-                            ✓ Duyệt & Ẩn nội dung vi phạm
-                          </button>
-                          <button
-                            className="admin-back-btn"
-                            style={{ padding: '8px 16px', width: 'auto', background: '#FFFFFF', color: '#000000', borderColor: '#000000', boxShadow: 'none' }}
-                            onClick={() => handleResolveReport(rep.id, 'reject')}
-                          >
-                            ✕ Bác bỏ báo cáo
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div style={{ textAlign: 'center', padding: '40px', background: '#FCFBFA', border: '2px dashed #000000', borderRadius: '12px' }}>
-                      <span style={{ fontSize: '28px' }}>🎉</span>
-                      <p style={{ fontWeight: '800', marginTop: '10px', margin: 0 }}>Không có báo cáo vi phạm nào chưa xử lý!</p>
-                    </div>
-                  )}
+                  {/* Filter by Target Type */}
+                  <div style={{ width: '180px' }}>
+                    <select
+                      className="admin-filter-select"
+                      value={modTargetTypeFilter}
+                      onChange={(e) => { setModTargetTypeFilter(e.target.value); setModPage(1); }}
+                      style={{ width: '100%', height: '100%', minHeight: '38px' }}
+                    >
+                      <option value="ALL">Loại đối tượng: Tất cả</option>
+                      <option value="COURSE">Khóa học (COURSE)</option>
+                      <option value="COMMENT">Bình luận (COMMENT)</option>
+                    </select>
+                  </div>
                 </div>
-              )}
+
+                {/* Bảng danh sách báo cáo */}
+                <div className="leads-table-container" style={{ marginTop: '20px' }}>
+                  <table className="leads-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '120px', textAlign: 'center' }}>Mã báo cáo</th>
+                        <th>Người báo cáo</th>
+                        <th>Đối tượng bị báo cáo</th>
+                        <th>Loại báo cáo</th>
+                        <th>Lý do báo cáo</th>
+                        <th>Ngày tạo</th>
+                        <th style={{ textAlign: 'center' }}>Trạng thái</th>
+                        <th style={{ textAlign: 'center', width: '120px' }}>Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reports.map(rep => (
+                        <tr key={rep.id} style={{ opacity: loadingReports ? 0.5 : 1 }}>
+                          <td style={{ textAlign: 'center', fontWeight: '800' }}>#{rep.id}</td>
+                          <td>
+                            <div style={{ fontWeight: '800' }}>{rep.reporter?.fullName || 'Ẩn danh'}</div>
+                            <div style={{ fontSize: '11px', color: '#7A7A7A' }}>{rep.reporter?.email || ''}</div>
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: '800', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={rep.targetName}>
+                              {rep.targetName}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#7A7A7A' }}>Tạo bởi: {rep.targetCreator || 'Hệ thống'}</div>
+                          </td>
+                          <td>
+                            <span style={{
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              border: '1.5px solid #000',
+                              fontSize: '10px',
+                              fontWeight: '800',
+                              background: rep.targetType === 'COURSE' ? '#E0E7FF' : '#F3E8FF',
+                              color: rep.targetType === 'COURSE' ? '#1E40AF' : '#6B21A8'
+                            }}>
+                              {rep.targetType === 'COURSE' ? 'KHÓA HỌC' : 'BÌNH LUẬN'}
+                            </span>
+                          </td>
+                          <td style={{ color: '#EF4444' }}>
+                            <div style={{ fontWeight: '750', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={rep.reason}>
+                              {rep.reason}
+                            </div>
+                          </td>
+                          <td style={{ whiteSpace: 'nowrap' }}>{new Date(rep.createdAt).toLocaleDateString('vi-VN')}</td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span style={{
+                              display: 'inline-block',
+                              whiteSpace: 'nowrap',
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              fontSize: '10px',
+                              fontWeight: '850',
+                              border: '1.5px solid #000',
+                              background: rep.status === 'APPROVED' ? '#D1FAE5' : rep.status === 'PENDING' ? '#FEF3C7' : rep.status === 'REJECTED' ? '#FEE2E2' : '#F3F4F6',
+                              color: rep.status === 'APPROVED' ? '#065F46' : rep.status === 'PENDING' ? '#D97706' : rep.status === 'REJECTED' ? '#991B1B' : '#374151'
+                            }}>
+                              {rep.status === 'PENDING' ? 'CHỜ XỬ LÝ' : rep.status === 'APPROVED' ? 'ĐÃ DUYỆT' : rep.status === 'REJECTED' ? 'TỪ CHỐI' : 'ĐÃ ĐÓNG'}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              className="admin-table-btn"
+                              style={{ background: '#3B82F6', color: '#FFF', borderColor: '#000' }}
+                              onClick={() => handleViewReportDetail(rep.id)}
+                            >
+                              Chi tiết
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {reports.length === 0 && (
+                        <tr>
+                          <td colSpan="8" style={{ textAlign: 'center', padding: '36px', color: '#7A7A7A', fontWeight: 'bold' }}>
+                            Không tìm thấy báo cáo vi phạm nào phù hợp.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           )}
 
@@ -3879,6 +4059,22 @@ export default function AdminDashboard({
                       <label>Đăng nhập cuối:</label>
                       <span style={{ fontWeight: '700' }}>
                         {selectedUser.user.lastLoginAt ? new Date(selectedUser.user.lastLoginAt).toLocaleString('vi-VN') : 'Chưa đăng nhập'}
+                      </span>
+                    </div>
+
+                    <div className="admin-form-group" style={{ margin: 0 }}>
+                      <label>Số lần bị cảnh báo:</label>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: '800',
+                        border: '1.5px solid #000',
+                        background: (selectedUser.user.warningCount || 0) > 0 ? '#FEF3C7' : '#D1FAE5',
+                        color: (selectedUser.user.warningCount || 0) > 0 ? '#D97706' : '#065F46'
+                      }}>
+                        {selectedUser.user.warningCount || 0} lần
                       </span>
                     </div>
                   </div>
@@ -5043,6 +5239,392 @@ export default function AdminDashboard({
                 Xác nhận Ẩn khóa học
               </button>
             </footer>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL: CHI TIẾT BÁO CÁO VI PHẠM (ADMIN VIEW)
+          ========================================== */}
+      {showReportModal && (
+        <div className="admin-modal-backdrop" onClick={() => setShowReportModal(false)}>
+          <div className="admin-modal" style={{ maxWidth: '800px' }} onClick={e => e.stopPropagation()}>
+            <header className="admin-modal-header">
+              <span>HỒ SƠ CHI TIẾT BÁO CÁO VI PHẠM</span>
+              <button 
+                onClick={() => setShowReportModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold' }}
+              >
+                ×
+              </button>
+            </header>
+
+            <div className="admin-modal-body" style={{ maxHeight: '70vh', overflowY: 'auto', padding: '20px' }}>
+              {reportDetailLoading || !selectedReport ? (
+                <div style={{ textAlign: 'center', padding: '40px' }}>
+                  <div className="stats-spinner" style={{ margin: '0 auto 16px auto' }} />
+                  <p style={{ fontWeight: 'bold' }}>Đang tải thông tin chi tiết báo cáo...</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  
+                  {/* Cột 1: Thông tin báo cáo */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                    <div style={{ padding: '16px', border: '2.5px solid #000', borderRadius: '12px', background: '#FCFBFA', boxShadow: '3px 3px 0px #000' }}>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '13.5px', fontWeight: '900', textTransform: 'uppercase', borderBottom: '2px dashed #000', paddingBottom: '6px' }}>
+                        🛡️ THÔNG TIN BÁO CÁO
+                      </h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12.5px', fontWeight: '700' }}>
+                        <div><strong>Mã báo cáo:</strong> #{selectedReport.id}</div>
+                        <div><strong>Loại đối tượng:</strong> {selectedReport.targetType === 'COURSE' ? 'Khóa học (COURSE)' : 'Bình luận (COMMENT)'}</div>
+                        <div><strong>Lý do tố cáo:</strong> <span style={{ color: '#EF4444' }}>{selectedReport.reason}</span></div>
+                        {selectedReport.description && <div><strong>Mô tả chi tiết:</strong> {selectedReport.description}</div>}
+                        <div><strong>Ngày báo cáo:</strong> {new Date(selectedReport.createdAt).toLocaleString('vi-VN')}</div>
+                        <div>
+                          <strong>Trạng thái:</strong>{' '}
+                          <span style={{
+                            display: 'inline-block',
+                            whiteSpace: 'nowrap',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            border: '1.5px solid #000',
+                            fontSize: '11px',
+                            fontWeight: '800',
+                            background: selectedReport.status === 'APPROVED' ? '#D1FAE5' : selectedReport.status === 'PENDING' ? '#FEF3C7' : selectedReport.status === 'REJECTED' ? '#FEE2E2' : '#F3F4F6',
+                            color: selectedReport.status === 'APPROVED' ? '#065F46' : selectedReport.status === 'PENDING' ? '#D97706' : selectedReport.status === 'REJECTED' ? '#991B1B' : '#374151'
+                          }}>
+                            {selectedReport.status === 'PENDING' ? 'CHỜ XỬ LÝ' : selectedReport.status === 'APPROVED' ? 'ĐÃ DUYỆT' : selectedReport.status === 'REJECTED' ? 'TỪ CHỐI' : 'ĐÃ ĐÓNG'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ padding: '16px', border: '2.5px solid #000', borderRadius: '12px', background: '#FCFBFA', boxShadow: '3px 3px 0px #000' }}>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '13.5px', fontWeight: '900', textTransform: 'uppercase', borderBottom: '2px dashed #000', paddingBottom: '6px' }}>
+                        👤 NGƯỜI BÁO CÁO & XỬ LÝ
+                      </h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12.5px', fontWeight: '700' }}>
+                        <div><strong>Họ tên:</strong> {selectedReport.reporter?.fullName || 'Ẩn danh'}</div>
+                        <div><strong>Email:</strong> {selectedReport.reporter?.email || 'N/A'}</div>
+                        <div><strong>Vai trò:</strong> {selectedReport.reporter?.role || 'N/A'}</div>
+                        {selectedReport.reviewedAt && (
+                          <>
+                            <div style={{ borderTop: '1.5px solid #E5E7EB', paddingTop: '8px', marginTop: '4px' }}>
+                              <strong>Ngày duyệt:</strong> {new Date(selectedReport.reviewedAt).toLocaleString('vi-VN')}
+                            </div>
+                            {selectedReport.resolutionNote && (
+                              <div><strong>Ghi chú xử lý:</strong> <span style={{ color: '#059669' }}>{selectedReport.resolutionNote}</span></div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Cột 2: Đối tượng bị báo cáo */}
+                  <div style={{ padding: '16px', border: '2.5px solid #000', borderRadius: '12px', background: '#F8FAFC', boxShadow: '3px 3px 0px #000' }}>
+                    <h4 style={{ margin: '0 0 12px 0', fontSize: '13.5px', fontWeight: '900', textTransform: 'uppercase', borderBottom: '2px dashed #000', paddingBottom: '6px' }}>
+                      🚨 NỘI DUNG BỊ BÁO CÁO (TẠO BỞI: {selectedReport.targetCreator})
+                    </h4>
+                    
+                    {selectedReport.targetType === 'COURSE' && selectedReport.targetInfo && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12.5px', fontWeight: '700' }}>
+                          <div><strong>Tên khóa học:</strong> {selectedReport.targetInfo.title}</div>
+                          <div><strong>Môn học:</strong> {selectedReport.targetInfo.subject}</div>
+                          <div><strong>Học phí:</strong> {formatCurrency(selectedReport.targetInfo.price)}</div>
+                          <div>
+                            <strong>Trạng thái hiển thị:</strong>{' '}
+                            <span style={{ color: selectedReport.targetInfo.visibility === 'VISIBLE' ? '#10B981' : '#EF4444' }}>
+                              {selectedReport.targetInfo.visibility === 'VISIBLE' ? 'HIỂN THỊ (VISIBLE)' : 'ĐANG ẨN (HIDDEN)'}
+                            </span>
+                          </div>
+                        </div>
+                        <div style={{ fontSize: '12.5px', fontWeight: '750', background: '#FFF', padding: '10px', border: '1.5px solid #000', borderRadius: '8px' }}>
+                          <strong>Mô tả khóa học:</strong> {selectedReport.targetInfo.description}
+                        </div>
+                        
+                        {/* Course actions directly in Report */}
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                          {selectedReport.targetInfo.visibility === 'VISIBLE' ? (
+                            <button
+                              type="button"
+                              className="admin-table-btn"
+                              style={{ background: '#EF4444', color: '#FFF', borderColor: '#000' }}
+                              onClick={() => {
+                                handleOpenHideCourseModal({ id: selectedReport.targetId, title: selectedReport.targetInfo.title });
+                              }}
+                            >
+                              Ẩn khóa học ngay
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="admin-table-btn"
+                              style={{ background: '#10B981', color: '#FFF', borderColor: '#000' }}
+                              onClick={async () => {
+                                await api.showCourse(selectedReport.targetId);
+                                toast('Hiển thị lại khóa học thành công!', 'success');
+                                handleViewReportDetail(selectedReport.id);
+                              }}
+                            >
+                              Hiển thị lại khóa học
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="admin-table-btn"
+                            style={{ background: '#3B82F6', color: '#FFF', borderColor: '#000' }}
+                            onClick={() => {
+                              setShowReportModal(false);
+                              handleViewCourseDetail(selectedReport.targetId);
+                            }}
+                          >
+                            Xem chi tiết khóa học 🔗
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedReport.targetType === 'COMMENT' && selectedReport.targetInfo && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ fontSize: '12.5px', fontWeight: '750', background: '#FFF', padding: '12px', border: '1.5px solid #000', borderRadius: '8px' }}>
+                          <strong>Nội dung bình luận:</strong> "{selectedReport.targetInfo.content}"
+                        </div>
+                        <div style={{ fontSize: '12px', fontWeight: '700', color: '#666' }}>
+                          Bình luận tại module: <strong>{selectedReport.targetInfo.type === 'FORUM' ? 'DIỄN ĐÀN (FORUM)' : 'TÀI LIỆU HỌC TẬP (DOCUMENT)'}</strong>
+                          <br />
+                          Ngày tạo bình luận: {new Date(selectedReport.targetInfo.createdAt).toLocaleString('vi-VN')}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Phần cảnh báo người dùng */}
+                  <div style={{ padding: '16px', border: '2.5px solid #000', borderRadius: '12px', background: '#FFFBEB', boxShadow: '3px 3px 0px #000' }}>
+                    <h4 style={{ margin: '0 0 10px 0', fontSize: '13.5px', fontWeight: '900', textTransform: 'uppercase', color: '#B45309' }}>
+                      ⚠️ XỬ LÝ VI PHẠM ĐỐI VỚI TÁC GIẢ NỘI DUNG: {selectedReport.targetCreator}
+                    </h4>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '13px', fontWeight: '750' }}>
+                        Email: <strong>{selectedReport.targetCreatorEmail}</strong> (Mã ID: {selectedReport.targetCreatorId})
+                      </span>
+                      <button
+                        type="button"
+                        className="admin-table-btn"
+                        style={{ background: '#F59E0B', color: '#FFF', borderColor: '#000' }}
+                        onClick={() => handleOpenWarningModal(selectedReport)}
+                      >
+                        Gửi Cảnh báo vi phạm ⚠️
+                      </button>
+                    </div>
+                  </div>
+
+                </div>
+              )}
+            </div>
+
+            <footer className="admin-modal-footer">
+              <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'flex-end' }}>
+                {selectedReport && selectedReport.status === 'PENDING' && (
+                  <>
+                    <button 
+                      type="button" 
+                      className="admin-table-btn" 
+                      style={{ background: '#10B981', color: '#FFFFFF', borderColor: '#000' }}
+                      onClick={() => handleApproveReportSubmit(selectedReport.id)}
+                    >
+                      Duyệt vi phạm (Ẩn nội dung)
+                    </button>
+                    <button 
+                      type="button" 
+                      className="admin-table-btn" 
+                      style={{ background: '#EF4444', color: '#FFFFFF', borderColor: '#000' }}
+                      onClick={() => handleOpenRejectReportModal(selectedReport)}
+                    >
+                      Bác bỏ báo cáo
+                    </button>
+                    <button 
+                      type="button" 
+                      className="admin-table-btn" 
+                      style={{ background: '#6B7280', color: '#FFFFFF', borderColor: '#000' }}
+                      onClick={() => handleOpenCloseReportModal(selectedReport)}
+                    >
+                      Đóng báo cáo
+                    </button>
+                  </>
+                )}
+                <button 
+                  type="button" 
+                  className="admin-back-btn" 
+                  style={{ background: '#1C2B17', color: '#FFFFFF', width: 'auto', margin: 0, boxShadow: 'none' }}
+                  onClick={() => setShowReportModal(false)}
+                >
+                  Đóng
+                </button>
+              </div>
+            </footer>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL: TỪ CHỐI BÁO CÁO VI PHẠM
+          ========================================== */}
+      {showRejectReportModal && (
+        <div className="admin-modal-backdrop" onClick={() => setShowRejectReportModal(false)}>
+          <div className="admin-modal" onClick={e => e.stopPropagation()}>
+            <header className="admin-modal-header">
+              <span>BÁC BỎ BÁO CÁO VI PHẠM</span>
+              <button 
+                onClick={() => setShowRejectReportModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold' }}
+              >
+                ×
+              </button>
+            </header>
+
+            <form onSubmit={handleRejectReportSubmit}>
+              <div className="admin-modal-body">
+                <div className="admin-form-group">
+                  <label>Lý do bác bỏ báo cáo (Bắt buộc):</label>
+                  <textarea
+                    className="admin-form-textarea"
+                    rows="4"
+                    placeholder="Vui lòng cung cấp lý do bác bỏ hoặc từ chối báo cáo vi phạm này..."
+                    value={rejectReportReason}
+                    onChange={e => setRejectReportReason(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <footer className="admin-modal-footer">
+                <button 
+                  type="button" 
+                  className="admin-back-btn" 
+                  style={{ background: 'none', boxShadow: 'none' }}
+                  onClick={() => setShowRejectReportModal(false)}
+                >
+                  Hủy bỏ
+                </button>
+                <button 
+                  type="submit" 
+                  className="admin-back-btn"
+                  style={{ background: '#EF4444', color: '#FFFFFF', borderColor: '#000' }}
+                >
+                  Gửi từ chối ✕
+                </button>
+              </footer>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL: ĐÓNG BÁO CÁO VI PHẠM
+          ========================================== */}
+      {showCloseReportModal && (
+        <div className="admin-modal-backdrop" onClick={() => setShowCloseReportModal(false)}>
+          <div className="admin-modal" onClick={e => e.stopPropagation()}>
+            <header className="admin-modal-header">
+              <span>ĐÓNG BÁO CÁO VI PHẠM</span>
+              <button 
+                onClick={() => setShowCloseReportModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold' }}
+              >
+                ×
+              </button>
+            </header>
+
+            <form onSubmit={handleCloseReportSubmit}>
+              <div className="admin-modal-body">
+                <div className="admin-form-group">
+                  <label>Ghi chú đóng báo cáo (Không bắt buộc):</label>
+                  <textarea
+                    className="admin-form-textarea"
+                    rows="4"
+                    placeholder="Nhập ghi chú đóng báo cáo..."
+                    value={closeReportNotes}
+                    onChange={e => setCloseReportNotes(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <footer className="admin-modal-footer">
+                <button 
+                  type="button" 
+                  className="admin-back-btn" 
+                  style={{ background: 'none', boxShadow: 'none' }}
+                  onClick={() => setShowCloseReportModal(false)}
+                >
+                  Hủy bỏ
+                </button>
+                <button 
+                  type="submit" 
+                  className="admin-back-btn"
+                  style={{ background: '#6B7280', color: '#FFFFFF', borderColor: '#000' }}
+                >
+                  Đóng báo cáo ✓
+                </button>
+              </footer>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL: GỬI CẢNH BÁO VI PHẠM CHO NGƯỜI DÙNG
+          ========================================== */}
+      {showWarningModal && (
+        <div className="admin-modal-backdrop" onClick={() => setShowWarningModal(false)}>
+          <div className="admin-modal" onClick={e => e.stopPropagation()}>
+            <header className="admin-modal-header">
+              <span>GỬI CẢNH BÁO VI PHẠM</span>
+              <button 
+                onClick={() => setShowWarningModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold' }}
+              >
+                ×
+              </button>
+            </header>
+
+            <form onSubmit={handleWarningSubmit}>
+              <div className="admin-modal-body">
+                <div className="admin-form-group">
+                  <label>Nội dung cảnh báo gửi đến người dùng vi phạm (Bắt buộc):</label>
+                  <textarea
+                    className="admin-form-textarea"
+                    rows="4"
+                    placeholder="Nhập nội dung cảnh báo (ví dụ: phát ngôn không phù hợp, chia sẻ học liệu lậu, nội dung khóa học sai lệch...)"
+                    value={warningMessage}
+                    onChange={e => setWarningMessage(e.target.value)}
+                    required
+                  />
+                  <p style={{ fontSize: '11px', color: '#D97706', fontWeight: '700', marginTop: '6px' }}>
+                    * Người dùng sẽ nhận được cảnh báo này qua thông báo hệ thống và số lần cảnh báo tài khoản sẽ tăng thêm 1.
+                  </p>
+                </div>
+              </div>
+
+              <footer className="admin-modal-footer">
+                <button 
+                  type="button" 
+                  className="admin-back-btn" 
+                  style={{ background: 'none', boxShadow: 'none' }}
+                  onClick={() => setShowWarningModal(false)}
+                >
+                  Hủy bỏ
+                </button>
+                <button 
+                  type="submit" 
+                  className="admin-back-btn"
+                  style={{ background: '#F59E0B', color: '#FFFFFF', borderColor: '#000' }}
+                >
+                  Gửi Cảnh báo ⚠️
+                </button>
+              </footer>
+            </form>
           </div>
         </div>
       )}

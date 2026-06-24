@@ -21,6 +21,7 @@ export const getAdminCoursesStats = async (req: Request, res: Response) => {
       approvedCourses,
       rejectedCourses,
       hiddenCourses,
+      draftCourses,
       enrollmentStats
     ] = await Promise.all([
       prisma.course.count(),
@@ -28,6 +29,7 @@ export const getAdminCoursesStats = async (req: Request, res: Response) => {
       prisma.course.count({ where: { status: 'APPROVED' } }),
       prisma.course.count({ where: { status: 'REJECTED' } }),
       prisma.course.count({ where: { visibility: 'HIDDEN', status: 'APPROVED' } }),
+      prisma.course.count({ where: { status: 'DRAFT' } }),
       prisma.enrollment.aggregate({
         _sum: {
           amount: true
@@ -56,6 +58,7 @@ export const getAdminCoursesStats = async (req: Request, res: Response) => {
         approvedCourses,
         rejectedCourses,
         hiddenCourses,
+        draftCourses,
         totalStudentsEnrolled,
         totalRevenue: enrollmentStats._sum.amount || 0,
         totalEnrollments: enrollmentStats._count.id || 0
