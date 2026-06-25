@@ -3781,18 +3781,7 @@ export default function App() {
         />
       )}
 
-      {/* Public Chatbot AI floating button and chat dialog */}
-      {parsedRoute.route !== 'public-flashcards' && 
-       parsedRoute.route !== 'public-ai-tutor' && 
-       parsedRoute.route !== 'public-mock-exam-taking' && 
-       parsedRoute.route !== 'learn' && 
-       parsedRoute.tab !== 'path' && 
-       parsedRoute.tab !== 'ai-qa' && 
-       activeTab !== 'login' &&
-       activeTab !== 'signup' &&
-       !activeTestSimulator && (
-        <ChatbotWidget />
-      )}
+
 
       {/* ── Toast Notifications ── */}
       <div className="app-toasts-container">

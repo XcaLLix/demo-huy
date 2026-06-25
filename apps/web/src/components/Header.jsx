@@ -258,25 +258,6 @@ export default function Header({
 
       {/* RIGHT COLUMN: Nav Links & Actions */}
       <div className="fts-header-nav-col">
-        <a 
-          className={`fts-header-nav-link ${isLinkActive('/') ? 'active' : ''}`}
-          onClick={() => navigateTo('/')}
-        >
-          Trang chủ
-        </a>
-        <a 
-          className={`fts-header-nav-link ${isLinkActive('/courses') ? 'active' : ''}`}
-          onClick={() => navigateTo('/courses')}
-        >
-          Khóa học
-        </a>
-        <a 
-          className={`fts-header-nav-link ${isLinkActive('/news') ? 'active' : ''}`}
-          onClick={() => toast('Tính năng tin tức đang phát triển!', 'info')}
-        >
-          Tin tức
-        </a>
-
         {/* Shopping Cart */}
         <button
           className="fts-header-cart-btn"
@@ -316,16 +297,6 @@ export default function Header({
             )}
           </button>
         )}
-
-        {/* Theme Toggle */}
-        <button
-          className="header-icon-btn"
-          style={{ background: 'none', border: 'none', fontSize: '22px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-          onClick={onToggleTheme}
-          title={theme === 'dark' ? 'Chế độ sáng' : 'Chế độ tối'}
-        >
-          {theme === 'dark' ? <HiSun style={{ color: '#FFD700' }} /> : <HiMoon style={{ color: 'var(--fts-purple)' }} />}
-        </button>
 
         {/* User Profile Avatar */}
         {role !== 'guest' && (
