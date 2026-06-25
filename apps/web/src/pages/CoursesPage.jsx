@@ -39,6 +39,10 @@ export default function CoursesPage({ courses = [], currentUser, onSelectCourse,
   const [sortBy, setSortBy] = useState('popular');
   const [loading, setLoading] = useState(true);
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const coursesPerPage = 6;
+
   // Map backend courses to client mock format
   const mappedCourses = useMemo(() => {
     return (courses || []).map(mapDbCourseToMockFormat);
@@ -47,6 +51,7 @@ export default function CoursesPage({ courses = [], currentUser, onSelectCourse,
   // Simulate shimmer loading on filter/page transitions
   useEffect(() => {
     setLoading(true);
+    setCurrentPage(1);
     const timer = setTimeout(() => {
       setLoading(false);
     }, 450);
@@ -157,6 +162,34 @@ export default function CoursesPage({ courses = [], currentUser, onSelectCourse,
     return result;
   }, [mappedCourses, search, subject, block, level, priceLimit, onlyFree, duration, ratingMin, language, hasCert, hasLive, sortBy, badgeFilter]);
 
+  // Compute paginated subset of courses
+  const indexOfLastCourse = currentPage * coursesPerPage;
+  const indexOfFirstCourse = indexOfLastCourse - coursesPerPage;
+  const currentCourses = useMemo(() => {
+    return filteredCourses.slice(indexOfFirstCourse, indexOfLastCourse);
+  }, [filteredCourses, indexOfFirstCourse, indexOfLastCourse]);
+
+  const totalPages = Math.ceil(filteredCourses.length / coursesPerPage);
+
+  const getPageNumbers = () => {
+    const delta = 2;
+    const range = [];
+    for (let i = Math.max(2, currentPage - delta); i <= Math.min(totalPages - 1, currentPage + delta); i++) {
+      range.push(i);
+    }
+    if (currentPage - delta > 2) {
+      range.unshift('...');
+    }
+    if (currentPage + delta < totalPages - 1) {
+      range.push('...');
+    }
+    range.unshift(1);
+    if (totalPages > 1) {
+      range.push(totalPages);
+    }
+    return range;
+  };
+
   const handleClearFilters = () => {
     setSearch('');
     setSubject('All');
@@ -171,6 +204,7 @@ export default function CoursesPage({ courses = [], currentUser, onSelectCourse,
     setHasLive(false);
     setBadgeFilter('All');
     setSortBy('popular');
+    setCurrentPage(1);
   };
 
   // Compile active enrolled courses to display (simulate using unlocked courses in user object)
@@ -219,7 +253,7 @@ export default function CoursesPage({ courses = [], currentUser, onSelectCourse,
             {/* Sorting and Summary Toolbar */}
             <div className="catalog-toolbar">
               <span className="results-count-text">
-                Tìm thấy <strong>{filteredCourses.length}</strong> khóa học phù hợp
+                Tìm thấy <strong>{filteredCourses.length}</strong> khóa học phù hợp (Trang {currentPage}/{totalPages || 1})
               </span>
               
               <div className="sorting-group">
@@ -243,19 +277,115 @@ export default function CoursesPage({ courses = [], currentUser, onSelectCourse,
               <div className="cp-list">
                 {[1, 2, 3, 4, 5, 6].map(i => <SkeletonCard key={i} />)}
               </div>
-            ) : filteredCourses.length > 0 ? (
-              <div className="cp-list">
-                {filteredCourses.map(course => (
-                  <CourseCard
-                    key={course.id}
-                    course={course}
-                    isOwned={currentUser?.unlockedCourses?.includes(Number(course.id)) || currentUser?.unlockedCourses?.includes(course.id)}
-                    onSelect={onSelectCourse}
-                    onPurchase={onCheckoutCourse}
-                    layout="list"
-                  />
-                ))}
-              </div>
+            ) : currentCourses.length > 0 ? (
+              <>
+                <div className="cp-list">
+                  {currentCourses.map(course => (
+                    <CourseCard
+                      key={course.id}
+                      course={course}
+                      isOwned={currentUser?.unlockedCourses?.includes(Number(course.id)) || currentUser?.unlockedCourses?.includes(course.id)}
+                      onSelect={onSelectCourse}
+                      onPurchase={onCheckoutCourse}
+                      layout="list"
+                    />
+                  ))}
+                </div>
+
+                {/* Neo-brutalist Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="catalog-pagination" style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: '10px',
+                    marginTop: '40px',
+                    marginBottom: '20px'
+                  }}>
+                    {/* Previous Button */}
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      style={{
+                        padding: '10px 18px',
+                        border: '2.5px solid #000',
+                        borderRadius: '8px',
+                        background: currentPage === 1 ? '#f1f5f9' : '#fff',
+                        color: currentPage === 1 ? '#94a3b8' : '#000',
+                        fontWeight: '900',
+                        fontSize: '13.5px',
+                        cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                        boxShadow: currentPage === 1 ? 'none' : '3px 3px 0px #000',
+                        transform: currentPage === 1 ? 'none' : 'translate(0px, 0px)',
+                        transition: 'all 0.1s'
+                      }}
+                      className="pagination-btn"
+                    >
+                      Trước
+                    </button>
+
+                    {/* Page Numbers */}
+                    {getPageNumbers().map((page, index) => {
+                      if (page === '...') {
+                        return (
+                          <span key={`dots-${index}`} style={{ padding: '0 8px', fontWeight: '900', color: '#64748b', fontSize: '15px' }}>
+                            ...
+                          </span>
+                        );
+                      }
+                      const isActive = page === currentPage;
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          style={{
+                            width: '42px',
+                            height: '42px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '2.5px solid #000',
+                            borderRadius: '8px',
+                            background: isActive ? '#FFE259' : '#fff',
+                            color: '#000',
+                            fontWeight: '900',
+                            fontSize: '14px',
+                            cursor: 'pointer',
+                            boxShadow: isActive ? 'none' : '3px 3px 0px #000',
+                            transform: isActive ? 'translate(2px, 2px)' : 'none',
+                            transition: 'all 0.1s'
+                          }}
+                          className="pagination-btn"
+                        >
+                          {page}
+                        </button>
+                      );
+                    })}
+
+                    {/* Next Button */}
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      style={{
+                        padding: '10px 18px',
+                        border: '2.5px solid #000',
+                        borderRadius: '8px',
+                        background: currentPage === totalPages ? '#f1f5f9' : '#fff',
+                        color: currentPage === totalPages ? '#94a3b8' : '#000',
+                        fontWeight: '900',
+                        fontSize: '13.5px',
+                        cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                        boxShadow: currentPage === totalPages ? 'none' : '3px 3px 0px #000',
+                        transform: currentPage === totalPages ? 'none' : 'translate(0px, 0px)',
+                        transition: 'all 0.1s'
+                      }}
+                      className="pagination-btn"
+                    >
+                      Sau
+                    </button>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="catalog-empty-state">
                 <HiOutlineEmojiSad className="empty-icon" />
