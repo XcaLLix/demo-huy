@@ -28,6 +28,7 @@ import { api } from '../../api';
 import { toast } from '../../utils/toast';
 import sunLogoImg from '../../assets/sun_logo.png';
 import '../../styles/studentDashboard.css';
+import ContinueLearningRail from '../courses/catalog/ContinueLearningRail';
 
 export default function StudentDashboard({ currentUser, setActiveTab, navigateTo, onUpdateUser, activeTab, currentTab: passedCurrentTab, onLogout, children }) {
   // --- STATES & STORES ---
@@ -909,86 +910,100 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
               </button>
             </div>
 
+            </div>
+
+            {/* CONTINUE LEARNING RAIL */}
+            <ContinueLearningRail 
+              currentUser={currentUser}
+              courses={dashboardData.courses}
+              onSelectCourse={(course) => navigateTo(`/learn/${course.id}`)}
+            />
+
             {coursesToRender.length > 0 ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
-                {coursesToRender.map((course) => (
-                  <div 
-                    key={course.id} 
-                    style={{
-                      background: '#ffffff',
-                      border: '3px solid #000000',
-                      borderRadius: '16px',
-                      padding: '20px',
-                      boxShadow: '5px 5px 0px #000000',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      position: 'relative',
-                      minHeight: '220px',
-                      transition: 'all 0.15s'
-                    }}
-                    className="sdb-my-course-card-item"
-                  >
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                        <span style={{
-                          background: course.subject === 'Toán' || course.subject === 'Toán học' ? '#f3e8ff' : course.subject === 'Vật lý' ? '#ccfbf1' : course.subject === 'Hóa học' ? '#dbeafe' : '#ffedd5',
-                          color: course.subject === 'Toán' || course.subject === 'Toán học' ? '#7c3aed' : course.subject === 'Vật lý' ? '#0d9488' : course.subject === 'Hóa học' ? '#2563eb' : '#ea580c',
-                          padding: '4px 10px',
-                          borderRadius: '20px',
-                          fontSize: '11px',
-                          fontWeight: '800',
-                          border: '1.5px solid #000'
-                        }}>
-                          {course.subject}
-                        </span>
-                        <span style={{ fontSize: '12px', fontWeight: '800', color: '#64748b' }}>
-                          {course.lessons?.length || 10} bài học
-                        </span>
-                      </div>
-                      
-                      <h4 style={{ fontSize: '16px', fontWeight: '950', color: '#000', margin: '0 0 8px 0', textAlign: 'left', lineHeight: '1.4' }}>
-                        {course.title}
-                      </h4>
-                      <p style={{ fontSize: '12px', color: '#4b5563', margin: '0 0 16px 0', textAlign: 'left', fontWeight: '500', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                        {course.description || 'Khóa học ôn thi THPT Quốc Gia toàn diện thiết kế theo phương pháp AI adaptive.'}
-                      </p>
-                    </div>
-
-                    <div>
-                      {/* Progress section */}
-                      <div style={{ marginBottom: '16px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: '12px', fontWeight: '800' }}>
-                          <span style={{ color: '#4b5563' }}>Tiến độ hoàn thành:</span>
-                          <span style={{ color: '#7c3aed' }}>{course.progress}%</span>
+              <div style={{ marginTop: '24px' }}>
+                <h4 style={{ fontSize: '18px', fontWeight: '950', marginBottom: '16px', textAlign: 'left' }}>
+                  Danh sách khóa học của tôi
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+                  {coursesToRender.map((course) => (
+                    <div 
+                      key={course.id} 
+                      style={{
+                        background: '#ffffff',
+                        border: '3px solid #000000',
+                        borderRadius: '16px',
+                        padding: '20px',
+                        boxShadow: '5px 5px 0px #000000',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        position: 'relative',
+                        minHeight: '220px',
+                        transition: 'all 0.15s'
+                      }}
+                      className="sdb-my-course-card-item"
+                    >
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                          <span style={{
+                            background: course.subject === 'Toán' || course.subject === 'Toán học' ? '#f3e8ff' : course.subject === 'Vật lý' ? '#ccfbf1' : course.subject === 'Hóa học' ? '#dbeafe' : '#ffedd5',
+                            color: course.subject === 'Toán' || course.subject === 'Toán học' ? '#7c3aed' : course.subject === 'Vật lý' ? '#0d9488' : course.subject === 'Hóa học' ? '#2563eb' : '#ea580c',
+                            padding: '4px 10px',
+                            borderRadius: '20px',
+                            fontSize: '11px',
+                            fontWeight: '800',
+                            border: '1.5px solid #000'
+                          }}>
+                            {course.subject}
+                          </span>
+                          <span style={{ fontSize: '12px', fontWeight: '800', color: '#64748b' }}>
+                            {course.lessons?.length || 10} bài học
+                          </span>
                         </div>
-                        <div style={{ height: '12px', background: '#f1f5f9', border: '2px solid #000', borderRadius: '6px', overflow: 'hidden' }}>
-                          <div style={{ width: `${course.progress}%`, height: '100%', background: 'linear-gradient(90deg, #8b5cf6, #6366f1)' }}></div>
-                        </div>
+                        
+                        <h4 style={{ fontSize: '16px', fontWeight: '950', color: '#000', margin: '0 0 8px 0', textAlign: 'left', lineHeight: '1.4' }}>
+                          {course.title}
+                        </h4>
+                        <p style={{ fontSize: '12px', color: '#4b5563', margin: '0 0 16px 0', textAlign: 'left', fontWeight: '500', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {course.description || 'Khóa học ôn thi THPT Quốc Gia toàn diện thiết kế theo phương pháp AI adaptive.'}
+                        </p>
                       </div>
 
-                      {/* Action buttons */}
-                      <button
-                        onClick={() => navigateTo(`/learn/${course.id}`)}
-                        style={{
-                          width: '100%',
-                          background: '#7c3aed',
-                          color: '#ffffff',
-                          border: '2.5px solid #000000',
-                          borderRadius: '10px',
-                          padding: '10px',
-                          fontWeight: '900',
-                          fontSize: '13px',
-                          cursor: 'pointer',
-                          boxShadow: '3px 3px 0px #000000',
-                          transition: 'all 0.1s'
-                        }}
-                      >
-                        Vào học ngay 🚀
-                      </button>
+                      <div>
+                        {/* Progress section */}
+                        <div style={{ marginBottom: '16px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: '12px', fontWeight: '800' }}>
+                            <span style={{ color: '#4b5563' }}>Tiến độ hoàn thành:</span>
+                            <span style={{ color: '#7c3aed' }}>{course.progress}%</span>
+                          </div>
+                          <div style={{ height: '12px', background: '#f1f5f9', border: '2px solid #000', borderRadius: '6px', overflow: 'hidden' }}>
+                            <div style={{ width: `${course.progress}%`, height: '100%', background: 'linear-gradient(90deg, #8b5cf6, #6366f1)' }}></div>
+                          </div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <button
+                          onClick={() => navigateTo(`/learn/${course.id}`)}
+                          style={{
+                            width: '100%',
+                            background: '#7c3aed',
+                            color: '#ffffff',
+                            border: '2.5px solid #000000',
+                            borderRadius: '10px',
+                            padding: '10px',
+                            fontWeight: '900',
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                            boxShadow: '3px 3px 0px #000000',
+                            transition: 'all 0.1s'
+                          }}
+                        >
+                          Vào học ngay 🚀
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             ) : (
               <div style={{

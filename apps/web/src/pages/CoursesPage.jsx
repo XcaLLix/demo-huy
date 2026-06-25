@@ -3,7 +3,6 @@ import { HiSparkles, HiStar, HiAdjustments, HiSelector, HiOutlineEmojiSad } from
 import { mapDbCourseToMockFormat } from '../utils/courseMapper';
 
 // Modular components
-import ContinueLearningRail from '../components/courses/catalog/ContinueLearningRail';
 import CourseTabBar from '../components/courses/catalog/CourseTabBar';
 import FilterSidebar from '../components/courses/catalog/FilterSidebar';
 import CourseCard from '../components/courses/shared/CourseCard';
@@ -186,14 +185,6 @@ export default function CoursesPage({ courses = [], currentUser, onSelectCourse,
   return (
     <div className="cp-page-container">
       <div className="cp-page animate-in">
-        {/* 2. CONTINUE LEARNING RAIL (IF ENROLLED) */}
-        {activeEnrolledCourses.length > 0 && (
-          <ContinueLearningRail 
-            currentUser={currentUser}
-            courses={mappedCourses}
-            onSelectCourse={onSelectCourse} 
-          />
-        )}
 
 
 

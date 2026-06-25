@@ -5,6 +5,7 @@ import teacherMathImg from '../assets/teacher_math.png';
 import studentLearningImg from '../assets/student_learning.png';
 import studentSuccessImg from '../assets/student_success.png';
 import educatorsTeamImg from '../assets/educators_team.png';
+import ContinueLearningRail from './courses/catalog/ContinueLearningRail';
 
 const getCourseImage = (course) => {
   const subject = course?.subject || '';
@@ -139,6 +140,13 @@ export default function CourseMall({ courses, currentUser, onSelectCourse, onLea
 
       {activeViewTab === 'my-courses' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Continue Learning Rail */}
+          <ContinueLearningRail 
+            currentUser={currentUser}
+            courses={courses}
+            onSelectCourse={(course) => onLearnCourse ? onLearnCourse(course) : onSelectCourse(course)}
+          />
+
           {/* Search Bar for Owned Courses */}
           <div className="card" style={{ padding: '16px', display: 'flex', gap: '16px', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', gap: '8px', overflowX: 'auto' }}>
