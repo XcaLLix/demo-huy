@@ -4,6 +4,10 @@ import {
   HiDocumentText, HiRefresh, HiUpload, HiX, HiChevronRight, 
   HiChevronLeft, HiFolder, HiBadgeCheck, HiStar, HiVolumeUp
 } from 'react-icons/hi';
+import { 
+  FaPencilAlt, FaLeaf, FaLaptop, FaUsers, FaMapMarkerAlt, 
+  FaChartBar, FaStethoscope, FaGraduationCap, FaUniversity 
+} from 'react-icons/fa';
 import Tesseract from 'tesseract.js';
 import { api } from '../api';
 import { toast } from '../utils/toast';
@@ -46,6 +50,21 @@ const DEFAULT_DECK = [
     hashtag: "# Văn hóa"
   }
 ];
+
+const getSubjectIcon = (iconName) => {
+  switch (iconName) {
+    case 'pencil': return <FaPencilAlt />;
+    case 'leaf': return <FaLeaf />;
+    case 'computer': return <FaLaptop />;
+    case 'group': return <FaUsers />;
+    case 'urn': return <FaMapMarkerAlt />;
+    case 'chart': return <FaChartBar />;
+    case 'stethoscope': return <FaStethoscope />;
+    case 'graduation': return <FaGraduationCap />;
+    case 'bank': return <FaUniversity />;
+    default: return <HiFolder />;
+  }
+};
 
 export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
   const [activeTab, setActiveTab] = useState('create'); // 'create' | 'history'
@@ -1333,135 +1352,152 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
 
         {/* ================= CENTER WORKSPACE ================= */}
         <main className="flashcard-center-workspace">
-          {currentView === 'decks' ? (
-            /* ================= DECKS SELECTOR VIEW ================= */
-            <div className="flashcard-decks-selector animate-in" style={{ padding: '8px 4px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <div>
-                  <h2 style={{ fontSize: '20px', fontWeight: '900', color: 'var(--fc-gold)', margin: 0 }}>Bộ thẻ của tôi 🗂️</h2>
-                  <p style={{ fontSize: '12.5px', color: 'var(--fc-text-secondary)', margin: '4px 0 0 0' }}>
-                    Chọn một bộ từ vựng dưới đây để bắt đầu ôn luyện. Bạn có thể tự tạo hoặc dùng AI để sinh bộ thẻ mới.
-                  </p>
-                </div>
-              </div>
-
-              {/* Decks Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px', marginTop: '16px' }}>
-                
-                {/* Default Deck */}
-                <div 
-                  className="flashcard-document-deck-item flashcard-document-deck-item--default animate-in"
-                  onClick={() => {
-                    setCards(DEFAULT_DECK);
-                    setDeckTitle('Chủ đề Lịch sử & Khảo cổ học');
-                    setActiveDeckId('default');
-                    setCurrentIdx(0);
-                    setIsFlipped(false);
-                    setIsFinished(false);
-                    setLearnedCards(new Set());
-                    setReviewCards(new Set());
-                    setCurrentView('study');
-                    toast('Đã tải bộ thẻ: Chủ đề Lịch sử & Khảo cổ học', 'success');
-                  }}
-                >
+          {currentView === 'decks' ? (() => {
+            const totalDecksCount = 1 + savedDecks.length;
+            const totalWordsCount = 5 + savedDecks.reduce((sum, d) => sum + (d.cards?.length || 0), 0);
+            return (
+              /* ================= DECKS SELECTOR VIEW ================= */
+              <div className="flashcard-decks-selector animate-in" style={{ padding: '8px 4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
                   <div>
-                    <div className="flashcard-doc-icon-container">
-                      <HiFolder className="flashcard-doc-large-icon" />
-                      <span className="flashcard-doc-meta-badge flashcard-doc-meta-badge--default">
-                        Mặc định
+                    <h2 style={{ fontSize: '22px', fontWeight: '900', color: '#ffffff', margin: 0 }}>Chọn bộ từ để bắt đầu học</h2>
+                  </div>
+                  <span className="new-fc-total-badge">{totalDecksCount} bộ • {totalWordsCount} từ</span>
+                </div>
+
+                {/* Decks Grid */}
+                <div className="new-fc-decks-grid">
+                  
+                  {/* Default Deck (Green Theme) */}
+                  <div 
+                    className="new-fc-card new-fc-card--green animate-in"
+                    onClick={() => {
+                      setCards(DEFAULT_DECK);
+                      setDeckTitle('Chủ đề Lịch sử & Khảo cổ học');
+                      setActiveDeckId('default');
+                      setCurrentIdx(0);
+                      setIsFlipped(false);
+                      setIsFinished(false);
+                      setLearnedCards(new Set());
+                      setReviewCards(new Set());
+                      setCurrentView('study');
+                      toast('Đã tải bộ thẻ: Bộ từ của bản thân', 'success');
+                    }}
+                  >
+                    <div className="new-fc-card-pattern" />
+                    
+                    <div className="new-fc-card-header">
+                      <span className="new-fc-card-meta">Cá nhân • 5 từ</span>
+                      <span className="new-fc-card-icon-badge">
+                        <FaPencilAlt />
                       </span>
                     </div>
-                    <span className="flashcard-doc-card-count">5 thẻ học</span>
-                    <h4 className="flashcard-doc-title">
-                      Chủ đề Lịch sử & Khảo cổ học
-                    </h4>
-                    <div className="flashcard-doc-lines-preview">
-                      <div className="flashcard-doc-line" />
-                      <div className="flashcard-doc-line" />
-                      <div className="flashcard-doc-line" />
-                    </div>
-                  </div>
-                  
-                  <div className="flashcard-doc-actions">
-                    <button 
-                      className="flashcard-doc-btn-study"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setCards(DEFAULT_DECK);
-                        setDeckTitle('Chủ đề Lịch sử & Khảo cổ học');
-                        setActiveDeckId('default');
-                        setCurrentIdx(0);
-                        setIsFlipped(false);
-                        setIsFinished(false);
-                        setLearnedCards(new Set());
-                        setReviewCards(new Set());
-                        setCurrentView('study');
-                        toast('Đã tải bộ thẻ: Chủ đề Lịch sử & Khảo cổ học', 'success');
-                      }}
-                    >
-                      Học ngay
-                    </button>
-                  </div>
-                </div>
 
-                {/* Saved Decks */}
-                {savedDecks.map(deck => (
-                  <div 
-                    key={deck.id} 
-                    className="flashcard-document-deck-item animate-in"
-                    onClick={() => handleLoadDeck(deck)}
-                  >
-                    <div>
-                      <div className="flashcard-doc-icon-container">
-                        <HiFolder className="flashcard-doc-large-icon" style={{ color: 'var(--fc-gold)' }} />
-                        <span className="flashcard-doc-meta-badge flashcard-doc-meta-badge--saved">
-                          Đã lưu
-                        </span>
-                      </div>
-                      <span className="flashcard-doc-card-count">{deck.cards?.length || 0} thẻ học</span>
-                      <h4 className="flashcard-doc-title">
-                        {deck.title}
-                      </h4>
-                      <div className="flashcard-doc-lines-preview">
-                        <div className="flashcard-doc-line" />
-                        <div className="flashcard-doc-line" />
-                        <div className="flashcard-doc-line" />
-                      </div>
+                    <div className="new-fc-card-body">
+                      <h3 className="new-fc-card-title">Bộ từ của bản thân</h3>
+                      <p className="new-fc-card-description">
+                        Tự thêm và ôn tập từ vựng của riêng bạn.
+                      </p>
                     </div>
 
-                    <div className="flashcard-doc-actions">
+                    <div className="new-fc-card-footer">
                       <button 
-                        onClick={(e) => handleDeleteDeck(e, deck.id)}
-                        className="flashcard-doc-btn-delete"
-                        title="Xóa bộ thẻ này"
-                      >
-                        Xóa
-                      </button>
-                      
-                      <button 
-                        className="flashcard-doc-btn-study" 
+                        className="new-fc-card-btn-action"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleLoadDeck(deck);
+                          setCards(DEFAULT_DECK);
+                          setDeckTitle('Chủ đề Lịch sử & Khảo cổ học');
+                          setActiveDeckId('default');
+                          setCurrentIdx(0);
+                          setIsFlipped(false);
+                          setIsFinished(false);
+                          setLearnedCards(new Set());
+                          setReviewCards(new Set());
+                          setCurrentView('study');
+                          toast('Đã tải bộ thẻ: Bộ từ của bản thân', 'success');
                         }}
                       >
                         Học ngay
                       </button>
                     </div>
                   </div>
-                ))}
 
-              </div>
-              
-              {savedDecks.length === 0 && (
-                <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.01)', border: '1px dashed var(--fc-border-dark)', borderRadius: '20px', padding: '40px', marginTop: '24px' }}>
-                  <p style={{ color: 'var(--fc-text-secondary)', fontSize: '13px', margin: 0 }}>
-                    Bạn chưa tạo thêm bộ thẻ nào khác. Hãy dán tài liệu vào khung nhập bên trái hoặc sử dụng EduBot chat để tạo thẻ học tự động!
-                  </p>
+                  {/* Saved Decks */}
+                  {savedDecks.map((deck, idx) => {
+                    const themes = [
+                      { theme: 'orange', icon: 'leaf', defaultDesc: 'Biến đổi khí hậu, tài nguyên và phát triển bền vững.' },
+                      { theme: 'teal', icon: 'computer', defaultDesc: 'Thuật ngữ công nghệ, AI và chuyển đổi số.' },
+                      { theme: 'red', icon: 'group', defaultDesc: 'Cộng đồng, bản sắc và các vấn đề xã hội.' },
+                      { theme: 'gold', icon: 'urn', defaultDesc: 'Văn minh, di sản và khám phá khảo cổ học.' },
+                      { theme: 'pink', icon: 'chart', defaultDesc: 'Thị trường, thương mại và tài chính.' },
+                      { theme: 'blue', icon: 'stethoscope', defaultDesc: 'Y học, dịch tễ và lối sống lành mạnh.' },
+                      { theme: 'purple', icon: 'graduation', defaultDesc: 'Học tập, nhận thức và hành vi con người.' },
+                      { theme: 'seagreen', icon: 'bank', defaultDesc: 'Quy hoạch, xây dựng và không gian sống.' }
+                    ];
+                    const themeCfg = themes[idx % themes.length];
+                    
+                    return (
+                      <div 
+                        key={deck.id} 
+                        className={`new-fc-card new-fc-card--${themeCfg.theme} animate-in`}
+                        onClick={() => handleLoadDeck(deck)}
+                      >
+                        <div className="new-fc-card-pattern" />
+
+                        <div className="new-fc-card-header">
+                          <span className="new-fc-card-meta">
+                            Tự tạo • {deck.cards?.length || 0} từ
+                          </span>
+                          <span className="new-fc-card-icon-badge">
+                            {getSubjectIcon(themeCfg.icon)}
+                          </span>
+                        </div>
+
+                        <div className="new-fc-card-body">
+                          <h3 className="new-fc-card-title">{deck.title}</h3>
+                          <p className="new-fc-card-description">
+                            {themeCfg.defaultDesc}
+                          </p>
+                        </div>
+
+                        <div className="new-fc-card-footer">
+                          <span className="new-fc-card-progress">
+                            <HiBadgeCheck className="new-fc-card-progress-icon" /> 0% thuộc
+                          </span>
+                          <div className="new-fc-card-btns-row">
+                            <button 
+                              onClick={(e) => handleDeleteDeck(e, deck.id)}
+                              className="new-fc-card-btn-delete"
+                              title="Xóa bộ thẻ"
+                            >
+                              Xóa
+                            </button>
+                            <button 
+                              className="new-fc-card-btn-action"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleLoadDeck(deck);
+                              }}
+                            >
+                              Học ngay
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              )}
-            </div>
-          ) : (
+
+                {savedDecks.length === 0 && (
+                  <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.01)', border: '1px dashed var(--fc-border-dark)', borderRadius: '20px', padding: '40px', marginTop: '24px' }}>
+                    <p style={{ color: 'var(--fc-text-secondary)', fontSize: '13px', margin: 0 }}>
+                      Bạn chưa tạo thêm bộ thẻ nào khác. Hãy dán tài liệu vào khung nhập bên trái hoặc sử dụng EduBot chat để tạo thẻ học tự động!
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })() : (
             /* ================= REGULAR STUDY CANVAS ================= */
             <>
               <div className="flashcard-center-header">

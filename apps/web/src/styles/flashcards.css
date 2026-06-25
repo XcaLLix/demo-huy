@@ -1470,3 +1470,259 @@
   }
 }
 
+
+/* ==========================================================================
+   NEW PREMIUM FLASHCARD DECK CARDS (MATCHING USER REFERENCE IMAGE)
+   ========================================================================== */
+
+.new-fc-total-badge {
+  background: rgba(74, 222, 128, 0.08);
+  border: 1px solid rgba(74, 222, 128, 0.2);
+  color: #4ade80;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 6px 14px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.new-fc-total-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #4ade80;
+  display: inline-block;
+  box-shadow: 0 0 8px #4ade80;
+}
+
+.new-fc-decks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 20px;
+  margin-top: 16px;
+}
+
+.new-fc-card {
+  position: relative;
+  border-radius: 24px;
+  padding: 22px;
+  color: #ffffff;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 180px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  box-sizing: border-box;
+  text-align: left;
+  cursor: pointer;
+}
+
+.new-fc-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 25px rgba(var(--fc-accent-rgb), 0.25);
+}
+
+/* Card Theme classes matching target screenshot colors & patterns */
+
+.new-fc-card--green {
+  --fc-accent: #606f49;
+  --fc-accent-rgb: 96, 111, 73;
+  background: linear-gradient(135deg, #7c935f 0%, #515f3b 100%);
+  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='1.5' fill='rgba%28255,255,255,0.08%29'/%3E%3C/svg%3E");
+}
+
+.new-fc-card--orange {
+  --fc-accent: #d97706;
+  --fc-accent-rgb: 217, 119, 6;
+  background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);
+  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 30 30'%3E%3Cline x1='0' y1='30' x2='30' y2='0' stroke='rgba%28255,255,255,0.08%29' stroke-width='4'/%3E%3C/svg%3E");
+}
+
+.new-fc-card--teal {
+  --fc-accent: #0d9488;
+  --fc-accent-rgb: 13, 148, 136;
+  background: linear-gradient(135deg, #14b8a6 0%, #0f766e 100%);
+  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Crect width='10' height='10' fill='rgba%28255,255,255,0.05%29'/%3E%3C/svg%3E");
+}
+
+.new-fc-card--red {
+  --fc-accent: #dc2626;
+  --fc-accent-rgb: 220, 38, 38;
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Ccircle cx='10' cy='10' r='1.5' fill='rgba%28255,255,255,0.08%29'/%3E%3C/svg%3E");
+}
+
+.new-fc-card--gold {
+  --fc-accent: #ca8a04;
+  --fc-accent-rgb: 202, 138, 4;
+  background: linear-gradient(135deg, #eab308 0%, #a16207 100%);
+  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='40' viewBox='0 0 10 40'%3E%3Cline x1='5' y1='0' x2='5' y2='40' stroke='rgba%28255,255,255,0.06%29' stroke-width='2'/%3E%3C/svg%3E");
+}
+
+.new-fc-card--pink {
+  --fc-accent: #db2777;
+  --fc-accent-rgb: 219, 39, 119;
+  background: linear-gradient(135deg, #ec4899 0%, #be185d 100%);
+  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Crect x='0' y='0' width='8' height='8' fill='rgba%28255,255,255,0.04%29'/%3E%3Crect x='8' y='8' width='8' height='8' fill='rgba%28255,255,255,0.04%29'/%3E%3C/svg%3E");
+}
+
+.new-fc-card--blue {
+  --fc-accent: #2563eb;
+  --fc-accent-rgb: 37, 99, 235;
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='30' viewBox='0 0 10 30'%3E%3Cline x1='0' y1='15' x2='10' y2='15' stroke='rgba%28255,255,255,0.06%29' stroke-width='2'/%3E%3C/svg%3E");
+}
+
+.new-fc-card--purple {
+  --fc-accent: #7c3aed;
+  --fc-accent-rgb: 124, 58, 237;
+  background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Ccircle cx='5' cy='5' r='1.5' fill='rgba%28255,255,255,0.08%29'/%3E%3Ccircle cx='15' cy='15' r='1.5' fill='rgba%28255,255,255,0.08%29'/%3E%3C/svg%3E");
+}
+
+.new-fc-card--seagreen {
+  --fc-accent: #0891b2;
+  --fc-accent-rgb: 8, 145, 178;
+  background: linear-gradient(135deg, #06b6d4 0%, #0e7490 100%);
+  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cline x1='0' y1='40' x2='40' y2='0' stroke='rgba%28255,255,255,0.08%29' stroke-width='4'/%3E%3C/svg%3E");
+}
+
+.new-fc-card-pattern {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-image: var(--fc-pattern);
+  opacity: 0.95;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.new-fc-card > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* Header inside card */
+.new-fc-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.new-fc-card-meta {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  letter-spacing: 0.5px;
+}
+
+.new-fc-card-icon-badge {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: var(--fc-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11.5px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* Body inside card */
+.new-fc-card-body {
+  margin-bottom: 16px;
+}
+
+.new-fc-card-title {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.3;
+  color: #ffffff;
+  margin: 0 0 4px 0;
+}
+
+.new-fc-card-description {
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.85);
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 35px;
+}
+
+/* Footer inside card */
+.new-fc-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+}
+
+.new-fc-card-progress {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.95);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.new-fc-card-progress-icon {
+  font-size: 15px;
+}
+
+.new-fc-card-btns-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.new-fc-card-btn-action {
+  background: #ffffff !important;
+  color: var(--fc-accent) !important;
+  border: none !important;
+  padding: 6px 12px !important;
+  border-radius: 14px;
+  font-size: 12px !important;
+  font-weight: 850 !important;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.new-fc-card-btn-action:hover {
+  transform: scale(1.03);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+}
+
+.new-fc-card-btn-delete {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  padding: 5px 10px !important;
+  border-radius: 14px;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.new-fc-card-btn-delete:hover {
+  background: #ef4444 !important;
+  border-color: #ef4444 !important;
+  color: #ffffff !important;
+}
+
+
