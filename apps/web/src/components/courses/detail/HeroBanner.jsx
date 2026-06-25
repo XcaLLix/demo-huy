@@ -32,8 +32,9 @@ export default function HeroBanner({ course, reviewsCount = 0 }) {
       borderRadius: '24px',
       border: '3px solid #000000',
       boxShadow: '8px 8px 0px #000000',
-      padding: '44px 44px 48px 44px',
-      color: '#fff'
+      padding: '24px 36px 28px 36px',
+      color: '#fff',
+      minHeight: 'auto'
     }}>
       {/* Background abstract blurs for depth */}
       <div style={{
@@ -64,7 +65,7 @@ export default function HeroBanner({ course, reviewsCount = 0 }) {
         <div className="fts-hero-left" style={{ textAlign: 'left' }}>
           
           {/* Badge & Subject Row */}
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
             {subject && (
               <span style={{
                 background: 'rgba(255, 255, 255, 0.2)',
@@ -116,11 +117,11 @@ export default function HeroBanner({ course, reviewsCount = 0 }) {
 
           {/* Title */}
           <h1 className="fts-hero-title" style={{
-            fontSize: '34px',
+            fontSize: '30px',
             fontWeight: '950',
             color: '#FFFFFF',
             lineHeight: '1.25',
-            marginBottom: '16px',
+            marginBottom: '12px',
             textShadow: '2px 2px 0px rgba(0, 0, 0, 0.2)',
             letterSpacing: '-0.02em',
             maxWidth: '100%'
@@ -130,10 +131,10 @@ export default function HeroBanner({ course, reviewsCount = 0 }) {
 
           {/* Description */}
           <p className="fts-hero-desc" style={{
-            fontSize: '14.5px',
-            lineHeight: '1.65',
+            fontSize: '14px',
+            lineHeight: '1.6',
             color: 'rgba(255, 255, 255, 0.85)',
-            marginBottom: '24px',
+            marginBottom: '16px',
             fontWeight: '500',
             maxWidth: '640px'
           }}>
@@ -168,7 +169,7 @@ export default function HeroBanner({ course, reviewsCount = 0 }) {
             alignItems: 'center',
             gap: '20px',
             flexWrap: 'wrap',
-            marginBottom: '28px'
+            marginBottom: '20px'
           }}>
             {/* Instructor badge */}
             <div style={{
@@ -233,7 +234,7 @@ export default function HeroBanner({ course, reviewsCount = 0 }) {
             display: 'flex',
             alignItems: 'center',
             gap: '32px',
-            paddingTop: '20px',
+            paddingTop: '16px',
             borderTop: '1.5px dashed rgba(255, 255, 255, 0.2)',
             flexWrap: 'wrap'
           }}>
