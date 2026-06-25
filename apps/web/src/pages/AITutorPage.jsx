@@ -72,6 +72,13 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
   const [activeTab, setActiveTab] = useState('create'); // 'create' | 'history'
   const [mindmapData, setMindmapData] = useState(null);
   
+  // Interactive Mindmap View Mode & Search States
+  const [viewMode, setViewMode] = useState('canvas'); // 'canvas' | 'outline'
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchIndex, setSearchIndex] = useState(-1);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  
   // Input states
   const [inputText, setInputText] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
@@ -518,6 +525,201 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
     setSelectedNode(node);
   };
 
+  // Search Logic for Mindmap nodes
+  const findMatchingNodes = (node, query, results = []) => {
+    if (!node || !query) return results;
+    if (node.name.toLowerCase().includes(query.toLowerCase())) {
+      results.push(node.id);
+    }
+    if (node.children) {
+      node.children.forEach(child => findMatchingNodes(child, query, results));
+    }
+    return results;
+  };
+
+  const handleSearchChange = (val) => {
+    setSearchQuery(val);
+    if (!val.trim()) {
+      setSearchResults([]);
+      setSearchIndex(-1);
+      return;
+    }
+    const results = findMatchingNodes(mindmapData, val.trim());
+    setSearchResults(results);
+    if (results.length > 0) {
+      setSearchIndex(0);
+      focusOnNode(results[0]);
+    } else {
+      setSearchIndex(-1);
+    }
+  };
+
+  const handleSearchNext = () => {
+    if (searchResults.length === 0) return;
+    const nextIndex = (searchIndex + 1) % searchResults.length;
+    setSearchIndex(nextIndex);
+    focusOnNode(searchResults[nextIndex]);
+  };
+
+  const handleSearchPrev = () => {
+    if (searchResults.length === 0) return;
+    const prevIndex = (searchIndex - 1 + searchResults.length) % searchResults.length;
+    setSearchIndex(prevIndex);
+    focusOnNode(searchResults[prevIndex]);
+  };
+
+  const focusOnNode = (nodeId) => {
+    const nodeInTree = findNodeById(mindmapData, nodeId);
+    if (nodeInTree) {
+      setSelectedNode(nodeInTree);
+      // Auto-expand all parent branches leading to this node
+      const parts = nodeId.split('-');
+      const newExpanded = new Set(expandedNodes);
+      let currentPath = '';
+      parts.forEach((part, idx) => {
+        currentPath = idx === 0 ? part : `${currentPath}-${part}`;
+        newExpanded.add(currentPath);
+      });
+      setExpandedNodes(newExpanded);
+
+      // Scroll canvas to focus on target node coordinates
+      const { nodes: layoutNodes } = computeTreeLayout();
+      const targetLayout = layoutNodes.find(n => n.id === nodeId);
+      if (targetLayout) {
+        const containerWidth = svgRef.current ? svgRef.current.clientWidth : 800;
+        const containerHeight = svgRef.current ? svgRef.current.clientHeight : 500;
+        const newZoom = 1.0;
+        setZoom(newZoom);
+        setPan({
+          x: (containerWidth / 2) - targetLayout.x * newZoom,
+          y: (containerHeight / 2) - targetLayout.y * newZoom
+        });
+      }
+    }
+  };
+
+  // Client-side HTML5 Canvas PNG Exporter
+  const handleExportPng = () => {
+    if (!svgRef.current) return;
+    try {
+      const svgElement = svgRef.current;
+      const serializer = new XMLSerializer();
+      let svgString = serializer.serializeToString(svgElement);
+
+      const styles = `
+        svg { background-color: #141410; font-family: 'Outfit', 'Inter', sans-serif; }
+        .canvas-node-card { border-radius: 14px; text-align: center; display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
+        .canvas-node-card-root { background: linear-gradient(135deg, #3B82F6, #1D4ED8) !important; color: #FFFFFF !important; }
+        .canvas-node-card-level1 { background: linear-gradient(135deg, #8B5CF6, #6D28D9) !important; color: #FFFFFF !important; }
+        .canvas-node-card-level2 { background: linear-gradient(135deg, #10B981, #047857) !important; color: #FFFFFF !important; }
+        .node-status--learning { border-left: 6px solid #F59E0B !important; background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(245, 158, 11, 0.04)) !important; border: 1.5px solid #F59E0B !important; color: #F59E0B !important; }
+        .node-status--learned { border-left: 6px solid #10B981 !important; background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.04)) !important; border: 1.5px solid #10B981 !important; color: #10B981 !important; }
+        .node-status--review { border-left: 6px solid #EF4444 !important; background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(239, 68, 68, 0.04)) !important; border: 1.5px solid #EF4444 !important; color: #EF4444 !important; }
+        .node-status--important { border-left: 6px solid #D946EF !important; background: linear-gradient(135deg, rgba(217, 70, 239, 0.15), rgba(217, 70, 239, 0.04)) !important; border: 1.5px solid #D946EF !important; color: #E879F9 !important; }
+        .node-status-badge { position: absolute; top: 4px; right: 6px; font-size: 9px; font-weight: 800; }
+        text { fill: #F3F4F6; }
+      `;
+      svgString = svgString.replace('</svg>', `<style>${styles}</style></svg>`);
+
+      const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+      const URL = window.URL || window.webkitURL || window;
+      const blobURL = URL.createObjectURL(svgBlob);
+      
+      const image = new Image();
+      image.onload = () => {
+        const canvas = document.createElement("canvas");
+        const bbox = svgElement.getBBox ? svgElement.getBBox() : { x: 0, y: 0, width: 1200, height: 800 };
+        
+        const padding = 120;
+        canvas.width = Math.max(bbox.width + padding * 2, 1200);
+        canvas.height = Math.max(bbox.height + padding * 2, 800);
+        
+        const context = canvas.getContext("2d");
+        if (context) {
+          context.fillStyle = "#141410";
+          context.fillRect(0, 0, canvas.width, canvas.height);
+          
+          const dx = padding - bbox.x;
+          const dy = padding - bbox.y;
+          context.drawImage(image, dx, dy);
+          
+          const pngUrl = canvas.toDataURL("image/png");
+          const downloadLink = document.createElement("a");
+          downloadLink.href = pngUrl;
+          downloadLink.download = `${mindmapData?.name || 'mindmap'}.png`;
+          document.body.appendChild(downloadLink);
+          downloadLink.click();
+          document.body.removeChild(downloadLink);
+          toast('Đã xuất file PNG thành công!', 'success');
+        }
+      };
+      image.onerror = (e) => {
+        console.error("PNG export image load error", e);
+        toast('Lỗi khi vẽ file PNG. Một số thành phần SVG có thể không được hỗ trợ.', 'error');
+      };
+      image.src = blobURL;
+    } catch (err) {
+      console.error(err);
+      toast('Lỗi khi xuất PNG!', 'error');
+    }
+  };
+
+  // Interactive recursive Outline view node builder
+  const renderOutlineNode = (node, depth = 0) => {
+    if (!node) return null;
+    const isExpanded = expandedNodes.has(node.id);
+    const isSelected = selectedNode?.id === node.id;
+    const hasChildren = node.children && node.children.length > 0;
+    
+    const nodeStatus = node.status || 'none';
+    let statusBadge = null;
+    if (nodeStatus === 'learned') statusBadge = <span className="outline-status-badge outline-status-badge--learned">Đã hiểu</span>;
+    else if (nodeStatus === 'learning') statusBadge = <span className="outline-status-badge outline-status-badge--learning">Đang học</span>;
+    else if (nodeStatus === 'review') statusBadge = <span className="outline-status-badge outline-status-badge--review">Cần ôn lại</span>;
+    else if (nodeStatus === 'important') statusBadge = <span className="outline-status-badge outline-status-badge--important">★ Quan trọng</span>;
+
+    return (
+      <div key={node.id} className={`outline-node-wrapper ${depth === 0 ? 'outline-node-wrapper--root' : ''}`}>
+        <div 
+          className={`outline-node-header ${isSelected ? 'outline-node-header--selected' : ''}`}
+          onClick={() => handleNodeSelect(node)}
+        >
+          <div className="outline-node-title-area">
+            {hasChildren && (
+              <button 
+                className="outline-node-expand-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleExpand(node.id);
+                }}
+              >
+                {isExpanded ? '▼' : '▶'}
+              </button>
+            )}
+            <span className="outline-node-name" style={{ fontWeight: depth === 0 ? '800' : (depth === 1 ? '700' : '500') }}>
+              {node.name}
+            </span>
+            <span className="outline-node-desc">{node.description}</span>
+          </div>
+          <div className="outline-node-actions">
+            {statusBadge}
+            {nodeProgressMap[node.id]?.mastery !== undefined && (
+              <span style={{ fontSize: '10.5px', color: 'var(--mm-gold)', fontWeight: 'bold' }}>
+                {Math.round(nodeProgressMap[node.id].mastery * 100)}% Thành thạo
+              </span>
+            )}
+          </div>
+        </div>
+        
+        {hasChildren && isExpanded && (
+          <div className="outline-node-children">
+            {node.children.map(child => renderOutlineNode(child, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // SVB Tree coordinate layout algorithm (Horizontal Tree left-to-right)
   const computeTreeLayout = () => {
     if (!mindmapData) return { nodes: [], links: [] };
@@ -570,7 +772,8 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
         x: layoutNode.x,
         y: layoutNode.y,
         hasChildren,
-        shape: rawNode?.shape || 'oval'
+        shape: rawNode?.shape || 'oval',
+        status: rawNode?.status || 'none'
       });
 
       layoutNode.children.forEach(child => {
@@ -1079,6 +1282,29 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
     toast('Đã cập nhật thông tin nút sơ đồ!', 'success');
   };
 
+  const handleUpdateNodeStatus = (status) => {
+    if (!selectedNode) return;
+    const nodeId = selectedNode.id;
+
+    const updateNodeStatusInTree = (node) => {
+      if (node.id === nodeId) {
+        return { ...node, status };
+      }
+      if (node.children) {
+        return {
+          ...node,
+          children: node.children.map(updateNodeStatusInTree)
+        };
+      }
+      return node;
+    };
+
+    const updatedData = updateNodeStatusInTree(mindmapData);
+    setMindmapData(updatedData);
+    setSelectedNode(findNodeById(updatedData, nodeId));
+    toast('Đã cập nhật trạng thái học tập của nút!', 'success');
+  };
+
   const handleAddChildNode = () => {
     if (!newChildName.trim()) {
       toast('Tên nút con không được để trống!', 'warning');
@@ -1390,7 +1616,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
 
       {/* Main Workspace grid */}
       <div 
-        className="aitutor-workspace"
+        className={`aitutor-workspace ${isFullscreen ? 'aitutor-workspace--fullscreen' : ''}`}
         style={{
           gridTemplateColumns: `${sidebarWidth}px 6px 1fr`,
           gap: '0px'
@@ -1640,6 +1866,50 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
                       <option value="rhombus">Hình Thoi (Rhombus)</option>
                     </select>
 
+                    <label className="flashcard-modal-label" style={{ marginBottom: '4px', display: 'block', fontSize: '10px', color: 'var(--text-secondary)' }}>Trạng thái học tập</label>
+                    <div className="status-tagger-group" style={{ marginBottom: '12px' }}>
+                      <button 
+                        type="button"
+                        className={`status-tag-pill ${selectedNode.status === 'none' || !selectedNode.status ? 'status-tag-pill--active' : ''}`}
+                        data-type="none"
+                        onClick={() => handleUpdateNodeStatus('none')}
+                      >
+                        Chưa học
+                      </button>
+                      <button 
+                        type="button"
+                        className={`status-tag-pill ${selectedNode.status === 'learning' ? 'status-tag-pill--active' : ''}`}
+                        data-type="learning"
+                        onClick={() => handleUpdateNodeStatus('learning')}
+                      >
+                        🟡 Đang học
+                      </button>
+                      <button 
+                        type="button"
+                        className={`status-tag-pill ${selectedNode.status === 'learned' ? 'status-tag-pill--active' : ''}`}
+                        data-type="learned"
+                        onClick={() => handleUpdateNodeStatus('learned')}
+                      >
+                        🟢 Đã hiểu
+                      </button>
+                      <button 
+                        type="button"
+                        className={`status-tag-pill ${selectedNode.status === 'review' ? 'status-tag-pill--active' : ''}`}
+                        data-type="review"
+                        onClick={() => handleUpdateNodeStatus('review')}
+                      >
+                        🔴 Cần ôn lại
+                      </button>
+                      <button 
+                        type="button"
+                        className={`status-tag-pill ${selectedNode.status === 'important' ? 'status-tag-pill--active' : ''}`}
+                        data-type="important"
+                        onClick={() => handleUpdateNodeStatus('important')}
+                      >
+                        ⭐ Quan trọng
+                      </button>
+                    </div>
+
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button 
                         className="flashcard-header-btn" 
@@ -1796,6 +2066,57 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               {mindmapData && (
                 <>
+                  {/* Search Bar */}
+                  <div className="aitutor-search-wrapper">
+                    <input 
+                      type="text" 
+                      className="aitutor-search-input" 
+                      placeholder="Tìm nút..." 
+                      value={searchQuery}
+                      onChange={(e) => handleSearchChange(e.target.value)}
+                    />
+                    {searchResults.length > 0 && (
+                      <span className="aitutor-search-count">
+                        {searchIndex + 1}/{searchResults.length}
+                      </span>
+                    )}
+                    <button 
+                      className="aitutor-search-btn" 
+                      onClick={handleSearchPrev}
+                      disabled={searchResults.length === 0}
+                      title="Nút trước"
+                    >
+                      ◀
+                    </button>
+                    <button 
+                      className="aitutor-search-btn" 
+                      onClick={handleSearchNext}
+                      disabled={searchResults.length === 0}
+                      title="Nút tiếp"
+                    >
+                      ▶
+                    </button>
+                  </div>
+
+                  {/* View Mode Toggle */}
+                  <button 
+                    className="canvas-action-pill" 
+                    onClick={() => setViewMode(viewMode === 'canvas' ? 'outline' : 'canvas')}
+                    title="Chuyển đổi giao diện Sơ đồ / Dàn ý"
+                    style={{ background: 'rgba(255, 226, 89, 0.1)', color: 'var(--fc-gold)', border: '1px solid rgba(255, 226, 89, 0.2)' }}
+                  >
+                    {viewMode === 'canvas' ? '📋 Dàn ý' : '🧠 Sơ đồ'}
+                  </button>
+
+                  {/* Fullscreen Toggle */}
+                  <button 
+                    className="canvas-action-pill" 
+                    onClick={() => setIsFullscreen(!isFullscreen)}
+                    title={isFullscreen ? "Hiện Sidebar" : "Chế độ tập trung (Ẩn Sidebar)"}
+                  >
+                    {isFullscreen ? '🔍 Hiện Sidebar' : '🧘 Tập trung'}
+                  </button>
+
                   <button 
                     className="canvas-action-pill"
                     onClick={handleGenerateWeaknessMindmap}
@@ -1856,6 +2177,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
                     </button>
                     <div className="canvas-export-menu">
                       <button onClick={handleExportSvg}>Xuất file SVG ảnh</button>
+                      <button onClick={handleExportPng}>Xuất file PNG ảnh</button>
                       <button onClick={handleExportJson}>Xuất file JSON</button>
                     </div>
                   </div>
@@ -1867,211 +2189,247 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
             </div>
           </div>
 
-          {/* Interactive SVG Canvas */}
-          <div 
-            className="aitutor-canvas-container"
-            onMouseDown={handleCanvasMouseDown}
-            onMouseMove={handleCanvasMouseMove}
-            onMouseUp={handleCanvasMouseUp}
-            onMouseLeave={handleCanvasMouseUp}
-            style={{ cursor: isDraggingCanvas ? 'grabbing' : 'grab' }}
-          >
-            {mindmapData ? (
-              <svg 
-                ref={svgRef}
-                className="aitutor-svg"
-                width="100%"
-                height="100%"
-              >
-                {/* Background grid representation */}
-                <defs>
-                  <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
-                    <path d="M 30 0 L 0 0 0 30" fill="none" stroke="var(--border)" strokeWidth="0.5" opacity="0.6" />
-                  </pattern>
-                </defs>
-                <rect width="100%" height="100%" fill="url(#grid)" data-canvas-bg="true" />
+          {/* Interactive SVG Canvas or Outline view */}
+          {viewMode === 'outline' ? (
+            <div className="aitutor-outline-view animate-in">
+              <div className="outline-card">
+                <h3 style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: '16px', color: 'var(--mm-gold)', borderBottom: '1px solid var(--mm-border-dark)', paddingBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  📋 DÀN Ý KIẾN THỨC HỆ THỐNG HÓA
+                </h3>
+                {mindmapData ? renderOutlineNode(mindmapData) : (
+                  <div style={{ textAlign: 'center', color: 'var(--mm-text-secondary)', fontSize: '13px', padding: '20px' }}>
+                    Nhập tài liệu ở cột trái để bắt đầu lập sơ đồ
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div 
+              className="aitutor-canvas-container"
+              onMouseDown={handleCanvasMouseDown}
+              onMouseMove={handleCanvasMouseMove}
+              onMouseUp={handleCanvasMouseUp}
+              onMouseLeave={handleCanvasMouseUp}
+              style={{ cursor: isDraggingCanvas ? 'grabbing' : 'grab' }}
+            >
+              {mindmapData ? (
+                <svg 
+                  ref={svgRef}
+                  className="aitutor-svg"
+                  width="100%"
+                  height="100%"
+                >
+                  {/* Background grid representation */}
+                  <defs>
+                    <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
+                      <path d="M 30 0 L 0 0 0 30" fill="none" stroke="var(--border)" strokeWidth="0.5" opacity="0.6" />
+                    </pattern>
+                  </defs>
+                  <rect width="100%" height="100%" fill="url(#grid)" data-canvas-bg="true" />
 
-                {/* Transform group with zoom/pan vector */}
-                <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
-                  
-                  {/* Connection lines (bezier links) */}
-                  {links.map((link) => {
-                    const x1 = link.source.x + 110;
-                    const y1 = link.source.y;
-                    const x2 = link.target.x - 110;
-                    const y2 = link.target.y;
-                    const cx1 = x1 + 55;
-                    const cy1 = y1;
-                    const cx2 = x2 - 55;
-                    const cy2 = y2;
-                    const pathData = `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`;
+                  {/* Transform group with zoom/pan vector */}
+                  <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
                     
-                    // Style links based on hierarchy depth
-                    let strokeColor = 'var(--border)';
-                    if (link.depth === 0) strokeColor = '#818CF8'; // Indigo for Root -> Level 1
-                    else if (link.depth === 1) strokeColor = '#C084FC'; // Purple for Level 1 -> Level 2
+                    {/* Connection lines (bezier links) */}
+                    {links.map((link) => {
+                      const x1 = link.source.x + 110;
+                      const y1 = link.source.y;
+                      const x2 = link.target.x - 110;
+                      const y2 = link.target.y;
+                      const cx1 = x1 + 55;
+                      const cy1 = y1;
+                      const cx2 = x2 - 55;
+                      const cy2 = y2;
+                      const pathData = `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`;
+                      
+                      // Style links based on hierarchy depth
+                      let strokeColor = 'var(--border)';
+                      if (link.depth === 0) strokeColor = '#818CF8'; // Indigo for Root -> Level 1
+                      else if (link.depth === 1) strokeColor = '#C084FC'; // Purple for Level 1 -> Level 2
 
-                    return (
-                      <path
-                        key={link.id}
-                        d={pathData}
-                        fill="none"
-                        stroke={strokeColor}
-                        strokeWidth="2.5"
-                        strokeDasharray={selectedNode?.id === link.target.id ? "4 2" : "none"}
-                        style={{ transition: 'stroke 0.2s, stroke-width 0.2s' }}
-                      />
-                    );
-                  })}
+                      return (
+                        <path
+                          key={link.id}
+                          d={pathData}
+                          fill="none"
+                          stroke={strokeColor}
+                          strokeWidth="2.5"
+                          strokeDasharray={selectedNode?.id === link.target.id ? "4 2" : "none"}
+                          style={{ transition: 'stroke 0.2s, stroke-width 0.2s' }}
+                        />
+                      );
+                    })}
 
-                  {/* Nodes list mapping */}
-                  {nodes.map((node) => {
-                    const isSelected = selectedNode?.id === node.id;
-                    const isRoot = node.depth === 0;
-                    const isLevel1 = node.depth === 1;
-                    const isExpanded = expandedNodes.has(node.id);
+                    {/* Nodes list mapping */}
+                    {nodes.map((node) => {
+                      const isSelected = selectedNode?.id === node.id;
+                      const isRoot = node.depth === 0;
+                      const isLevel1 = node.depth === 1;
+                      const isExpanded = expandedNodes.has(node.id);
 
-                    // Progress-based Styling
-                    const progressStyle = getNodeProgressStyle(node, isRoot, isLevel1);
+                      // Progress-based Styling
+                      const progressStyle = getNodeProgressStyle(node, isRoot, isLevel1);
 
-                    // Custom Shapes Styling
-                    let borderRadius = '14px';
-                    let borderLeft = progressStyle.borderLeft;
-                    let border = progressStyle.border;
-                    let clipPath = 'none';
-                    let width = '100%';
-                    let height = '100%';
-                    let margin = '0';
-                    let padding = '8px 12px';
+                      // Custom Shapes Styling
+                      let borderRadius = '14px';
+                      let borderLeft = progressStyle.borderLeft;
+                      let border = progressStyle.border;
+                      let clipPath = 'none';
+                      let width = '100%';
+                      let height = '100%';
+                      let margin = '0';
+                      let padding = '8px 12px';
 
-                    if (node.shape === 'rectangle') {
-                      borderRadius = '4px';
-                    } else if (node.shape === 'oval') {
-                      borderRadius = '100px';
-                    } else if (node.shape === 'circle') {
-                      borderRadius = '50%';
-                      width = '80px';
-                      height = '80px';
-                      margin = '0 auto';
-                      borderLeft = 'none';
-                      border = progressStyle.border;
-                      padding = '6px';
-                    } else if (node.shape === 'rhombus') {
-                      clipPath = 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)';
-                      borderRadius = '0px';
-                      borderLeft = 'none';
-                      border = progressStyle.border;
-                      padding = '12px 28px';
-                    }
+                      if (node.shape === 'rectangle') {
+                        borderRadius = '4px';
+                      } else if (node.shape === 'oval') {
+                        borderRadius = '100px';
+                      } else if (node.shape === 'circle') {
+                        borderRadius = '50%';
+                        width = '80px';
+                        height = '80px';
+                        margin = '0 auto';
+                        borderLeft = 'none';
+                        border = progressStyle.border;
+                        padding = '6px';
+                      } else if (node.shape === 'rhombus') {
+                        clipPath = 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)';
+                        borderRadius = '0px';
+                        borderLeft = 'none';
+                        border = progressStyle.border;
+                        padding = '12px 28px';
+                      }
 
-                    return (
-                      <g key={node.id} transform={`translate(${node.x}, ${node.y})`}>
-                        {/* Interactive HTML inside SVG foreignObject */}
-                        <foreignObject x="-110" y="-40" width="220" height="80">
-                          <div 
-                            xmlns="http://www.w3.org/1999/xhtml"
-                            onClick={() => handleNodeSelect(node)}
-                            title={getNodeTooltip(node)}
-                            style={{
-                              width: width,
-                              height: height,
-                              margin: margin,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              textAlign: 'center',
-                              padding: padding,
-                              boxSizing: 'border-box',
-                              background: progressStyle.background,
-                              color: progressStyle.color,
-                              border: border,
-                              borderLeft: borderLeft,
-                              borderRadius: borderRadius,
-                              clipPath: clipPath,
-                              boxShadow: isSelected 
-                                ? '0 0 0 3px #FFA751, 0 8px 16px rgba(0,0,0,0.12)' 
-                                : '0 3px 8px rgba(0,0,0,0.06)',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                              overflow: 'hidden',
-                              userSelect: 'none'
-                            }}
-                            className={`canvas-node-card ${isSelected ? 'canvas-node-card--selected' : ''}`}
-                          >
-                            <span 
-                              style={{ 
-                                fontSize: '11px', 
-                                fontWeight: 'bold', 
-                                lineHeight: '1.3',
-                                overflow: 'hidden', 
-                                textOverflow: 'ellipsis', 
-                                display: '-webkit-box', 
-                                WebkitLineClamp: 3, 
-                                WebkitBoxOrient: 'vertical' 
+                      const nodeStatus = node.status || 'none';
+                      let statusBadgeText = '';
+                      if (nodeStatus === 'learned') statusBadgeText = '🟢';
+                      else if (nodeStatus === 'learning') statusBadgeText = '🟡';
+                      else if (nodeStatus === 'review') statusBadgeText = '🔴';
+                      else if (nodeStatus === 'important') statusBadgeText = '⭐';
+
+                      let depthClass = '';
+                      if (isRoot) depthClass = 'canvas-node-card-root';
+                      else if (isLevel1) depthClass = 'canvas-node-card-level1';
+                      else if (node.depth === 2) depthClass = 'canvas-node-card-level2';
+
+                      let statusClass = '';
+                      if (nodeStatus !== 'none') statusClass = `node-status--${nodeStatus}`;
+
+                      return (
+                        <g key={node.id} transform={`translate(${node.x}, ${node.y})`}>
+                          {/* Interactive HTML inside SVG foreignObject */}
+                          <foreignObject x="-110" y="-40" width="220" height="80">
+                            <div 
+                              xmlns="http://www.w3.org/1999/xhtml"
+                              onClick={() => handleNodeSelect(node)}
+                              title={getNodeTooltip(node)}
+                              style={{
+                                width: width,
+                                height: height,
+                                margin: margin,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                textAlign: 'center',
+                                padding: padding,
+                                boxSizing: 'border-box',
+                                background: progressStyle.background,
+                                color: progressStyle.color,
+                                border: border,
+                                borderLeft: borderLeft,
+                                borderRadius: borderRadius,
+                                clipPath: clipPath,
+                                boxShadow: isSelected 
+                                  ? '0 0 0 3px #FFA751, 0 8px 16px rgba(0,0,0,0.12)' 
+                                  : '0 3px 8px rgba(0,0,0,0.06)',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                overflow: 'hidden',
+                                userSelect: 'none',
+                                position: 'relative'
                               }}
-                              title={node.name}
+                              className={`canvas-node-card ${isSelected ? 'canvas-node-card--selected' : ''} ${depthClass} ${statusClass}`}
                             >
-                              {node.name}
-                            </span>
-                          </div>
-                        </foreignObject>
+                              {statusBadgeText && (
+                                <span className="node-status-badge" style={{ pointerEvents: 'none' }}>
+                                  {statusBadgeText}
+                                </span>
+                              )}
+                              <span 
+                                style={{ 
+                                  fontSize: '11px', 
+                                  fontWeight: 'bold', 
+                                  lineHeight: '1.3',
+                                  overflow: 'hidden', 
+                                  textOverflow: 'ellipsis', 
+                                  display: '-webkit-box', 
+                                  WebkitLineClamp: 3, 
+                                  WebkitBoxOrient: 'vertical' 
+                                }}
+                                title={node.name}
+                              >
+                                {node.name}
+                              </span>
+                            </div>
+                          </foreignObject>
 
-                        {/* Node Collapse/Expand Toggle Controller */}
-                        {node.hasChildren && (
-                          <g 
-                            transform="translate(110, 0)"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleExpand(node.id);
-                            }}
-                            style={{ cursor: 'pointer' }}
-                          >
-                            <circle 
-                              r="10" 
-                              fill="var(--bg-card)" 
-                              stroke={isRoot ? '#4F46E5' : '#8B5CF6'}
-                              strokeWidth="2"
-                              style={{ transition: 'all 0.2s' }}
-                            />
-                            <text
-                              textAnchor="middle"
-                              dominantBaseline="central"
-                              fontSize="13"
-                              fontWeight="900"
-                              fill="var(--text-primary)"
-                              y="0.5"
-                              style={{ userSelect: 'none' }}
+                          {/* Node Collapse/Expand Toggle Controller */}
+                          {node.hasChildren && (
+                            <g 
+                              transform="translate(110, 0)"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleExpand(node.id);
+                              }}
+                              style={{ cursor: 'pointer' }}
                             >
-                              {isExpanded ? '-' : '+'}
-                            </text>
-                          </g>
-                        )}
-                      </g>
-                    );
-                  })}
-                </g>
-              </svg>
-            ) : (
-              <div className="aitutor-canvas-empty">
-                <p>Nhập tài liệu ở cột trái để bắt đầu lập sơ đồ tư duy</p>
-              </div>
-            )}
+                              <circle 
+                                r="10" 
+                                fill="var(--bg-card)" 
+                                stroke={isRoot ? '#4F46E5' : '#8B5CF6'}
+                                strokeWidth="2"
+                                style={{ transition: 'all 0.2s' }}
+                              />
+                              <text
+                                textAnchor="middle"
+                                dominantBaseline="central"
+                                fontSize="13"
+                                fontWeight="900"
+                                fill="var(--text-primary)"
+                                y="0.5"
+                                style={{ userSelect: 'none' }}
+                              >
+                                {isExpanded ? '-' : '+'}
+                              </text>
+                            </g>
+                          )}
+                        </g>
+                      );
+                    })}
+                  </g>
+                </svg>
+              ) : (
+                <div className="aitutor-canvas-empty">
+                  <p>Nhập tài liệu ở cột trái để bắt đầu lập sơ đồ tư duy</p>
+                </div>
+              )}
 
-            {/* Floating Zoom & Tool Controls bar */}
-            {mindmapData && (
-              <div className="aitutor-canvas-controls">
-                <button className="control-btn" onClick={zoomIn} title="Phóng to (Scroll Up)">
-                  <HiPlus />
-                </button>
-                <button className="control-btn" onClick={zoomOut} title="Thu nhỏ (Scroll Down)">
-                  <HiMinus />
-                </button>
-                <button className="control-btn" onClick={resetZoom} title="Mặc định / Căn giữa">
-                  <HiRefresh /> Căn giữa
-                </button>
-              </div>
-            )}
-          </div>
+              {/* Floating Zoom & Tool Controls bar */}
+              {mindmapData && (
+                <div className="aitutor-canvas-controls">
+                  <button className="control-btn" onClick={zoomIn} title="Phóng to (Scroll Up)">
+                    <HiPlus />
+                  </button>
+                  <button className="control-btn" onClick={zoomOut} title="Thu nhỏ (Scroll Down)">
+                    <HiMinus />
+                  </button>
+                  <button className="control-btn" onClick={resetZoom} title="Mặc định / Căn giữa">
+                    <HiRefresh /> Căn giữa
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </main>
 
         {/* Right slide-in drawer details & AI mini-chat */}
@@ -2126,6 +2484,50 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
                   <option value="circle">Hình Tròn (Circle)</option>
                   <option value="rhombus">Hình Thoi (Rhombus)</option>
                 </select>
+
+                <label className="flashcard-modal-label" style={{ marginBottom: '4px', display: 'block', fontSize: '10px', color: 'var(--text-secondary)' }}>Trạng thái học tập</label>
+                <div className="status-tagger-group" style={{ marginBottom: '12px' }}>
+                  <button 
+                    type="button"
+                    className={`status-tag-pill ${selectedNode.status === 'none' || !selectedNode.status ? 'status-tag-pill--active' : ''}`}
+                    data-type="none"
+                    onClick={() => handleUpdateNodeStatus('none')}
+                  >
+                    Chưa học
+                  </button>
+                  <button 
+                    type="button"
+                    className={`status-tag-pill ${selectedNode.status === 'learning' ? 'status-tag-pill--active' : ''}`}
+                    data-type="learning"
+                    onClick={() => handleUpdateNodeStatus('learning')}
+                  >
+                    🟡 Đang học
+                  </button>
+                  <button 
+                    type="button"
+                    className={`status-tag-pill ${selectedNode.status === 'learned' ? 'status-tag-pill--active' : ''}`}
+                    data-type="learned"
+                    onClick={() => handleUpdateNodeStatus('learned')}
+                  >
+                    🟢 Đã hiểu
+                  </button>
+                  <button 
+                    type="button"
+                    className={`status-tag-pill ${selectedNode.status === 'review' ? 'status-tag-pill--active' : ''}`}
+                    data-type="review"
+                    onClick={() => handleUpdateNodeStatus('review')}
+                  >
+                    🔴 Cần ôn lại
+                  </button>
+                  <button 
+                    type="button"
+                    className={`status-tag-pill ${selectedNode.status === 'important' ? 'status-tag-pill--active' : ''}`}
+                    data-type="important"
+                    onClick={() => handleUpdateNodeStatus('important')}
+                  >
+                    ⭐ Quan trọng
+                  </button>
+                </div>
 
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
                   <button 

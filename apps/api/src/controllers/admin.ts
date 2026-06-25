@@ -129,193 +129,258 @@ export const getAdminStats = async (req: Request, res: Response) => {
       req.query.endDate ? String(req.query.endDate) : undefined
     );
 
-    // 1. Total registered users
-    const totalUsers = await prisma.user.count();
-    const prevTotalUsers = await prisma.user.count({
-      where: {
-        createdAt: { lt: startDate }
-      }
-    });
+    const diffDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const showDaily = diffDays <= 32;
 
-    // 2. New users registered in current and previous periods
-    const newUsers = await prisma.user.count({
-      where: {
-        createdAt: { gte: startDate, lte: endDate }
-      }
-    });
-    const prevNewUsers = await prisma.user.count({
-      where: {
-        createdAt: { gte: prevStartDate, lte: prevEndDate }
-      }
-    });
+    let newUsers = 0;
+    let prevNewUsers = 0;
+    let totalAttempts = 0;
+    let prevTotalAttempts = 0;
+    let totalAiQ = 0;
+    let prevTotalAiQ = 0;
+    let totalRevenue = 0;
+    let prevRevenue = 0;
 
-    // 3. Total exam attempts in current and previous periods
-    const totalAttempts = await prisma.testAttempt.count({
-      where: {
-        startedAt: { gte: startDate, lte: endDate }
-      }
-    });
-    const prevTotalAttempts = await prisma.testAttempt.count({
-      where: {
-        startedAt: { gte: prevStartDate, lte: prevEndDate }
-      }
-    });
-
-    // 4. Total AI questions
-    const totalAiQ = await prisma.chatMessage.count({
-      where: {
-        role: 'user',
-        createdAt: { gte: startDate, lte: endDate }
-      }
-    });
-    const prevTotalAiQ = await prisma.chatMessage.count({
-      where: {
-        role: 'user',
-        createdAt: { gte: prevStartDate, lte: prevEndDate }
-      }
-    });
-
-    // 5. Total revenue
-    const enrollments = await prisma.enrollment.findMany({
-      where: {
-        paidAt: { gte: startDate, lte: endDate }
-      },
-      include: {
-        course: true
-      }
-    });
-    const totalRevenue = enrollments.reduce((sum, e) => {
-      const price = e.course?.price ?? 0;
-      const discount = e.course?.discount ?? 0;
-      const finalPrice = price * (1 - discount / 100);
-      return sum + finalPrice;
-    }, 0);
-
-    const prevEnrollments = await prisma.enrollment.findMany({
-      where: {
-        paidAt: { gte: prevStartDate, lte: prevEndDate }
-      },
-      include: {
-        course: true
-      }
-    });
-    const prevRevenue = prevEnrollments.reduce((sum, e) => {
-      const price = e.course?.price ?? 0;
-      const discount = e.course?.discount ?? 0;
-      const finalPrice = price * (1 - discount / 100);
-      return sum + finalPrice;
-    }, 0);
-
-    // --- Chart Data logic based on period range ---
     let attemptsChart: { date: string; count: number }[] = [];
     let aiQuestionsChart: { date: string; count: number }[] = [];
     let revenueChart: { label: string; revenue: number }[] = [];
 
-    const diffDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    const showDaily = diffDays <= 32;
+    let totalUsers = 0;
+    let prevTotalUsers = 0;
 
-    if (showDaily) {
-      const attemptsList = await prisma.testAttempt.findMany({
-        where: { startedAt: { gte: startDate, lte: endDate } },
-        select: { startedAt: true }
-      });
-      const chatList = await prisma.chatMessage.findMany({
-        where: { role: 'user', createdAt: { gte: startDate, lte: endDate } },
-        select: { createdAt: true }
-      });
-      const enrollList = await prisma.enrollment.findMany({
-        where: { paidAt: { gte: startDate, lte: endDate } },
-        include: { course: true }
-      });
+    const isPredefined = ['this-month', 'last-month', '3-months', '6-months', 'this-year'].includes(filter);
 
-      const daysList: Date[] = [];
-      const cursor = new Date(startDate);
-      while (cursor <= endDate) {
-        daysList.push(new Date(cursor));
-        cursor.setDate(cursor.getDate() + 1);
-      }
-
-      const formatDateKey = (d: Date) => `${d.getDate()}/${d.getMonth() + 1}`;
-
-      attemptsChart = daysList.map(d => {
-        const key = formatDateKey(d);
-        const count = attemptsList.filter(att => formatDateKey(new Date(att.startedAt)) === key).length;
-        return { date: key, count };
-      });
-
-      aiQuestionsChart = daysList.map(d => {
-        const key = formatDateKey(d);
-        const count = chatList.filter(msg => formatDateKey(new Date(msg.createdAt)) === key).length;
-        return { date: key, count };
-      });
-
-      revenueChart = daysList.map(d => {
-        const key = formatDateKey(d);
-        const revenue = enrollList
-          .filter(e => formatDateKey(new Date(e.paidAt)) === key)
-          .reduce((sum, e) => {
-            const price = e.course?.price ?? 0;
-            const discount = e.course?.discount ?? 0;
-            return sum + price * (1 - discount / 100);
-          }, 0);
-        return { label: key, revenue };
-      });
-    } else {
-      const attemptsList = await prisma.testAttempt.findMany({
-        where: { startedAt: { gte: startDate, lte: endDate } },
-        select: { startedAt: true }
-      });
-      const chatList = await prisma.chatMessage.findMany({
-        where: { role: 'user', createdAt: { gte: startDate, lte: endDate } },
-        select: { createdAt: true }
-      });
-      const enrollList = await prisma.enrollment.findMany({
-        where: { paidAt: { gte: startDate, lte: endDate } },
-        include: { course: true }
-      });
-
-      const monthsList: { month: number; year: number }[] = [];
-      const cursor = new Date(startDate);
-      while (cursor <= endDate) {
-        const m = cursor.getMonth();
+    const getMonthsRangeKeys = (start: Date, end: Date) => {
+      const keys: { month: number; year: number }[] = [];
+      const cursor = new Date(start);
+      while (cursor <= end) {
+        const m = cursor.getMonth() + 1;
         const y = cursor.getFullYear();
-        if (!monthsList.find(item => item.month === m && item.year === y)) {
-          monthsList.push({ month: m, year: y });
+        if (!keys.find(item => item.month === m && item.year === y)) {
+          keys.push({ month: m, year: y });
         }
         cursor.setMonth(cursor.getMonth() + 1);
       }
+      return keys;
+    };
 
-      const formatMonthKey = (m: number) => `Thg ${m + 1}`;
+    if (isPredefined) {
+      const monthlyKeys = getMonthsRangeKeys(startDate, endDate);
+      const prevMonthlyKeys = getMonthsRangeKeys(prevStartDate, prevEndDate);
 
-      attemptsChart = monthsList.map(item => {
-        const count = attemptsList.filter(att => {
-          const d = new Date(att.startedAt);
-          return d.getMonth() === item.month && d.getFullYear() === item.year;
-        }).length;
-        return { date: formatMonthKey(item.month), count };
-      });
+      const [monthlyStats, prevMonthlyStats, dailyStats] = await Promise.all([
+        prisma.monthlyStatistic.findMany({
+          where: monthlyKeys.length > 0 ? { OR: monthlyKeys } : {},
+          orderBy: [
+            { year: 'asc' },
+            { month: 'asc' }
+          ]
+        }),
+        prisma.monthlyStatistic.findMany({
+          where: prevMonthlyKeys.length > 0 ? { OR: prevMonthlyKeys } : {}
+        }),
+        showDaily
+          ? prisma.dailyStatistic.findMany({
+              where: { date: { gte: startDate, lte: endDate } },
+              orderBy: { date: 'asc' }
+            })
+          : Promise.resolve([])
+      ]);
 
-      aiQuestionsChart = monthsList.map(item => {
-        const count = chatList.filter(msg => {
-          const d = new Date(msg.createdAt);
-          return d.getMonth() === item.month && d.getFullYear() === item.year;
-        }).length;
-        return { date: formatMonthKey(item.month), count };
-      });
+      // Direct lookup from monthly stats! No need to calculate from daily stats!
+      newUsers = monthlyStats.reduce((sum, m) => sum + m.newUsers, 0);
+      prevNewUsers = prevMonthlyStats.reduce((sum, m) => sum + m.newUsers, 0);
+      totalAttempts = monthlyStats.reduce((sum, m) => sum + m.totalAttempts, 0);
+      prevTotalAttempts = prevMonthlyStats.reduce((sum, m) => sum + m.totalAttempts, 0);
+      totalAiQ = monthlyStats.reduce((sum, m) => sum + m.totalAiQuestions, 0);
+      prevTotalAiQ = prevMonthlyStats.reduce((sum, m) => sum + m.totalAiQuestions, 0);
+      totalRevenue = monthlyStats.reduce((sum, m) => sum + m.revenue, 0);
+      prevRevenue = prevMonthlyStats.reduce((sum, m) => sum + m.revenue, 0);
 
-      revenueChart = monthsList.map(item => {
-        const revenue = enrollList
-          .filter(e => {
-            const d = new Date(e.paidAt);
-            return d.getMonth() === item.month && d.getFullYear() === item.year;
-          })
-          .reduce((sum, e) => {
-            const price = e.course?.price ?? 0;
-            const discount = e.course?.discount ?? 0;
-            return sum + price * (1 - discount / 100);
-          }, 0);
-        return { label: formatMonthKey(item.month), revenue };
-      });
+      // Get cumulative total users from the most recent month in the range
+      const latestMonth = monthlyStats[monthlyStats.length - 1];
+      totalUsers = latestMonth ? latestMonth.totalUsers : 0;
+
+      const latestPrevMonth = prevMonthlyStats[prevMonthlyStats.length - 1];
+      prevTotalUsers = latestPrevMonth ? latestPrevMonth.totalUsers : 0;
+
+      // Safety fallback to raw count query if monthly statistic has 0 totalUsers
+      if (totalUsers === 0 || prevTotalUsers === 0) {
+        const [usersCount, prevUsersCount] = await Promise.all([
+          prisma.user.count(),
+          prisma.user.count({ where: { createdAt: { lt: startDate } } })
+        ]);
+        if (totalUsers === 0) totalUsers = usersCount;
+        if (prevTotalUsers === 0) prevTotalUsers = prevUsersCount;
+      }
+
+      if (showDaily) {
+        const daysList: Date[] = [];
+        const cursor = new Date(startDate);
+        while (cursor <= endDate) {
+          daysList.push(new Date(cursor));
+          cursor.setDate(cursor.getDate() + 1);
+        }
+
+        const formatDateKey = (d: Date) => `${d.getDate()}/${d.getMonth() + 1}`;
+        const statsMap = new Map<string, typeof dailyStats[0]>();
+        dailyStats.forEach(d => {
+          statsMap.set(formatDateKey(new Date(d.date)), d);
+        });
+
+        attemptsChart = daysList.map(d => {
+          const key = formatDateKey(d);
+          const record = statsMap.get(key);
+          return { date: key, count: record ? record.totalAttempts : 0 };
+        });
+
+        aiQuestionsChart = daysList.map(d => {
+          const key = formatDateKey(d);
+          const record = statsMap.get(key);
+          return { date: key, count: record ? record.totalAiQuestions : 0 };
+        });
+
+        revenueChart = daysList.map(d => {
+          const key = formatDateKey(d);
+          const record = statsMap.get(key);
+          return { label: key, revenue: record ? record.revenue : 0 };
+        });
+      } else {
+        const monthsList: { month: number; year: number }[] = [];
+        const cursor = new Date(startDate);
+        while (cursor <= endDate) {
+          const m = cursor.getMonth();
+          const y = cursor.getFullYear();
+          if (!monthsList.find(item => item.month === m && item.year === y)) {
+            monthsList.push({ month: m, year: y });
+          }
+          cursor.setMonth(cursor.getMonth() + 1);
+        }
+
+        const formatMonthKey = (m: number) => `Thg ${m + 1}`;
+        const statsMap = new Map<string, typeof monthlyStats[0]>();
+        monthlyStats.forEach(m => {
+          statsMap.set(`${m.month}-${m.year}`, m);
+        });
+
+        attemptsChart = monthsList.map(item => {
+          const key = `${item.month + 1}-${item.year}`;
+          const record = statsMap.get(key);
+          return { date: formatMonthKey(item.month), count: record ? record.totalAttempts : 0 };
+        });
+
+        aiQuestionsChart = monthsList.map(item => {
+          const key = `${item.month + 1}-${item.year}`;
+          const record = statsMap.get(key);
+          return { date: formatMonthKey(item.month), count: record ? record.totalAiQuestions : 0 };
+        });
+
+        revenueChart = monthsList.map(item => {
+          const key = `${item.month + 1}-${item.year}`;
+          const record = statsMap.get(key);
+          return { label: formatMonthKey(item.month), revenue: record ? record.revenue : 0 };
+        });
+      }
+    } else {
+      // Fallback for custom date range using dailyStatistic
+      const [dailyStats, prevDailyStats, usersCount, prevUsersCount] = await Promise.all([
+        prisma.dailyStatistic.findMany({
+          where: { date: { gte: startDate, lte: endDate } },
+          orderBy: { date: 'asc' }
+        }),
+        prisma.dailyStatistic.findMany({
+          where: { date: { gte: prevStartDate, lte: prevEndDate } }
+        }),
+        prisma.user.count(),
+        prisma.user.count({ where: { createdAt: { lt: startDate } } })
+      ]);
+
+      totalUsers = usersCount;
+      prevTotalUsers = prevUsersCount;
+
+      newUsers = dailyStats.reduce((sum, d) => sum + d.newUsers, 0);
+      prevNewUsers = prevDailyStats.reduce((sum, d) => sum + d.newUsers, 0);
+      totalAttempts = dailyStats.reduce((sum, d) => sum + d.totalAttempts, 0);
+      prevTotalAttempts = prevDailyStats.reduce((sum, d) => sum + d.totalAttempts, 0);
+      totalAiQ = dailyStats.reduce((sum, d) => sum + d.totalAiQuestions, 0);
+      prevTotalAiQ = prevDailyStats.reduce((sum, d) => sum + d.totalAiQuestions, 0);
+      totalRevenue = dailyStats.reduce((sum, d) => sum + d.revenue, 0);
+      prevRevenue = prevDailyStats.reduce((sum, d) => sum + d.revenue, 0);
+
+      if (showDaily) {
+        const daysList: Date[] = [];
+        const cursor = new Date(startDate);
+        while (cursor <= endDate) {
+          daysList.push(new Date(cursor));
+          cursor.setDate(cursor.getDate() + 1);
+        }
+
+        const formatDateKey = (d: Date) => `${d.getDate()}/${d.getMonth() + 1}`;
+        const statsMap = new Map<string, typeof dailyStats[0]>();
+        dailyStats.forEach(d => {
+          statsMap.set(formatDateKey(new Date(d.date)), d);
+        });
+
+        attemptsChart = daysList.map(d => {
+          const key = formatDateKey(d);
+          const record = statsMap.get(key);
+          return { date: key, count: record ? record.totalAttempts : 0 };
+        });
+
+        aiQuestionsChart = daysList.map(d => {
+          const key = formatDateKey(d);
+          const record = statsMap.get(key);
+          return { date: key, count: record ? record.totalAiQuestions : 0 };
+        });
+
+        revenueChart = daysList.map(d => {
+          const key = formatDateKey(d);
+          const record = statsMap.get(key);
+          return { label: key, revenue: record ? record.revenue : 0 };
+        });
+      } else {
+        const monthsList: { month: number; year: number }[] = [];
+        const cursor = new Date(startDate);
+        while (cursor <= endDate) {
+          const m = cursor.getMonth();
+          const y = cursor.getFullYear();
+          if (!monthsList.find(item => item.month === m && item.year === y)) {
+            monthsList.push({ month: m, year: y });
+          }
+          cursor.setMonth(cursor.getMonth() + 1);
+        }
+
+        const formatMonthKey = (m: number) => `Thg ${m + 1}`;
+        const monthlyStatsMap = new Map<string, { totalAttempts: number; totalAiQuestions: number; revenue: number }>();
+        dailyStats.forEach(d => {
+          const dateObj = new Date(d.date);
+          const key = `${dateObj.getMonth() + 1}-${dateObj.getFullYear()}`;
+          const current = monthlyStatsMap.get(key) || { totalAttempts: 0, totalAiQuestions: 0, revenue: 0 };
+          monthlyStatsMap.set(key, {
+            totalAttempts: current.totalAttempts + d.totalAttempts,
+            totalAiQuestions: current.totalAiQuestions + d.totalAiQuestions,
+            revenue: current.revenue + d.revenue
+          });
+        });
+
+        attemptsChart = monthsList.map(item => {
+          const key = `${item.month + 1}-${item.year}`;
+          const record = monthlyStatsMap.get(key);
+          return { date: formatMonthKey(item.month), count: record ? record.totalAttempts : 0 };
+        });
+
+        aiQuestionsChart = monthsList.map(item => {
+          const key = `${item.month + 1}-${item.year}`;
+          const record = monthlyStatsMap.get(key);
+          return { date: formatMonthKey(item.month), count: record ? record.totalAiQuestions : 0 };
+        });
+
+        revenueChart = monthsList.map(item => {
+          const key = `${item.month + 1}-${item.year}`;
+          const record = monthlyStatsMap.get(key);
+          return { label: formatMonthKey(item.month), revenue: record ? record.revenue : 0 };
+        });
+      }
     }
 
     res.json({
@@ -505,6 +570,10 @@ export const getUserDetail = async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, error: 'User không tồn tại' });
     }
 
+    const warningCount = await prisma.warning.count({
+      where: { userId: Number(id) }
+    });
+
     let stats: any = {};
 
     if (user.role === 'STUDENT') {
@@ -561,7 +630,8 @@ export const getUserDetail = async (req: Request, res: Response) => {
           lastLoginAt: user.lastLoginAt ? user.lastLoginAt.toISOString() : null,
           blockedAt: user.blockedAt ? user.blockedAt.toISOString() : null,
           blockedReason: user.blockedReason,
-          blockedBy: user.blockedBy
+          blockedBy: user.blockedBy,
+          warningCount
         },
         stats
       }

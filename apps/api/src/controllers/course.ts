@@ -12,6 +12,8 @@ export async function getCourses(req: AuthRequest, res: Response) {
       filters.teacherId = String(teacherId);
     } else {
       filters.isApproved = true;
+      filters.status = 'APPROVED';
+      filters.visibility = 'VISIBLE';
     }
 
     if (subject) {

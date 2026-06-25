@@ -1,7 +1,7 @@
+import './env.js';
 import express from 'express';
 import { createServer } from 'http';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -24,6 +24,15 @@ import { auditLogger } from './middleware/audit.js';
 import { getAdminStats, getAdminUsers, toggleUserBan, getAdminLeads, createAdminLead, updateAdminLeadStatus, getFeatureFlags, toggleFeatureFlag, getUserDetail, blockUser, unblockUser } from './controllers/admin.js';
 import { getTeacherStats, getAdminTeachers, getTeacherDetail, createTeacherAccount, approveTeacherProfile, rejectTeacherProfile, blockTeacher, unblockTeacher } from './controllers/adminTeachers.js';
 import { getAdminCoursesStats, getAdminCourses, getAdminCourseDetail, approveCourse, rejectCourse, hideCourse, showCourse } from './controllers/adminCourses.js';
+import {
+  getAdminReports,
+  getAdminReportById,
+  approveAdminReport,
+  rejectAdminReport,
+  closeAdminReport,
+  createAdminReportWarning,
+  getAdminReportStatistics
+} from './controllers/moderation.js';
 
 import { getLeaderboardRankings, getActivityHeatmap } from './controllers/gamification.js';
 import { getTeacherStats as getTeacherDashboardStats } from './controllers/teacher.js';
@@ -74,8 +83,7 @@ import {
   getLeaderboard as getForumLeaderboard, getUserGamificationProfile,
   downloadResource, createReport, getReports, resolveReport
 } from './controllers/forum.js';
-
-dotenv.config();
+// Environment variables are loaded at the top of the file via import './env.js'
 
 const app = express();
 const server = createServer(app);
@@ -106,7 +114,7 @@ app.use((req, res, next) => {
 
 // Logging Middleware
 app.use((req, res, next) => {
-  console.log(`[API] ${req.method} ${req.path}`);
+  console.log(`[API] ${req.method} ${req.url}`);
   next();
 });
 
@@ -351,6 +359,15 @@ app.get('/admin/affiliates/payouts/pending', authenticateJWT, requireRole(['ADMI
 app.post('/admin/affiliates/payouts/:id/approve', authenticateJWT, requireRole(['ADMIN']), approvePayout);
 app.post('/admin/affiliates/payouts/:id/reject', authenticateJWT, requireRole(['ADMIN']), rejectPayout);
 app.post('/admin/affiliates/commissions/auto-approve', authenticateJWT, requireRole(['ADMIN']), autoApproveCommissions);
+
+// Admin moderation for general reports
+app.get('/admin/reports/statistics', authenticateJWT, requireRole(['ADMIN']), getAdminReportStatistics);
+app.get('/admin/reports', authenticateJWT, requireRole(['ADMIN']), getAdminReports);
+app.get('/admin/reports/:id', authenticateJWT, requireRole(['ADMIN']), getAdminReportById);
+app.patch('/admin/reports/:id/approve', authenticateJWT, requireRole(['ADMIN']), approveAdminReport);
+app.patch('/admin/reports/:id/reject', authenticateJWT, requireRole(['ADMIN']), rejectAdminReport);
+app.patch('/admin/reports/:id/close', authenticateJWT, requireRole(['ADMIN']), closeAdminReport);
+app.post('/admin/reports/:id/warning', authenticateJWT, requireRole(['ADMIN']), createAdminReportWarning);
 
 // =========================================================================
 // TEACHER MATERIALS SYSTEM ROUTING

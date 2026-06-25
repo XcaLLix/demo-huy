@@ -1536,10 +1536,9 @@ export default function App() {
         setActiveTab('login');
       } else {
         if (role !== 'admin') setRole('admin');
-        if (activeTab !== 'home') setActiveTab('home');
       }
     }
-  }, [currentPath, role, currentUser, activeTab]);
+  }, [currentPath, role, currentUser]);
 
   // Sync state data to localStorage
   useEffect(() => {
