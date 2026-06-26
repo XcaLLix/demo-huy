@@ -1981,9 +1981,7 @@ export default function LandingPage({
             {/* ── HERO ── */}
             <section className="lp-hero">
         <div className="lp-hero__left">
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'linear-gradient(135deg, #FFE259, #FFA751)', border: '2.5px solid #000', borderRadius: '30px', padding: '6px 16px', fontSize: '12.5px', fontWeight: '900', color: '#000', boxShadow: '3px 3px 0px #000', marginBottom: '20px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            <span>🎁</span> Đăng ký miễn phí • Trải nghiệm AI Tutor 7 ngày
-          </div>
+
           <div className="lp-hero__title-row">
             <h2 className="lp-hero__title-main">Nền tảng</h2>
             <span className="lp-hero__title-badge">EduPath AI</span>
@@ -1998,15 +1996,6 @@ export default function LandingPage({
             Đầy đủ tài liệu, bài luyện, phương pháp và từ vựng giúp bạn chinh phục kỳ thi THPTQG dễ dàng hơn mỗi ngày.
           </p>
 
-          <div className="lp-hero__follow-pill">
-            <span className="lp-hero__follow-text">Follow us on</span>
-            <button className="lp-hero__social-btn lp-hero__social-btn--fb" title="Facebook">
-              <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 320 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M279.14 288l14.22-92.66h-88.91v-60.13c0-25.35 12.42-50.06 52.24-50.06h40.42V6.26S260.43 0 225.36 0c-73.22 0-121.08 44.38-121.08 124.72v70.62H22.89V288h81.39v224h100.17V288z"></path></svg>
-            </button>
-            <button className="lp-hero__social-btn lp-hero__social-btn--tt" title="TikTok">
-              <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 448 512" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M448,209.91a210.06,210.06,0,0,1-122.77-39.25V349.38A162.55,162.55,0,1,1,185,188.07c8.89,0,17.44,1,25.74,2.9V273.7a81.24,81.24,0,1,0-45.74,75.68V209.91c0-43.1,34.9-78,78-78a77.34,77.34,0,0,1,47,15.82V0h81.38a206.52,206.52,0,0,0,76.57,69.57v81.38a211,211,0,0,1-76.57-21Z"></path></svg>
-            </button>
-          </div>
 
           <div className="lp-hero__actions">
             <button className="lp-hero__btn-white" onClick={() => currentUser ? onBackToDashboard('forum') : onNavigateToAuth('signup')}>
@@ -2029,13 +2018,10 @@ export default function LandingPage({
       <div className="lp-flat-divider" />
 
       {/* ── HIGHLY PREDICTIVE FEATURE CARDS (NEO-BRUTALIST STYLE) ── */}
-      <section id="featured-exams" className="lp-subjects" style={{ background: '#F5F1E8', borderBottom: '3.5px solid #000', padding: '70px 0' }}>
+      <section id="featured-exams" className="lp-subjects" style={{ background: '#FFFFFF', padding: '70px 0' }}>
         <div className="lp-container">
           <div className="lp-section-header lp-section-header--light" style={{ marginBottom: '45px', textAlign: 'center' }}>
-            <span className="lp-eyebrow lp-eyebrow--dark" style={{ background: '#FFE259', border: '2.5px solid #000', color: '#000', boxShadow: '3px 3px 0 #000', padding: '6px 16px', borderRadius: '30px', fontWeight: '900', fontSize: '12px' }}>
-              ⚡ CÔNG CỤ HỌC TẬP THÔNG MINH
-            </span>
-            <h2 style={{ fontSize: '32px', fontWeight: '950', color: '#000', marginTop: '16px', letterSpacing: '-0.8px' }}>Trải Nghiệm Các Tính Năng Đột Phá</h2>
+            <h2 style={{ fontSize: '32px', fontWeight: '950', color: '#000', marginTop: '0px', letterSpacing: '-0.8px' }}>Trải Nghiệm Các Tính Năng Đột Phá</h2>
             <p style={{ fontSize: '15px', color: '#444', maxWidth: '600px', margin: '8px auto 0 auto', lineHeight: 1.5 }}>
               Ứng dụng Trí tuệ nhân tạo (AI) giúp tăng tốc quá trình học tập, củng cố lý thuyết và cá nhân hóa lộ trình ôn thi THPT Quốc Gia của bạn.
             </p>
@@ -2053,9 +2039,9 @@ export default function LandingPage({
                 }
               }}
               style={{
-                background: '#5b75f3',
+                background: '#BFDBFE',
                 border: '3.5px solid #000',
-                borderRadius: '20px',
+                borderRadius: '0px',
                 padding: '24px',
                 boxShadow: '6px 6px 0px #000',
                 display: 'flex',
@@ -2079,8 +2065,8 @@ export default function LandingPage({
               <div style={{ width: '42px', height: '42px', background: '#FFF', border: '2.5px solid #000', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
                 <HiLightningBolt style={{ fontSize: '20px', color: '#000' }} />
               </div>
-              <h4 style={{ fontSize: '22px', fontWeight: '950', color: '#FFF', margin: '0 0 10px', letterSpacing: '-0.5px' }}>Flashcard</h4>
-              <p style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.9)', margin: 0, lineHeight: 1.5, fontWeight: '600' }}>
+              <h4 style={{ fontSize: '22px', fontWeight: '950', color: '#000', margin: '0 0 10px', letterSpacing: '-0.5px' }}>Flashcard</h4>
+              <p style={{ fontSize: '13px', color: '#1E293B', margin: 0, lineHeight: 1.5, fontWeight: '600' }}>
                 Ghi nhớ nhanh các công thức toán học, vật lý, hóa học và từ vựng tiếng Anh qua hệ thống thẻ học thông minh và phương pháp Spaced Repetition.
               </p>
               
@@ -2093,7 +2079,7 @@ export default function LandingPage({
                 width: '130px',
                 height: '65px',
                 borderRadius: '65px 65px 0 0',
-                background: '#3c53c4',
+                background: '#60A5FA',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'center',
@@ -2139,9 +2125,9 @@ export default function LandingPage({
                 }
               }}
               style={{
-                background: '#3b8253',
+                background: '#A7F3D0',
                 border: '3.5px solid #000',
-                borderRadius: '20px',
+                borderRadius: '0px',
                 padding: '24px',
                 boxShadow: '6px 6px 0px #000',
                 display: 'flex',
@@ -2165,8 +2151,8 @@ export default function LandingPage({
               <div style={{ width: '42px', height: '42px', background: '#FFF', border: '2.5px solid #000', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
                 <HiShare style={{ fontSize: '20px', color: '#000' }} />
               </div>
-              <h4 style={{ fontSize: '22px', fontWeight: '950', color: '#FFF', margin: '0 0 10px', letterSpacing: '-0.5px' }}>Mindmap</h4>
-              <p style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.9)', margin: 0, lineHeight: 1.5, fontWeight: '600' }}>
+              <h4 style={{ fontSize: '22px', fontWeight: '950', color: '#000', margin: '0 0 10px', letterSpacing: '-0.5px' }}>Mindmap</h4>
+              <p style={{ fontSize: '13px', color: '#1E293B', margin: 0, lineHeight: 1.5, fontWeight: '600' }}>
                 Hệ thống sơ đồ tư duy thông minh tích hợp AI, giúp kết nối kiến thức bài học trực quan và hỗ trợ lượng giá năng lượng học tập tức thì.
               </p>
               
@@ -2179,7 +2165,7 @@ export default function LandingPage({
                 width: '130px',
                 height: '65px',
                 borderRadius: '65px 65px 0 0',
-                background: '#275938',
+                background: '#34D399',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'center',
@@ -2223,9 +2209,9 @@ export default function LandingPage({
                 }
               }}
               style={{
-                background: '#c06c3a',
+                background: '#FED7AA',
                 border: '3.5px solid #000',
-                borderRadius: '20px',
+                borderRadius: '0px',
                 padding: '24px',
                 boxShadow: '6px 6px 0px #000',
                 display: 'flex',
@@ -2249,8 +2235,8 @@ export default function LandingPage({
               <div style={{ width: '42px', height: '42px', background: '#FFF', border: '2.5px solid #000', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
                 <HiBookOpen style={{ fontSize: '20px', color: '#000' }} />
               </div>
-              <h4 style={{ fontSize: '22px', fontWeight: '950', color: '#FFF', margin: '0 0 10px', letterSpacing: '-0.5px' }}>Thư viện tài liệu</h4>
-              <p style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.9)', margin: 0, lineHeight: 1.5, fontWeight: '600' }}>
+              <h4 style={{ fontSize: '22px', fontWeight: '950', color: '#000', margin: '0 0 10px', letterSpacing: '-0.5px' }}>Thư viện tài liệu</h4>
+              <p style={{ fontSize: '13px', color: '#1E293B', margin: 0, lineHeight: 1.5, fontWeight: '600' }}>
                 Kho lưu trữ tài liệu, đề cương bài học và ngân hàng đề thi thử THPT Quốc Gia từ các trường chuyên danh tiếng trên cả nước.
               </p>
               
@@ -2263,7 +2249,7 @@ export default function LandingPage({
                 width: '130px',
                 height: '65px',
                 borderRadius: '65px 65px 0 0',
-                background: '#8c4e28',
+                background: '#FB923C',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'center',
@@ -2314,9 +2300,9 @@ export default function LandingPage({
                 }
               }}
               style={{
-                background: '#482980',
+                background: '#DDD6FE',
                 border: '3.5px solid #000',
-                borderRadius: '20px',
+                borderRadius: '0px',
                 padding: '24px',
                 boxShadow: '6px 6px 0px #000',
                 display: 'flex',
@@ -2340,8 +2326,8 @@ export default function LandingPage({
               <div style={{ width: '42px', height: '42px', background: '#FFF', border: '2.5px solid #000', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
                 <HiSparkles style={{ fontSize: '20px', color: '#000' }} />
               </div>
-              <h4 style={{ fontSize: '22px', fontWeight: '950', color: '#FFF', margin: '0 0 10px', letterSpacing: '-0.5px' }}>Cá nhân hóa</h4>
-              <p style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.9)', margin: 0, lineHeight: 1.5, fontWeight: '600' }}>
+              <h4 style={{ fontSize: '22px', fontWeight: '950', color: '#000', margin: '0 0 10px', letterSpacing: '-0.5px' }}>Cá nhân hóa</h4>
+              <p style={{ fontSize: '13px', color: '#1E293B', margin: 0, lineHeight: 1.5, fontWeight: '600' }}>
                 Phân tích tự động điểm mạnh và điểm yếu từ lịch sử làm bài để sinh ra Lộ trình học tập 7 ngày, kèm đề ôn tập thích ứng chuẩn xác nhất.
               </p>
               
@@ -2354,7 +2340,7 @@ export default function LandingPage({
                 width: '130px',
                 height: '65px',
                 borderRadius: '65px 65px 0 0',
-                background: '#341d5e',
+                background: '#A78BFA',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'center',
@@ -2395,7 +2381,7 @@ export default function LandingPage({
       </section>
 
       {/* ── STATISTICS & ROLES TABS SECTION ── */}
-      <section id="role-tabs-section" className="lp-subjects" style={{ background: '#FFF', borderBottom: '3.5px solid #000', padding: '70px 0' }}>
+      <section id="role-tabs-section" className="lp-subjects" style={{ background: '#FFF', padding: '70px 0' }}>
         <div className="lp-container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }}>
           
           {/* Section Header */}
@@ -2798,7 +2784,7 @@ export default function LandingPage({
 
 
       {/* ── STUDENT FEEDBACK CAROUSEL SECTION ── */}
-      <section id="student-feedbacks" className="lp-subjects" style={{ background: '#FFFDF2', borderBottom: '3.5px solid #000', padding: '70px 0', overflow: 'hidden' }}>
+      <section id="student-feedbacks" className="lp-subjects" style={{ background: '#FFFFFF', padding: '70px 0', overflow: 'hidden' }}>
         <div className="lp-container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }}>
           
           {/* Section Header */}
@@ -3139,7 +3125,7 @@ export default function LandingPage({
       </section>
 
       {/* ── REGISTRATION FORM ── */}
-      <section id="pricing" className="lp-pricing-section" style={{ backgroundColor: '#FFFDF2', padding: '80px 0', borderTop: '3.5px solid #000000', borderBottom: '3.5px solid #000000' }}>
+      <section id="pricing" className="lp-pricing-section" style={{ backgroundColor: '#FFFFFF', padding: '80px 0' }}>
         <div className="lp-container" style={{ maxWidth: '1000px', margin: '0 auto', padding: '0 20px' }}>
           <div style={{
             display: 'flex',

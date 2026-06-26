@@ -3,16 +3,18 @@ import { motion, useSpring, useTransform, useMotionValue } from 'framer-motion';
 
 const getSpikePath = () => {
   const points = [];
-  const numSpikes = 36;
+  const numSpikes = 32;
   const cx = 31.75;
   const cy = 31.75;
-  const rMin = 25.5;
-  const rMax = 31.2;
-  for (let i = 0; i < numSpikes; i++) {
-    const angle1 = (i * 2 * Math.PI) / numSpikes - Math.PI / 2;
-    const angle2 = ((i + 0.5) * 2 * Math.PI) / numSpikes - Math.PI / 2;
-    points.push(`${(cx + rMax * Math.cos(angle1)).toFixed(2)} ${(cy + rMax * Math.sin(angle1)).toFixed(2)}`);
-    points.push(`${(cx + rMin * Math.cos(angle2)).toFixed(2)} ${(cy + rMin * Math.sin(angle2)).toFixed(2)}`);
+  const rMin = 27.2;
+  const rMax = 29.7;
+  const rAvg = (rMin + rMax) / 2;
+  const rAmp = (rMax - rMin) / 2;
+  const steps = 180;
+  for (let i = 0; i < steps; i++) {
+    const angle = (i * 2 * Math.PI) / steps - Math.PI / 2;
+    const r = rAvg + rAmp * Math.cos(angle * numSpikes);
+    points.push(`${(cx + r * Math.cos(angle)).toFixed(2)} ${(cy + r * Math.sin(angle)).toFixed(2)}`);
   }
   return `M ${points.join(' L ')} Z`;
 };
@@ -121,7 +123,7 @@ export default function FooterSunMascot({
         >
           <svg viewBox="0 0 63 63" fill="none" className="lp-cute-sun" style={{ overflow: 'visible' }}>
             {/* Symmetrical Sun Rays Path */}
-            <path transform="translate(0 3)" d={spikePath} fill="#F3A20F" />
+            <path transform="translate(0 3)" d={spikePath} fill="#F3A20F" stroke="#1d3c29" strokeWidth="0.8" strokeLinejoin="round" />
             
 
             

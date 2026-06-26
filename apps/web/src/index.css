@@ -1332,18 +1332,62 @@ body {
   position: fixed;
   top: 0; left: 0; right: 0;
   z-index: 500;
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: #5b7947;
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.12) 1.5px, transparent 1.5px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.12) 1.5px, transparent 1.5px);
+  background-size: 42px 42px;
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.15);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  height: 72px;
+  height: 76px;
 }
 .lp-nav--scrolled {
-  background: rgba(9, 13, 26, 0.94);
-  border-bottom: 1px solid rgba(99, 102, 241, 0.2);
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.4);
-  height: 64px;
+  background: rgba(244, 244, 240, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1.5px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  height: 68px;
+}
+/* Scrolled state overrides */
+.lp-nav--scrolled .lp-nav__logo {
+  color: #2d3e26;
+}
+.lp-nav--scrolled .lp-nav__logo em {
+  background: linear-gradient(135deg, #5b7947, #1c280f);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.lp-nav--scrolled .lp-nav__links a {
+  color: #2d3e26;
+}
+.lp-nav--scrolled .lp-nav__links a:hover {
+  color: #1c280f;
+  background: rgba(0, 0, 0, 0.05);
+}
+.lp-nav--scrolled .lp-link--active {
+  color: #fff !important;
+  background: #5b7947 !important;
+  border: 1.5px solid #2d3e26 !important;
+}
+.lp-nav--scrolled .lp-nav__cta button {
+  color: #2d3e26 !important;
+  background: rgba(0, 0, 0, 0.05) !important;
+  border: 1.5px solid rgba(0, 0, 0, 0.1) !important;
+}
+.lp-nav--scrolled .lp-nav__cta button:hover {
+  background: rgba(0, 0, 0, 0.08) !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+}
+.lp-nav--scrolled .lp-nav__cta .lp-btn--ghost,
+.lp-nav--scrolled .lp-nav__cta .lp-btn--outline {
+  color: #2d3e26 !important;
+  border-color: #2d3e26 !important;
+  background: transparent !important;
+}
+.lp-nav--scrolled .lp-nav__cta .lp-btn--ghost:hover,
+.lp-nav--scrolled .lp-nav__cta .lp-btn--outline:hover {
+  background: rgba(0, 0, 0, 0.05) !important;
 }
 .lp-nav__inner {
   max-width: 1440px;
@@ -1384,27 +1428,27 @@ body {
   box-shadow: 0 6px 16px rgba(108, 92, 231, 0.45);
 }
 .lp-nav__links {
-  display: flex; align-items: center; gap: 2px; flex: 1;
+  display: flex; align-items: center; gap: 4px; flex: 1;
   justify-content: center;
 }
 .lp-nav__links a {
-  padding: 6px 10px; border-radius: 20px;
-  font-size: 12.5px; font-weight: 600;
-  color: rgba(255, 255, 255, 0.7); text-decoration: none;
+  padding: 8px 14px; border-radius: 20px;
+  font-size: 13.5px; font-weight: 800;
+  color: rgba(255, 255, 255, 0.95); text-decoration: none;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid transparent;
+  border: 1.5px solid transparent;
   white-space: nowrap;
 }
 .lp-nav__links a:hover {
   color: #fff;
-  background: rgba(255, 255, 255, 0.06);
-  transform: translateY(-0.5px);
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
 }
 .lp-link--active {
-  color: #a29bfe !important;
-  background: rgba(108, 92, 231, 0.12) !important;
-  border: 1px solid rgba(108, 92, 231, 0.25) !important;
-  font-weight: 700 !important;
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.2) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.45) !important;
+  font-weight: 900 !important;
 }
 .lp-nav__cta {
   display: flex; align-items: center; gap: 10px; flex-shrink: 0;
@@ -1544,12 +1588,11 @@ body {
 
 /* ── Hero ── */
 .lp-hero {
-  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #020617 100%);
+  background: #5b7947;
   background-image: 
-    linear-gradient(rgba(255, 255, 255, 0.03) 1.5px, transparent 1.5px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1.5px, transparent 1.5px),
-    linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #020617 100%);
-  background-size: 42px 42px, 42px 42px, 100% 100%;
+    linear-gradient(rgba(255, 255, 255, 0.12) 1.5px, transparent 1.5px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.12) 1.5px, transparent 1.5px);
+  background-size: 42px 42px;
   min-height: 100vh;
   padding-top: 68px;
   display: flex; align-items: center;
@@ -2057,7 +2100,7 @@ body {
 .lp-stats-tagline p { font-size: 16px; color: rgba(255,255,255,0.8); line-height: 1.7; font-weight: 600; }
 
 /* ── Features ── */
-.lp-features-section { background: #f8faf8; padding: 80px 0; }
+.lp-features-section { background: #ffffff; padding: 80px 0; }
 .lp-features-grid {
   display: grid; grid-template-columns: repeat(4,1fr); gap: 20px;
 }
