@@ -1169,8 +1169,8 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
             >
               <img src={sunLogoImg} alt="EduPath AI" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
             </div>
-            <span style={{ fontWeight: 800, fontSize: '15px', color: '#fff', letterSpacing: '0.3px', fontFamily: "'Outfit', sans-serif" }}>
-              EduPath <em style={{ fontStyle: 'normal', color: '#FFD234' }}>AI</em>
+            <span style={{ fontWeight: 800, fontSize: '15px', color: 'var(--fc-text-primary)', letterSpacing: '0.3px', fontFamily: "'Outfit', sans-serif" }}>
+              EduPath <em style={{ fontStyle: 'normal', color: 'var(--fc-gold)' }}>AI</em>
             </span>
           </div>
 
@@ -1360,7 +1360,7 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
               <div className="flashcard-decks-selector animate-in" style={{ padding: '8px 4px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
                   <div>
-                    <h2 style={{ fontSize: '22px', fontWeight: '900', color: '#ffffff', margin: 0 }}>Chọn bộ từ để bắt đầu học</h2>
+                    <h2 style={{ fontSize: '22px', fontWeight: '900', color: 'var(--fc-text-primary)', margin: 0 }}>Chọn bộ từ để bắt đầu học</h2>
                   </div>
                   <span className="new-fc-total-badge">{totalDecksCount} bộ • {totalWordsCount} từ</span>
                 </div>
