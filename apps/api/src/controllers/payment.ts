@@ -3,6 +3,7 @@ import type { AuthRequest } from '../middleware/auth.js';
 import crypto from 'crypto';
 import { prisma } from '../lib/prisma.js';
 import { addBothRevenue } from '../lib/monthlyStats.js';
+import { logSystemEvent } from '../utils/logger.js';
 
 
 const VNPAY_TMN_CODE = process.env.VNPAY_TMN_CODE || 'EDUPATH123';
@@ -77,6 +78,14 @@ export async function vnpayWebhook(req: AuthRequest, res: Response) {
 
   // Verify HMAC signature
   if (secureHash !== calculatedHash) {
+    await logSystemEvent(null, {
+      type: 'SYSTEM',
+      action: 'PAYMENT_ERROR',
+      module: 'PAYMENT_SERVICE',
+      description: `Sai chữ ký bảo mật webhook VNPay (calculated !== secure)`,
+      metadata: { secureHash, calculatedHash, query: req.query },
+      level: 'CRITICAL'
+    });
     return res.status(400).json({ success: false, error: 'Mã chữ ký bảo mật VNPay không khớp!' });
   }
 
@@ -96,6 +105,15 @@ export async function vnpayWebhook(req: AuthRequest, res: Response) {
     }
   }
 
+  await logSystemEvent(null, {
+    type: 'SYSTEM',
+    action: 'PAYMENT_FAILED',
+    module: 'PAYMENT_SERVICE',
+    description: `Thanh toán qua VNPay thất bại. Giao dịch: ${txnRef}, responseCode: ${responseCode}`,
+    metadata: { txnRef, responseCode, amount },
+    level: 'ERROR'
+  });
+
   return res.status(400).json({ success: false, error: 'Giao dịch thất bại tại cổng VNPay!' });
 }
 
@@ -113,6 +131,14 @@ export async function sepayWebhook(req: any, res: Response) {
       const expectedBearer = `Bearer ${SEPAY_WEBHOOK_KEY}`;
       if (!authHeader || (authHeader !== expectedAuth && authHeader !== expectedBearer && authHeader !== SEPAY_WEBHOOK_KEY)) {
         console.warn('[SePay Webhook] Cảnh báo: Chữ ký xác thực SePay không trùng khớp hoặc bị thiếu!', authHeader);
+        await logSystemEvent(null, {
+          type: 'SYSTEM',
+          action: 'PAYMENT_ERROR',
+          module: 'PAYMENT_SERVICE',
+          description: `Lỗi webhook Sepay: Sai mã Token xác thực webhook`,
+          metadata: { authHeader },
+          level: 'CRITICAL'
+        });
         return res.status(401).json({ success: false, error: 'Chữ ký xác thực SePay không hợp lệ!' });
       }
     }
@@ -145,8 +171,17 @@ export async function sepayWebhook(req: any, res: Response) {
       });
 
       if (!user) {
-        console.error(`[SePay Webhook] Không tìm thấy học sinh có ID: ${studentId}`);
-        return res.status(404).json({ success: false, error: `Không tìm thấy học sinh có ID: ${studentId}` });
+        const errMsg = `Không tìm thấy học sinh nâng cấp PRO có ID: ${studentId}`;
+        console.error(`[SePay Webhook] ${errMsg}`);
+        await logSystemEvent(null, {
+          type: 'SYSTEM',
+          action: 'PAYMENT_FAILED',
+          module: 'PAYMENT_SERVICE',
+          description: `Thanh toán qua Sepay thất bại. Lỗi: ${errMsg}`,
+          metadata: { body: req.body },
+          level: 'ERROR'
+        });
+        return res.status(404).json({ success: false, error: errMsg });
       }
 
       // Upgrade to PRO in DB (cast to any to bypass local prisma generator locked EPERM compile errors on windows)
@@ -169,6 +204,14 @@ export async function sepayWebhook(req: any, res: Response) {
 
     if (!match) {
       console.warn(`[SePay Webhook] Không tìm thấy mã định danh EP... hoặc UP... hợp lệ trong nội dung: "${transactionContent}"`);
+      await logSystemEvent(null, {
+        type: 'SYSTEM',
+        action: 'PAYMENT_FAILED',
+        module: 'PAYMENT_SERVICE',
+        description: `Thanh toán qua Sepay thất bại. Lỗi: Nội dung chuyển khoản không hợp lệ ("${transactionContent}")`,
+        metadata: { body: req.body },
+        level: 'ERROR'
+      });
       return res.status(400).json({ success: false, error: 'Nội dung chuyển khoản không hợp lệ!' });
     }
 
@@ -182,8 +225,17 @@ export async function sepayWebhook(req: any, res: Response) {
     });
 
     if (!studentUser) {
-      console.error(`[SePay Webhook] Không tìm thấy học sinh có ID: ${studentId}`);
-      return res.status(404).json({ success: false, error: `Không tìm thấy học sinh có ID: ${studentId}` });
+      const errMsg = `Không tìm thấy học sinh mua khóa học có ID: ${studentId}`;
+      console.error(`[SePay Webhook] ${errMsg}`);
+      await logSystemEvent(null, {
+        type: 'SYSTEM',
+        action: 'PAYMENT_FAILED',
+        module: 'PAYMENT_SERVICE',
+        description: `Thanh toán qua Sepay thất bại. Lỗi: ${errMsg}`,
+        metadata: { body: req.body },
+        level: 'ERROR'
+      });
+      return res.status(404).json({ success: false, error: errMsg });
     }
 
     // Ensure student record exists
@@ -203,8 +255,17 @@ export async function sepayWebhook(req: any, res: Response) {
     });
 
     if (!course) {
-      console.error(`[SePay Webhook] Không tìm thấy khóa học có ID: ${courseId}`);
-      return res.status(404).json({ success: false, error: `Không tìm thấy khóa học có ID: ${courseId}` });
+      const errMsg = `Không tìm thấy khóa học có ID: ${courseId}`;
+      console.error(`[SePay Webhook] ${errMsg}`);
+      await logSystemEvent(null, {
+        type: 'SYSTEM',
+        action: 'PAYMENT_FAILED',
+        module: 'PAYMENT_SERVICE',
+        description: `Thanh toán qua Sepay thất bại. Lỗi: ${errMsg}`,
+        metadata: { body: req.body },
+        level: 'ERROR'
+      });
+      return res.status(404).json({ success: false, error: errMsg });
     }
 
     // Parse the amounts to verify payment validity

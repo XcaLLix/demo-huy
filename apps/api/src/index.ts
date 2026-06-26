@@ -21,6 +21,7 @@ import { authenticateJWT, requireRole } from './middleware/auth.js';
 import { ownsCourse, ownsLesson, ownsAttempt } from './middleware/ownership.js';
 import { rateLimiter } from './middleware/rateLimit.js';
 import { auditLogger } from './middleware/audit.js';
+import { logSystemEvent } from './utils/logger.js';
 import { getAdminStats, getAdminUsers, toggleUserBan, getAdminLeads, createAdminLead, updateAdminLeadStatus, getFeatureFlags, toggleFeatureFlag, getUserDetail, blockUser, unblockUser } from './controllers/admin.js';
 import { getTeacherStats, getAdminTeachers, getTeacherDetail, createTeacherAccount, approveTeacherProfile, rejectTeacherProfile, blockTeacher, unblockTeacher } from './controllers/adminTeachers.js';
 import { getAdminCoursesStats, getAdminCourses, getAdminCourseDetail, approveCourse, rejectCourse, hideCourse, showCourse } from './controllers/adminCourses.js';
@@ -33,6 +34,8 @@ import {
   createAdminReportWarning,
   getAdminReportStatistics
 } from './controllers/moderation.js';
+
+import { getAdminLogs, getAdminLogById, getAdminLogsStatistics } from './controllers/adminLogs.js';
 
 import { getLeaderboardRankings, getActivityHeatmap } from './controllers/gamification.js';
 import { getTeacherStats as getTeacherDashboardStats } from './controllers/teacher.js';
@@ -169,11 +172,19 @@ app.post('/admin/exams/import', authenticateJWT, requireRole(['ADMIN']), importE
 app.get('/admin/stats', authenticateJWT, requireRole(['ADMIN']), getAdminStats);
 app.get('/admin/users', authenticateJWT, requireRole(['ADMIN']), getAdminUsers);
 app.post('/admin/users/:id/ban', authenticateJWT, requireRole(['ADMIN']), toggleUserBan);
+app.get('/admin/users/:id/detail', authenticateJWT, requireRole(['ADMIN']), getUserDetail);
+app.post('/admin/users/:id/block', authenticateJWT, requireRole(['ADMIN']), blockUser);
+app.post('/admin/users/:id/unblock', authenticateJWT, requireRole(['ADMIN']), unblockUser);
 app.get('/admin/leads', authenticateJWT, requireRole(['ADMIN']), getAdminLeads);
 app.post('/admin/leads', authenticateJWT, createAdminLead);
 app.put('/admin/leads/:id/status', authenticateJWT, requireRole(['ADMIN']), updateAdminLeadStatus);
 app.get('/admin/features', getFeatureFlags);
 app.post('/admin/features/:id/toggle', authenticateJWT, requireRole(['ADMIN']), toggleFeatureFlag);
+
+// Admin System Logs Routes
+app.get('/admin/logs/statistics', authenticateJWT, requireRole(['ADMIN']), getAdminLogsStatistics);
+app.get('/admin/logs', authenticateJWT, requireRole(['ADMIN']), getAdminLogs);
+app.get('/admin/logs/:id', authenticateJWT, requireRole(['ADMIN']), getAdminLogById);
 
 // Admin Teacher Management Routes
 app.get('/admin/teachers/statistics', authenticateJWT, requireRole(['ADMIN']), getTeacherStats);
@@ -453,6 +464,28 @@ async function seedDefaultCategories() {
 
 // Auto-seed on startup
 seedDefaultCategories();
+
+// Global Error Handler Middleware to catch exceptions and log them
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error('[Global Error Handler]', err);
+  
+  const isPrismaError = err.code !== undefined || err.message?.includes('prisma') || err.message?.includes('Prisma');
+  logSystemEvent(req, {
+    type: 'SYSTEM',
+    action: 'SERVER_ERROR',
+    module: isPrismaError ? 'DATABASE' : 'SERVER',
+    description: `Exception Backend: ${err.message || 'Lỗi hệ thống không xác định'}`,
+    metadata: { 
+      message: err.message, 
+      stack: err.stack,
+      path: req.path,
+      method: req.method
+    },
+    level: 'ERROR'
+  }).catch(logErr => console.error('Failed to log global error to DB:', logErr));
+
+  res.status(500).json({ success: false, error: 'Đã xảy ra lỗi hệ thống! Vui lòng thử lại sau.' });
+});
 
 export default app;
 

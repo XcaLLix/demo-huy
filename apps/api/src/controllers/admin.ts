@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { startOfDayUTC } from '../lib/monthlyStats.js';
+import { logSystemEvent } from '../utils/logger.js';
 
 // ────────────────────────────────────────────────────────────
 // Utilities
@@ -681,6 +682,16 @@ export const blockUser = async (req: Request, res: Response) => {
       }
     });
 
+    await logSystemEvent(req, {
+      type: 'ADMIN',
+      action: 'BLOCK_USER',
+      module: 'USER_MANAGEMENT',
+      userId: adminId,
+      description: `Khóa tài khoản người dùng ${updated.fullName} (${updated.email}). Lý do: ${reason.trim()}`,
+      metadata: { targetUserId: updated.id, email: updated.email, reason: reason.trim() },
+      level: 'WARNING'
+    });
+
     res.json({
       success: true,
       message: 'Khóa tài khoản thành công',
@@ -698,6 +709,7 @@ export const blockUser = async (req: Request, res: Response) => {
 export const unblockUser = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const adminId = (req as any).user?.id;
     const targetUser = await prisma.user.findUnique({ where: { id: Number(id) } });
     if (!targetUser) {
       return res.status(404).json({ success: false, error: 'Người dùng không tồn tại!' });
@@ -712,6 +724,16 @@ export const unblockUser = async (req: Request, res: Response) => {
         blockedReason: null,
         blockedBy: null
       }
+    });
+
+    await logSystemEvent(req, {
+      type: 'ADMIN',
+      action: 'UNBLOCK_USER',
+      module: 'USER_MANAGEMENT',
+      userId: adminId,
+      description: `Mở khóa tài khoản người dùng ${updated.fullName} (${updated.email})`,
+      metadata: { targetUserId: updated.id, email: updated.email },
+      level: 'INFO'
     });
 
     res.json({
@@ -808,7 +830,19 @@ export const toggleFeatureFlag = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { isEnabled } = req.body;
+    const adminId = (req as any).user?.id;
     const flag = await prisma.featureFlag.update({ where: { id }, data: { isEnabled: Boolean(isEnabled) } });
+    
+    await logSystemEvent(req, {
+      type: 'ADMIN',
+      action: isEnabled ? 'ENABLE_FEATURE' : 'DISABLE_FEATURE',
+      module: 'SYSTEM_SETTINGS',
+      userId: adminId,
+      description: `${isEnabled ? 'Bật' : 'Tắt'} chức năng hệ thống: ${flag.name || flag.id}`,
+      metadata: { flagId: flag.id, isEnabled },
+      level: 'INFO'
+    });
+
     res.json({ success: true, data: flag });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

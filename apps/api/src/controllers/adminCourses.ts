@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
+import { logSystemEvent } from '../utils/logger.js';
 
 // Helper interface
 interface AuthRequest extends Request {
@@ -354,6 +355,16 @@ export const approveCourse = async (req: AuthRequest, res: Response) => {
       }
     });
 
+    await logSystemEvent(req as any, {
+      type: 'ADMIN',
+      action: 'APPROVE_COURSE',
+      module: 'COURSE_MANAGEMENT',
+      userId: adminId,
+      description: `Duyệt phát hành khóa học: ${course.title} (ID: ${course.id})`,
+      metadata: { courseId: course.id, title: course.title },
+      level: 'INFO'
+    });
+
     return res.status(200).json({
       success: true,
       message: 'Phê duyệt khóa học và phát hành lên trang học viên thành công!'
@@ -403,6 +414,16 @@ export const rejectCourse = async (req: AuthRequest, res: Response) => {
       }
     });
 
+    await logSystemEvent(req as any, {
+      type: 'ADMIN',
+      action: 'REJECT_COURSE',
+      module: 'COURSE_MANAGEMENT',
+      userId: adminId,
+      description: `Từ chối phát hành khóa học: ${course.title} (ID: ${course.id}). Lý do: ${reason.trim()}`,
+      metadata: { courseId: course.id, title: course.title, reason: reason.trim() },
+      level: 'WARNING'
+    });
+
     return res.status(200).json({
       success: true,
       message: 'Đã từ chối phê duyệt khóa học thành công!'
@@ -448,6 +469,16 @@ export const hideCourse = async (req: AuthRequest, res: Response) => {
       }
     });
 
+    await logSystemEvent(req as any, {
+      type: 'ADMIN',
+      action: 'HIDE_COURSE',
+      module: 'COURSE_MANAGEMENT',
+      userId: adminId,
+      description: `Ẩn khóa học khỏi hệ thống học viên: ${course.title} (ID: ${course.id}). Lý do: ${reason.trim()}`,
+      metadata: { courseId: course.id, title: course.title, reason: reason.trim() },
+      level: 'WARNING'
+    });
+
     return res.status(200).json({
       success: true,
       message: 'Đã ẩn khóa học thành công!'
@@ -485,6 +516,17 @@ export const showCourse = async (req: AuthRequest, res: Response) => {
         hiddenBy: null,
         hiddenReason: null
       }
+    });
+
+    const adminId = req.user?.id || 1;
+    await logSystemEvent(req as any, {
+      type: 'ADMIN',
+      action: 'SHOW_COURSE',
+      module: 'COURSE_MANAGEMENT',
+      userId: adminId,
+      description: `Hiển thị lại khóa học trên hệ thống: ${course.title} (ID: ${course.id})`,
+      metadata: { courseId: course.id, title: course.title },
+      level: 'INFO'
     });
 
     return res.status(200).json({

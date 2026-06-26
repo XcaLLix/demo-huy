@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import bcrypt from 'bcrypt';
+import { logSystemEvent } from '../utils/logger.js';
 
 // ────────────────────────────────────────────────────────────
 // Get Teacher Stats (KPI cards)
@@ -270,6 +271,16 @@ export const createTeacherAccount = async (req: Request, res: Response) => {
       return u;
     });
 
+    await logSystemEvent(req, {
+      type: 'ADMIN',
+      action: 'CREATE_TEACHER',
+      module: 'TEACHER_MANAGEMENT',
+      userId: (req as any).user?.id,
+      description: `Tạo tài khoản giáo viên: ${newTeacher.fullName} (${newTeacher.email})`,
+      metadata: { teacherId: newTeacher.id, email: newTeacher.email },
+      level: 'INFO'
+    });
+
     return res.status(201).json({
       success: true,
       message: 'Tạo tài khoản Giáo viên thành công!',
@@ -312,6 +323,16 @@ export const approveTeacherProfile = async (req: Request, res: Response) => {
         rejectedBy: null,
         rejectedReason: null
       }
+    });
+
+    await logSystemEvent(req, {
+      type: 'ADMIN',
+      action: 'APPROVE_TEACHER',
+      module: 'TEACHER_MANAGEMENT',
+      userId: adminId,
+      description: `Duyệt hồ sơ giáo viên: ${teacher.fullName} (${teacher.email})`,
+      metadata: { teacherId: teacher.id, email: teacher.email },
+      level: 'INFO'
     });
 
     return res.status(200).json({
@@ -358,6 +379,16 @@ export const rejectTeacherProfile = async (req: Request, res: Response) => {
       }
     });
 
+    await logSystemEvent(req, {
+      type: 'ADMIN',
+      action: 'REJECT_TEACHER',
+      module: 'TEACHER_MANAGEMENT',
+      userId: adminId,
+      description: `Từ chối hồ sơ giáo viên: ${teacher.fullName} (${teacher.email}). Lý do: ${reason.trim()}`,
+      metadata: { teacherId: teacher.id, email: teacher.email, reason: reason.trim() },
+      level: 'WARNING'
+    });
+
     return res.status(200).json({
       success: true,
       message: 'Từ chối hồ sơ giáo viên thành công!'
@@ -399,6 +430,16 @@ export const blockTeacher = async (req: Request, res: Response) => {
       }
     });
 
+    await logSystemEvent(req, {
+      type: 'ADMIN',
+      action: 'BLOCK_TEACHER',
+      module: 'TEACHER_MANAGEMENT',
+      userId: (req as any).user?.id,
+      description: `Khóa tài khoản giáo viên: ${teacher.fullName} (${teacher.email}). Lý do: ${reason.trim()}`,
+      metadata: { teacherId: teacher.id, email: teacher.email, reason: reason.trim() },
+      level: 'WARNING'
+    });
+
     return res.status(200).json({
       success: true,
       message: 'Khóa tài khoản giáo viên thành công!'
@@ -414,6 +455,7 @@ export const blockTeacher = async (req: Request, res: Response) => {
 export const unblockTeacher = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const adminId = (req as any).user?.id;
 
     const teacher = await prisma.user.findUnique({
       where: { id: Number(id) }
@@ -432,6 +474,16 @@ export const unblockTeacher = async (req: Request, res: Response) => {
         blockedReason: null,
         blockedBy: null
       }
+    });
+
+    await logSystemEvent(req, {
+      type: 'ADMIN',
+      action: 'UNBLOCK_TEACHER',
+      module: 'TEACHER_MANAGEMENT',
+      userId: adminId,
+      description: `Mở khóa tài khoản giáo viên: ${teacher.fullName} (${teacher.email})`,
+      metadata: { teacherId: teacher.id, email: teacher.email },
+      level: 'INFO'
     });
 
     return res.status(200).json({

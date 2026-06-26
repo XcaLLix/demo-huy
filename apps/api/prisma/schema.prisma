@@ -65,6 +65,7 @@ model User {
   weaknessMindmaps     WeaknessMindmap[]
   apiAuditLogs         AuditLog[]
   userDocuments        UserDocument[]
+  systemLogs           SystemLog[]
   reportsCreated       Report[]            @relation("ReportReporter")
   reportsReviewed      Report[]            @relation("ReportResolver")
   warningsReceived     Warning[]           @relation("UserWarnings")
@@ -1111,6 +1112,38 @@ model Warning {
   createdAt DateTime @default(now())
 
   @@map("warnings")
+}
+
+model SystemLog {
+  id              Int        @id @default(autoincrement())
+  type            LogType
+  action          String
+  module          String
+  userId          Int?
+  user            User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  ipAddress       String?
+  device          String?
+  browser         String?
+  operatingSystem String?
+  description     String     @db.Text
+  metadata        Json?
+  level           LogLevel
+  createdAt       DateTime   @default(now())
+
+  @@map("system_logs")
+}
+
+enum LogType {
+  LOGIN
+  ADMIN
+  SYSTEM
+}
+
+enum LogLevel {
+  INFO
+  WARNING
+  ERROR
+  CRITICAL
 }
 
 

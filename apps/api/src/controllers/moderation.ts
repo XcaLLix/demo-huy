@@ -1,6 +1,7 @@
 import type { Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import type { AuthRequest } from '../middleware/auth.js';
+import { logSystemEvent } from '../utils/logger.js';
 
 // GET /api/admin/reports/statistics
 export async function getAdminReportStatistics(req: AuthRequest, res: Response) {
@@ -315,6 +316,16 @@ export async function approveAdminReport(req: AuthRequest, res: Response) {
       }
     });
 
+    await logSystemEvent(req as any, {
+      type: 'ADMIN',
+      action: 'APPROVE_REPORT',
+      module: 'MODERATION',
+      userId: adminId,
+      description: `Duyệt báo cáo vi phạm #${report.id} (${report.targetType} ID: ${report.targetId})`,
+      metadata: { reportId: report.id, targetType: report.targetType, targetId: report.targetId },
+      level: 'INFO'
+    });
+
     return res.status(200).json({
       success: true,
       message: 'Duyệt báo cáo thành công',
@@ -354,6 +365,16 @@ export async function rejectAdminReport(req: AuthRequest, res: Response) {
       }
     });
 
+    await logSystemEvent(req as any, {
+      type: 'ADMIN',
+      action: 'REJECT_REPORT',
+      module: 'MODERATION',
+      userId: adminId,
+      description: `Từ chối báo cáo vi phạm #${report.id}. Lý do: ${reason.trim()}`,
+      metadata: { reportId: report.id, reason: reason.trim() },
+      level: 'INFO'
+    });
+
     return res.status(200).json({
       success: true,
       message: 'Từ chối báo cáo thành công',
@@ -387,6 +408,16 @@ export async function closeAdminReport(req: AuthRequest, res: Response) {
         reviewedAt: new Date(),
         reviewedBy: adminId
       }
+    });
+
+    await logSystemEvent(req as any, {
+      type: 'ADMIN',
+      action: 'CLOSE_REPORT',
+      module: 'MODERATION',
+      userId: adminId,
+      description: `Đóng báo cáo vi phạm #${report.id}. Ghi chú: ${notes ? notes.trim() : 'Đóng báo cáo xử lý xong.'}`,
+      metadata: { reportId: report.id, notes },
+      level: 'INFO'
     });
 
     return res.status(200).json({
@@ -466,6 +497,17 @@ export async function createAdminReportWarning(req: AuthRequest, res: Response) 
         title: 'Cảnh báo từ Quản trị viên ⚠️',
         message: `Tài khoản của bạn nhận được cảnh báo: "${message.trim()}" liên quan đến nội dung bị báo cáo #${report.id}.`
       }
+    });
+
+    const adminId = req.user?.id;
+    await logSystemEvent(req as any, {
+      type: 'ADMIN',
+      action: 'SEND_WARNING',
+      module: 'MODERATION',
+      userId: adminId,
+      description: `Gửi cảnh báo tới người dùng ID: ${targetUserId} liên quan đến báo cáo #${report.id}. Nội dung: ${message.trim()}`,
+      metadata: { reportId: report.id, targetUserId, message: message.trim() },
+      level: 'WARNING'
     });
 
     return res.status(201).json({

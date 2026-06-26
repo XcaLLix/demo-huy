@@ -534,7 +534,19 @@ export const api = {
 
   getUserDocuments: () => request('/user-documents', { method: 'GET' }),
   createUserDocument: (title, fileUrl, fileType) => request('/user-documents', { method: 'POST', body: { title, fileUrl, fileType } }),
-  deleteUserDocument: (id) => request(`/user-documents/${id}`, { method: 'DELETE' })
+  deleteUserDocument: (id) => request(`/user-documents/${id}`, { method: 'DELETE' }),
+
+  getAdminLogsStatistics: () => request('/admin/logs/statistics'),
+  getAdminLogs: (params = {}) => {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') {
+        query.append(k, String(v));
+      }
+    });
+    return request('/admin/logs?' + query.toString());
+  },
+  getAdminLogById: (id) => request(`/admin/logs/${id}`)
 };
 
 

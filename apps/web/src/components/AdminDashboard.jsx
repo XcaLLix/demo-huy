@@ -117,8 +117,6 @@ export default function AdminDashboard({
   submissions = [],
   leadsList = [],
   setLeadsList,
-  booksList = [],
-  setBooksList,
   featureFlags = [],
   setFeatureFlags,
   
@@ -132,13 +130,115 @@ export default function AdminDashboard({
   onChangePassword,
   onNavigateSettings,
   cartCourse,
-  onCheckoutCourse
+  onCheckoutCourse,
+
+  // Tab Sync Props
+  activeTab: propActiveTab = 'stats',
+  setActiveTab: propSetActiveTab
 }) {
-  // Sidebar tabs state
-  const [activeTab, setActiveTab] = useState('stats'); // stats, exams, content, books, users, leads, features
+  // Sidebar tabs state (sync'ed with prop)
+  const [activeTab, setActiveTabState] = useState(propActiveTab || 'stats');
+  
+  useEffect(() => {
+    if (propActiveTab) {
+      setActiveTabState(propActiveTab);
+    }
+  }, [propActiveTab]);
+
+  const setActiveTab = (tab) => {
+    setActiveTabState(tab);
+    if (propSetActiveTab) {
+      propSetActiveTab(tab);
+    }
+  };
+
+  // --- SYSTEM LOGS STATE ---
+  const [systemLogsList, setSystemLogsList] = useState([]);
+  const [systemLogsStats, setSystemLogsStats] = useState({
+    totalToday: 0,
+    loginToday: 0,
+    adminToday: 0,
+    systemToday: 0,
+    aiErrorsToday: 0,
+    paymentErrorsToday: 0
+  });
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsPage, setLogsPage] = useState(1);
+  const [logsTotalPages, setLogsTotalPages] = useState(1);
+  const [logsSearch, setLogsSearch] = useState('');
+  const [logsTypeFilter, setLogsTypeFilter] = useState('ALL'); // ALL, LOGIN, ADMIN, SYSTEM
+  const [logsLevelFilter, setLogsLevelFilter] = useState('ALL'); // ALL, INFO, WARNING, ERROR, CRITICAL
+  const [logsModuleFilter, setLogsModuleFilter] = useState('ALL');
+  const [logsFromDate, setLogsFromDate] = useState('');
+  const [logsToDate, setLogsToDate] = useState('');
+  const [selectedLogDetail, setSelectedLogDetail] = useState(null);
+  const [showLogDetailDrawer, setShowLogDetailDrawer] = useState(false);
+
+  const fetchLogsStats = async () => {
+    try {
+      const statsData = await api.getAdminLogsStatistics();
+      if (statsData) {
+        setSystemLogsStats(statsData);
+      }
+    } catch (err) {
+      console.error('[AdminDashboard] Lỗi tải thống kê logs:', err);
+    }
+  };
+
+  const fetchSystemLogs = async () => {
+    try {
+      setLogsLoading(true);
+      const data = await api.getAdminLogs({
+        page: logsPage,
+        limit: 10,
+        search: logsSearch,
+        type: logsTypeFilter,
+        level: logsLevelFilter,
+        module: logsModuleFilter,
+        fromDate: logsFromDate,
+        toDate: logsToDate
+      });
+      if (data) {
+        setSystemLogsList(data.logs || []);
+        setLogsTotalPages(data.pagination?.totalPages || 1);
+      }
+    } catch (err) {
+      console.error('[AdminDashboard] Lỗi tải danh sách logs:', err);
+    } finally {
+      setLogsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'system-logs') {
+      fetchLogsStats();
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'system-logs') {
+      fetchSystemLogs();
+    }
+  }, [activeTab, logsPage, logsTypeFilter, logsLevelFilter, logsModuleFilter, logsFromDate, logsToDate]);
+
+  // Debounced search logic for logs search input
+  useEffect(() => {
+    if (activeTab !== 'system-logs') return;
+    const timer = setTimeout(() => {
+      setLogsPage(1);
+      fetchSystemLogs();
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [logsSearch]);
+
+  const tabOptions = [
+    { key: 'LOGIN', label: 'Nhật ký đăng nhập' },
+    { key: 'ADMIN', label: 'Nhật ký quản trị' },
+    { key: 'SYSTEM', label: 'Nhật ký hệ thống' }
+  ];
   
   // Sub-tabs for Content ('content')
-  const [contentSubTab, setContentSubTab] = useState('approvals'); // approvals, logs, announcements, ai-config
+  const [contentSubTab, setContentSubTab] = useState('approvals'); // approvals, logs, announcements
   
   // Dynamic stats state from Supabase
   const [stats, setStats] = useState({
@@ -702,9 +802,6 @@ export default function AdminDashboard({
     }
   };
 
-  const [showBookModal, setShowBookModal] = useState(false);
-  const [editingBook, setEditingBook] = useState(null);
-  const [bookForm, setBookForm] = useState({ title: '', author: '', coverUrl: '', price: '', description: '', link: '' });
   const [leadSearch, setLeadSearch] = useState('');
 
   const getCurrentDateVietnamese = () => {
@@ -759,6 +856,20 @@ export default function AdminDashboard({
           <h4 className="kpi-value">{displayVal}</h4>
           <span className="kpi-title">{title}</span>
           <p className="kpi-desc">{data?.description}</p>
+        </div>
+      </div>
+    );
+  };
+
+  const renderLogKpiCard = (title, icon, value, colorKey = 'blue') => {
+    return (
+      <div className="kpi-card" key={title} style={{ cursor: 'default' }}>
+        <div className="kpi-card-header">
+          <div className={`kpi-card-icon ${colorKey}`}>{icon}</div>
+        </div>
+        <div className="kpi-card-body">
+          <h4 className="kpi-value">{value}</h4>
+          <span className="kpi-title">{title}</span>
         </div>
       </div>
     );
@@ -999,43 +1110,7 @@ export default function AdminDashboard({
     toast('Cập nhật cấu hình thuật toán AI thành công!', 'success');
   };
 
-  // Books CRUD logic
-  const handleOpenBookModal = (book = null) => {
-    if (book) {
-      setEditingBook(book);
-      setBookForm({ ...book });
-    } else {
-      setEditingBook(null);
-      setBookForm({ title: '', author: '', coverUrl: '', price: '', description: '', link: '' });
-    }
-    setShowBookModal(true);
-  };
 
-  const handleSaveBook = (e) => {
-    e.preventDefault();
-    if (editingBook) {
-      setBooksList(prev => prev.map(b => b.id === editingBook.id ? { ...b, ...bookForm } : b));
-      addLog(`[Admin] Đã chỉnh sửa cuốn sách đề xuất: "${bookForm.title}"`, 'sys');
-      toast('Cập nhật sách đề xuất thành công!', 'success');
-    } else {
-      const newBook = {
-        id: Date.now(),
-        ...bookForm
-      };
-      setBooksList(prev => [...prev, newBook]);
-      addLog(`[Admin] Đã thêm cuốn sách đề xuất mới: "${bookForm.title}"`, 'sys');
-      toast('Thêm sách đề xuất mới thành công!', 'success');
-    }
-    setShowBookModal(false);
-  };
-
-  const handleDeleteBook = (id, title) => {
-    if (window.confirm(`Bạn có chắc chắn muốn xóa sách đề xuất "${title}"?`)) {
-      setBooksList(prev => prev.filter(b => b.id !== id));
-      addLog(`[Admin] Đã xóa cuốn sách đề xuất: "${title}"`, 'sys');
-      toast('Xóa sách thành công!', 'success');
-    }
-  };
 
   // Leads logic with DB sync
   const handleToggleLeadStatus = async (id, currentStatus) => {
@@ -1987,6 +2062,17 @@ export default function AdminDashboard({
         .dark-theme .stats-loading-text {
           color: #A3B899 !important;
         }
+
+        /* ── SYSTEM LOGS DRAWER & KPI ── */
+        .kpi-card-icon.red {
+          background-color: #FEE2E2;
+          color: #EF4444;
+          border-color: #FCA5A5;
+        }
+        @keyframes slideIn {
+          from { transform: translateX(100%); }
+          to { transform: translateX(0); }
+        }
       `}} />
 
       {/* ── LEFT SIDEBAR ── */}
@@ -2018,12 +2104,7 @@ export default function AdminDashboard({
               <span className="admin-menu-badge">{courseApprovals.length}</span>
             )}
           </button>
-          <button 
-            className={`admin-menu-item ${activeTab === 'books' ? 'active' : ''}`}
-            onClick={() => setActiveTab('books')}
-          >
-            <HiCollection style={{ fontSize: '18px' }} /> Đề xuất Sách
-          </button>
+
           <button 
             className={`admin-menu-item ${activeTab === 'users' ? 'active' : ''}`}
             onClick={() => setActiveTab('users')}
@@ -2072,6 +2153,12 @@ export default function AdminDashboard({
           >
             <HiCurrencyDollar style={{ fontSize: '18px' }} /> Doanh thu & Chi trả
           </button>
+          <button 
+            className={`admin-menu-item ${activeTab === 'system-logs' ? 'active' : ''}`}
+            onClick={() => setActiveTab('system-logs')}
+          >
+            <HiTerminal style={{ fontSize: '18px' }} /> Nhật ký hệ thống
+          </button>
         </nav>
 
         <div className="admin-sidebar-footer">
@@ -2114,7 +2201,6 @@ export default function AdminDashboard({
                 {activeTab === 'stats' && 'Dashboard Thống kê'}
                 {activeTab === 'exams' && 'QUẢN LÝ ĐỀ THI'}
                 {activeTab === 'content' && 'QUẢN TRỊ NỘI DUNG'}
-                {activeTab === 'books' && 'ĐỀ XUẤT SÁCH ÔN THI'}
                 {activeTab === 'users' && 'QUẢN LÝ NGƯỜI DÙNG'}
                 {activeTab === 'teachers' && 'QUẢN LÝ GIÁO VIÊN'}
                 {activeTab === 'courses' && 'QUẢN LÝ KHÓA HỌC'}
@@ -2123,6 +2209,7 @@ export default function AdminDashboard({
                 {activeTab === 'moderation' && 'KIỂM DUYỆT BÁO CÁO VI PHẠM'}
                 {activeTab === 'roles' && 'PHÊ DUYỆT NÂNG CẤP QUYỀN'}
                 {activeTab === 'finance' && 'QUẢN LÝ TÀI CHÍNH & CHI TRẢ'}
+                {activeTab === 'system-logs' && 'NHẬT KÝ HOẠT ĐỘNG HỆ THỐNG'}
               </h2>
               {activeTab === 'stats' && (
                 <p className="admin-header-subtitle-date">{getCurrentDateVietnamese()}</p>
@@ -2328,12 +2415,6 @@ export default function AdminDashboard({
                 >
                   <HiGlobeAlt /> Gửi thông báo hệ thống
                 </button>
-                <button 
-                  className={`admin-sub-tab-btn ${contentSubTab === 'ai-config' ? 'active' : ''}`}
-                  onClick={() => setContentSubTab('ai-config')}
-                >
-                  <HiAdjustments /> Cấu hình thuật toán AI
-                </button>
               </div>
 
               {/* Sub-tab: Phê duyệt khóa học */}
@@ -2434,112 +2515,10 @@ export default function AdminDashboard({
                 </div>
               )}
 
-              {/* Sub-tab: AI config */}
-              {contentSubTab === 'ai-config' && (
-                <div className="admin-card" style={{ maxWidth: '600px' }}>
-                  <h3 className="chart-card-title">Cấu hình tham số thuật toán AI thích ứng</h3>
-                  <p style={{ fontSize: '13px', color: '#7A7A7A', marginBottom: '20px', fontWeight: '700' }}>
-                    Điều chỉnh trọng số ưu tiên của hệ thống AI khi quét lỗ hổng kiến thức và đề xuất bài tập tự động cho học viên.
-                  </p>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '24px' }}>
-                    <div className="admin-form-group">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '800', marginBottom: '4px' }}>
-                        <span>Độ ưu tiên Độ khó câu hỏi sai:</span>
-                        <span style={{ color: '#6c5ce7' }}>{aiWeightDifficulty}%</span>
-                      </div>
-                      <input
-                        type="range" min="0" max="100"
-                        value={aiWeightDifficulty}
-                        onChange={e => setAiWeightDifficulty(e.target.value)}
-                        style={{ width: '100%', accentColor: '#6c5ce7' }}
-                      />
-                    </div>
-
-                    <div className="admin-form-group">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '800', marginBottom: '4px' }}>
-                        <span>Độ nhạy phân tích Điểm yếu:</span>
-                        <span style={{ color: '#6c5ce7' }}>{aiWeightWeakness}%</span>
-                      </div>
-                      <input
-                        type="range" min="0" max="100"
-                        value={aiWeightWeakness}
-                        onChange={e => setAiWeightWeakness(e.target.value)}
-                        style={{ width: '100%', accentColor: '#6c5ce7' }}
-                      />
-                    </div>
-
-                    <div className="admin-form-group">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '800', marginBottom: '4px' }}>
-                        <span>Tốc độ thay đổi Lộ trình học (Roadmap Adjust Rate):</span>
-                        <span style={{ color: '#6c5ce7' }}>{aiWeightRoadmap}%</span>
-                      </div>
-                      <input
-                        type="range" min="0" max="100"
-                        value={aiWeightRoadmap}
-                        onChange={e => setAiWeightRoadmap(e.target.value)}
-                        style={{ width: '100%', accentColor: '#6c5ce7' }}
-                      />
-                    </div>
-                  </div>
-
-                  <button className="admin-back-btn" onClick={handleUpdateAIWeights} style={{ background: '#1C2B17', color: '#FFFFFF' }}>
-                    Lưu cấu hình tham số AI
-                  </button>
-                </div>
-              )}
             </div>
           )}
 
-          {/* ==========================================
-              TAB: ĐỀ XUẤT SÁCH (CRUD BOOKS)
-              ========================================== */}
-          {activeTab === 'books' && (
-            <div>
-              <div className="books-actions-bar">
-                <span style={{ fontSize: '13.5px', color: '#7A7A7A', fontWeight: '800' }}>
-                  Hiển thị đề xuất sách ôn luyện chất lượng cho học viên
-                </span>
-                <button 
-                  className="admin-back-btn" 
-                  style={{ background: '#1C2B17', color: '#FFFFFF', width: 'auto' }}
-                  onClick={() => handleOpenBookModal()}
-                >
-                  <HiPlus /> Thêm sách đề xuất mới
-                </button>
-              </div>
 
-              <div className="books-grid">
-                {booksList.map(book => (
-                  <div key={book.id} className="book-card">
-                    <img src={book.coverUrl} alt={book.title} className="book-cover" onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&q=80&w=200"; }} />
-                    <div className="book-info">
-                      <div>
-                        <h4 className="book-title">{book.title}</h4>
-                        <div className="book-author">Tác giả: {book.author}</div>
-                        <p className="book-desc">{book.description}</p>
-                      </div>
-                      <div className="book-footer">
-                        <span className="book-price">{book.price}</span>
-                        <a href={book.link} target="_blank" rel="noopener noreferrer" className="book-btn-buy">
-                          Mua ngay →
-                        </a>
-                      </div>
-                    </div>
-
-                    <div className="book-actions-overlay">
-                      <button className="book-act-btn edit" onClick={() => handleOpenBookModal(book)} title="Chỉnh sửa">
-                        <HiPencil />
-                      </button>
-                      <button className="book-act-btn delete" onClick={() => handleDeleteBook(book.id, book.title)} title="Xóa">
-                        <HiTrash />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* ==========================================
               TAB: USERS LIST & VERIFY
@@ -3458,99 +3437,154 @@ export default function AdminDashboard({
           )}
 
           {/* ==========================================
-              TAB: FEATURE FLAGS MANAGER
+              TAB: FEATURE FLAGS & AI ALGORITHM CONFIG
               ========================================== */}
           {activeTab === 'features' && (
-            <div className="admin-card">
-              <div style={{ marginBottom: '24px' }}>
-                <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '8px' }}>
-                  ⚙️ QUẢN LÝ CÁC CHỨC NĂNG HỆ THỐNG (FEATURE FLAGS)
-                </h2>
-                <p style={{ fontSize: '13px', color: '#666', fontWeight: '600' }}>
-                  Bật hoặc tắt các module chức năng chính hiển thị cho học viên trên hệ thống. 
-                  Các thay đổi sẽ có hiệu lực ngay lập tức đối với người dùng cuối.
-                </p>
-              </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <div className="admin-card" style={{ marginBottom: 0 }}>
+                <div style={{ marginBottom: '24px' }}>
+                  <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '8px' }}>
+                    ⚙️ QUẢN LÝ CÁC CHỨC NĂNG HỆ THỐNG (FEATURE FLAGS)
+                  </h2>
+                  <p style={{ fontSize: '13px', color: '#666', fontWeight: '600' }}>
+                    Bật hoặc tắt các module chức năng chính hiển thị cho học viên trên hệ thống. 
+                    Các thay đổi sẽ có hiệu lực ngay lập tức đối với người dùng cuối.
+                  </p>
+                </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
-                {(featureFlags || []).map(flag => (
-                  <div 
-                    key={flag.id} 
-                    className="admin-card" 
-                    style={{ 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      justifyContent: 'space-between', 
-                      padding: '20px',
-                      border: '3px solid #000000',
-                      boxShadow: '4px 4px 0px #000000',
-                      borderRadius: '12px',
-                      background: '#FFFFFF',
-                      marginBottom: 0
-                    }}
-                  >
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                        <span style={{ fontSize: '16px', fontWeight: '800' }}>
-                          {flag.name}
-                        </span>
-                        <span 
-                          style={{
-                            padding: '4px 10px',
-                            border: '2px solid #000000',
-                            borderRadius: '6px',
-                            fontSize: '11px',
-                            fontWeight: '800',
-                            background: flag.isEnabled ? '#D1FAE5' : '#FEE2E2',
-                            color: '#000000',
-                            boxShadow: '1px 1px 0px #000000'
-                          }}
-                        >
-                          {flag.isEnabled ? 'ĐANG BẬT' : 'ĐANG TẮT'}
-                        </span>
-                      </div>
-                      <p style={{ fontSize: '12px', color: '#777', fontWeight: '600', marginBottom: '16px' }}>
-                        Mã định danh: <code style={{ background: '#F3F4F6', padding: '2px 6px', borderRadius: '4px', border: '1px solid #E5E7EB' }}>{flag.id}</code>
-                      </p>
-                    </div>
-
-                    <button
-                      onClick={async () => {
-                        try {
-                          const { api } = await import('../api');
-                          const updated = await api.toggleFeatureFlag(flag.id, !flag.isEnabled);
-                          if (updated) {
-                            setFeatureFlags(prev => prev.map(f => f.id === flag.id ? { ...f, isEnabled: updated.isEnabled } : f));
-                            toast(`Đã ${updated.isEnabled ? 'bật' : 'tắt'} chức năng "${flag.name}" thành công!`, 'success');
-                            if (addLog) addLog(`[ADMIN] Đã ${updated.isEnabled ? 'bật' : 'tắt'} chức năng ${flag.id}`, 'info');
-                          }
-                        } catch (err) {
-                          toast(`Lỗi khi cập nhật trạng thái chức năng: ${err.message}`, 'error');
-                        }
-                      }}
-                      className="admin-back-btn"
-                      style={{
-                        width: '100%',
-                        background: flag.isEnabled ? '#EF4444' : '#10B981',
-                        color: '#FFFFFF',
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+                  {(featureFlags || []).map(flag => (
+                    <div 
+                      key={flag.id} 
+                      className="admin-card" 
+                      style={{ 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        justifyContent: 'space-between', 
+                        padding: '20px',
                         border: '3px solid #000000',
-                        boxShadow: '3px 3px 0px #000000',
-                        fontWeight: '800',
-                        cursor: 'pointer',
-                        padding: '10px',
-                        borderRadius: '8px'
+                        boxShadow: '4px 4px 0px #000000',
+                        borderRadius: '12px',
+                        background: '#FFFFFF',
+                        marginBottom: 0
                       }}
                     >
-                      {flag.isEnabled ? 'Tắt chức năng' : 'Bật chức năng'}
-                    </button>
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                          <span style={{ fontSize: '16px', fontWeight: '800' }}>
+                            {flag.name}
+                          </span>
+                          <span 
+                            style={{
+                              padding: '4px 10px',
+                              border: '2px solid #000000',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: '800',
+                              background: flag.isEnabled ? '#D1FAE5' : '#FEE2E2',
+                              color: '#000000',
+                              boxShadow: '1px 1px 0px #000000'
+                            }}
+                          >
+                            {flag.isEnabled ? 'ĐANG BẬT' : 'ĐANG TẮT'}
+                          </span>
+                        </div>
+                        <p style={{ fontSize: '12px', color: '#777', fontWeight: '600', marginBottom: '16px' }}>
+                          Mã định danh: <code style={{ background: '#F3F4F6', padding: '2px 6px', borderRadius: '4px', border: '1px solid #E5E7EB' }}>{flag.id}</code>
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={async () => {
+                          try {
+                            const { api } = await import('../api');
+                            const updated = await api.toggleFeatureFlag(flag.id, !flag.isEnabled);
+                            if (updated) {
+                              setFeatureFlags(prev => prev.map(f => f.id === flag.id ? { ...f, isEnabled: updated.isEnabled } : f));
+                              toast(`Đã ${updated.isEnabled ? 'bật' : 'tắt'} chức năng "${flag.name}" thành công!`, 'success');
+                              if (addLog) addLog(`[ADMIN] Đã ${updated.isEnabled ? 'bật' : 'tắt'} chức năng ${flag.id}`, 'info');
+                            }
+                          } catch (err) {
+                            toast(`Lỗi khi cập nhật trạng thái chức năng: ${err.message}`, 'error');
+                          }
+                        }}
+                        className="admin-back-btn"
+                        style={{
+                          width: '100%',
+                          background: flag.isEnabled ? '#EF4444' : '#10B981',
+                          color: '#FFFFFF',
+                          border: '3px solid #000000',
+                          boxShadow: '3px 3px 0px #000000',
+                          fontWeight: '800',
+                          cursor: 'pointer',
+                          padding: '10px',
+                          borderRadius: '8px'
+                        }}
+                      >
+                        {flag.isEnabled ? 'Tắt chức năng' : 'Bật chức năng'}
+                      </button>
+                    </div>
+                  ))}
+                  {(featureFlags || []).length === 0 && (
+                    <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', background: '#FCFBFA', border: '2px dashed #000000', borderRadius: '12px' }}>
+                      <span style={{ fontSize: '28px' }}>⚙️</span>
+                      <p style={{ fontWeight: '800', marginTop: '10px' }}>Không có chức năng nào để thiết lập.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* AI Algorithm configuration card */}
+              <div className="admin-card" style={{ maxWidth: '600px', marginBottom: 0 }}>
+                <h3 className="chart-card-title">Cấu hình tham số thuật toán AI thích ứng</h3>
+                <p style={{ fontSize: '13px', color: '#7A7A7A', marginBottom: '20px', fontWeight: '700' }}>
+                  Điều chỉnh trọng số ưu tiên của hệ thống AI khi quét lỗ hổng kiến thức và đề xuất bài tập tự động cho học viên.
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '24px' }}>
+                  <div className="admin-form-group">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '800', marginBottom: '4px' }}>
+                      <span>Độ ưu tiên Độ khó câu hỏi sai:</span>
+                      <span style={{ color: '#6c5ce7' }}>{aiWeightDifficulty}%</span>
+                    </div>
+                    <input
+                      type="range" min="0" max="100"
+                      value={aiWeightDifficulty}
+                      onChange={e => setAiWeightDifficulty(e.target.value)}
+                      style={{ width: '100%', accentColor: '#6c5ce7' }}
+                    />
                   </div>
-                ))}
-                {(featureFlags || []).length === 0 && (
-                  <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', background: '#FCFBFA', border: '2px dashed #000000', borderRadius: '12px' }}>
-                    <span style={{ fontSize: '28px' }}>⚙️</span>
-                    <p style={{ fontWeight: '800', marginTop: '10px' }}>Không có chức năng nào để thiết lập.</p>
+
+                  <div className="admin-form-group">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '800', marginBottom: '4px' }}>
+                      <span>Độ nhạy phân tích Điểm yếu:</span>
+                      <span style={{ color: '#6c5ce7' }}>{aiWeightWeakness}%</span>
+                    </div>
+                    <input
+                      type="range" min="0" max="100"
+                      value={aiWeightWeakness}
+                      onChange={e => setAiWeightWeakness(e.target.value)}
+                      style={{ width: '100%', accentColor: '#6c5ce7' }}
+                    />
                   </div>
-                )}
+
+                  <div className="admin-form-group">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '800', marginBottom: '4px' }}>
+                      <span>Tốc độ thay đổi Lộ trình học (Roadmap Adjust Rate):</span>
+                      <span style={{ color: '#6c5ce7' }}>{aiWeightRoadmap}%</span>
+                    </div>
+                    <input
+                      type="range" min="0" max="100"
+                      value={aiWeightRoadmap}
+                      onChange={e => setAiWeightRoadmap(e.target.value)}
+                      style={{ width: '100%', accentColor: '#6c5ce7' }}
+                    />
+                  </div>
+                </div>
+
+                <button className="admin-back-btn" onClick={handleUpdateAIWeights} style={{ background: '#1C2B17', color: '#FFFFFF' }}>
+                  Lưu cấu hình tham số AI
+                </button>
               </div>
             </div>
           )}
@@ -3854,117 +3888,285 @@ export default function AdminDashboard({
               </div>
             </div>
           )}
-        </div>
-      </main>
 
-      {/* ==========================================
-          BOOK DIALOG MODAL (ADD / EDIT)
-          ========================================== */}
-      {showBookModal && (
-        <div className="admin-modal-backdrop" onClick={() => setShowBookModal(false)}>
-          <div className="admin-modal" onClick={e => e.stopPropagation()}>
-            <header className="admin-modal-header">
-              <span>{editingBook ? 'CHỈNH SỬA SÁCH ĐỀ XUẤT' : 'THÊM SÁCH ĐỀ XUẤT MỚI'}</span>
-              <button 
-                onClick={() => setShowBookModal(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold' }}
-              >
-                ×
-              </button>
-            </header>
+          {/* ==========================================
+              TAB: SYSTEM LOGS (NHẬT KÝ HỆ THỐNG)
+              ========================================== */}
+          {activeTab === 'system-logs' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              
+              {/* Statistics Cards */}
+              <div className="stats-row-6col" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px', marginBottom: '8px' }}>
+                {renderLogKpiCard('Tổng Log Hôm Nay', <HiTerminal />, systemLogsStats.totalToday || 0, 'blue')}
+                {renderLogKpiCard('Số Lượt Đăng Nhập', <HiUsers />, systemLogsStats.loginToday || 0, 'green')}
+                {renderLogKpiCard('Thao Tác Quản Trị', <HiAdjustments />, systemLogsStats.adminToday || 0, 'indigo')}
+                {renderLogKpiCard('Lỗi Hệ Thống', <HiShieldCheck />, systemLogsStats.systemToday || 0, 'purple')}
+                {renderLogKpiCard('Lỗi AI Coach', <HiTerminal />, systemLogsStats.aiErrorsToday || 0, 'amber')}
+                {renderLogKpiCard('Lỗi Thanh Toán', <HiCurrencyDollar />, systemLogsStats.paymentErrorsToday || 0, 'red')}
+              </div>
 
-            <form onSubmit={handleSaveBook}>
-              <div className="admin-modal-body">
-                <div className="admin-form-group">
-                  <label>Tiêu đề sách:</label>
-                  <input
-                    type="text"
+              {/* Filtering Controls */}
+              <div className="admin-card" style={{ marginBottom: '0', border: '2px solid #000', boxShadow: '3px 3px 0px #000', borderRadius: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 1fr 1.2fr 80px', gap: '12px', alignItems: 'center' }}>
+                  {/* Search Input */}
+                  <div style={{ position: 'relative' }}>
+                    <HiSearch style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#7A7A7A' }} />
+                    <input
+                      type="text"
+                      className="admin-form-input"
+                      placeholder="Tìm theo người dùng, email, nội dung..."
+                      value={logsSearch}
+                      onChange={(e) => setLogsSearch(e.target.value)}
+                      style={{ paddingLeft: '32px' }}
+                    />
+                  </div>
+
+                  {/* Log Type filter */}
+                  <select
                     className="admin-form-input"
-                    value={bookForm.title}
-                    onChange={e => setBookForm(prev => ({ ...prev, title: e.target.value }))}
-                    required
-                  />
-                </div>
+                    value={logsTypeFilter}
+                    onChange={(e) => { 
+                      setLogsTypeFilter(e.target.value); 
+                      setLogsModuleFilter('ALL'); 
+                      setLogsPage(1); 
+                    }}
+                    style={{ height: '40px', padding: '0 10px' }}
+                  >
+                    <option value="ALL">Tất cả loại nhật ký</option>
+                    <option value="LOGIN">Nhật ký đăng nhập</option>
+                    <option value="ADMIN">Nhật ký quản trị</option>
+                    <option value="SYSTEM">Nhật ký hệ thống</option>
+                  </select>
 
-                <div className="admin-form-group">
-                  <label>Tác giả / Nguồn biên soạn:</label>
-                  <input
-                    type="text"
+                  {/* Level filter */}
+                  <select
                     className="admin-form-input"
-                    value={bookForm.author}
-                    onChange={e => setBookForm(prev => ({ ...prev, author: e.target.value }))}
-                    required
-                  />
-                </div>
+                    value={logsLevelFilter}
+                    onChange={(e) => { setLogsLevelFilter(e.target.value); setLogsPage(1); }}
+                    style={{ height: '40px', padding: '0 10px' }}
+                  >
+                    <option value="ALL">Tất cả mức độ</option>
+                    <option value="INFO">Thông tin (INFO)</option>
+                    <option value="WARNING">Cảnh báo (WARNING)</option>
+                    <option value="ERROR">Lỗi (ERROR)</option>
+                    <option value="CRITICAL">Nghiêm trọng (CRITICAL)</option>
+                  </select>
 
-                <div className="admin-form-group">
-                  <label>Đường dẫn hình ảnh bìa (Cover URL):</label>
-                  <input
-                    type="text"
+                  {/* Module filter */}
+                  <select
                     className="admin-form-input"
-                    placeholder="https://example.com/cover.jpg"
-                    value={bookForm.coverUrl}
-                    onChange={e => setBookForm(prev => ({ ...prev, coverUrl: e.target.value }))}
-                  />
-                </div>
+                    value={logsModuleFilter}
+                    onChange={(e) => { setLogsModuleFilter(e.target.value); setLogsPage(1); }}
+                    style={{ height: '40px', padding: '0 10px' }}
+                  >
+                    <option value="ALL">Tất cả chức năng</option>
+                    {(logsTypeFilter === 'ALL' || logsTypeFilter === 'LOGIN') && (
+                      <option value="AUTH_SERVICE">Xác thực (AUTH_SERVICE)</option>
+                    )}
+                    {(logsTypeFilter === 'ALL' || logsTypeFilter === 'ADMIN') && (
+                      <>
+                        <option value="ADMIN_SERVICE">Quản trị chung (ADMIN_SERVICE)</option>
+                        <option value="TEACHER_SERVICE">Giáo viên (TEACHER_SERVICE)</option>
+                        <option value="COURSE_SERVICE">Khóa học (COURSE_SERVICE)</option>
+                        <option value="MODERATION_SERVICE">Báo cáo vi phạm (MODERATION_SERVICE)</option>
+                      </>
+                    )}
+                    {(logsTypeFilter === 'ALL' || logsTypeFilter === 'SYSTEM') && (
+                      <>
+                        <option value="AI_SERVICE">Dịch vụ AI (AI_SERVICE)</option>
+                        <option value="PAYMENT_SERVICE">Thanh toán (PAYMENT_SERVICE)</option>
+                        <option value="SYSTEM_SERVICE">Nhân hệ thống (SYSTEM_SERVICE)</option>
+                      </>
+                    )}
+                  </select>
 
-                <div className="admin-form-group">
-                  <label>Giá bán:</label>
-                  <input
-                    type="text"
-                    className="admin-form-input"
-                    placeholder="129.000đ"
-                    value={bookForm.price}
-                    onChange={e => setBookForm(prev => ({ ...prev, price: e.target.value }))}
-                    required
-                  />
-                </div>
+                  {/* Date range filter */}
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input
+                      type="date"
+                      className="admin-form-input"
+                      value={logsFromDate}
+                      onChange={(e) => { setLogsFromDate(e.target.value); setLogsPage(1); }}
+                      style={{ fontSize: '11px', height: '40px' }}
+                    />
+                    <span style={{ fontSize: '12px', fontWeight: 'bold' }}>-</span>
+                    <input
+                      type="date"
+                      className="admin-form-input"
+                      value={logsToDate}
+                      onChange={(e) => { setLogsToDate(e.target.value); setLogsPage(1); }}
+                      style={{ fontSize: '11px', height: '40px' }}
+                    />
+                  </div>
 
-                <div className="admin-form-group">
-                  <label>Đường dẫn mua hàng (Shopee/Tiki):</label>
-                  <input
-                    type="text"
-                    className="admin-form-input"
-                    placeholder="https://shopee.vn/..."
-                    value={bookForm.link}
-                    onChange={e => setBookForm(prev => ({ ...prev, link: e.target.value }))}
-                    required
-                  />
-                </div>
-
-                <div className="admin-form-group">
-                  <label>Mô tả ngắn gọn:</label>
-                  <textarea
-                    className="admin-form-textarea"
-                    rows="3"
-                    value={bookForm.description}
-                    onChange={e => setBookForm(prev => ({ ...prev, description: e.target.value }))}
-                    required
-                  />
+                  {/* Reset filters button */}
+                  <button
+                    type="button"
+                    className="admin-table-btn"
+                    onClick={() => {
+                      setLogsSearch('');
+                      setLogsTypeFilter('ALL');
+                      setLogsLevelFilter('ALL');
+                      setLogsModuleFilter('ALL');
+                      setLogsFromDate('');
+                      setLogsToDate('');
+                      setLogsPage(1);
+                    }}
+                    style={{ height: '40px', justifyContent: 'center' }}
+                  >
+                    Đặt lại
+                  </button>
                 </div>
               </div>
 
-              <footer className="admin-modal-footer">
-                <button 
-                  type="button" 
-                  className="admin-back-btn" 
-                  style={{ background: 'none', boxShadow: 'none' }}
-                  onClick={() => setShowBookModal(false)}
-                >
-                  Hủy bỏ
-                </button>
-                <button 
-                  type="submit" 
-                  className="admin-back-btn"
-                  style={{ background: '#1C2B17', color: '#FFFFFF' }}
-                >
-                  Lưu thông tin
-                </button>
-              </footer>
-            </form>
-          </div>
+              {/* Data Table */}
+              <div className="admin-card" style={{ border: '2px solid #000', boxShadow: '3px 3px 0px #000', borderRadius: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <h3 className="chart-card-title" style={{ margin: 0 }}>
+                    {logsTypeFilter === 'ALL' && 'BẢNG NHẬT KÝ HOẠT ĐỘNG HỆ THỐNG'}
+                    {logsTypeFilter === 'LOGIN' && 'BẢNG NHẬT KÝ ĐĂNG NHẬP'}
+                    {logsTypeFilter === 'ADMIN' && 'BẢNG NHẬT KÝ THAO TÁC QUẢN TRỊ'}
+                    {logsTypeFilter === 'SYSTEM' && 'BẢNG NHẬT KÝ HỆ THỐNG'}
+                  </h3>
+                  {logsLoading && <div className="stats-spinner" style={{ width: '20px', height: '20px' }} />}
+                </div>
+
+                <div className="admin-terminal" style={{ height: '450px', cursor: 'default' }}>
+                  {systemLogsList.map((log) => {
+                    const timeStr = new Date(log.createdAt).toLocaleTimeString('vi-VN');
+                    
+                    if (log.type === 'LOGIN') {
+                      const isSuccess = log.level !== 'ERROR' && log.level !== 'CRITICAL';
+                      return (
+                        <div 
+                          key={log.id} 
+                          className="terminal-line" 
+                          onClick={() => {
+                            setSelectedLogDetail(log);
+                            setShowLogDetailDrawer(true);
+                          }}
+                          style={{ cursor: 'pointer', padding: '2px 4px', borderRadius: '4px', transition: 'background 0.15s' }}
+                          title="Click để xem chi tiết log"
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          <span className="terminal-time">[{timeStr}]</span>
+                          <span style={{ color: '#00BFFF', fontWeight: 'bold', marginRight: '6px' }}>[LOGIN]</span>
+                          <span style={{ color: '#4AF626', fontWeight: 'bold', marginRight: '6px' }}>
+                            [{isSuccess ? 'SUCCESS' : 'FAILED'}]
+                          </span>
+                          <span style={{ color: '#4AF626' }}>
+                            {log.description} - IP: {log.ipAddress || 'N/A'} - {log.device || 'N/A'} ({log.operatingSystem || 'N/A'} • {log.browser || 'N/A'})
+                          </span>
+                        </div>
+                      );
+                    }
+
+                    if (log.type === 'ADMIN') {
+                      return (
+                        <div 
+                          key={log.id} 
+                          className="terminal-line" 
+                          onClick={() => {
+                            setSelectedLogDetail(log);
+                            setShowLogDetailDrawer(true);
+                          }}
+                          style={{ cursor: 'pointer', padding: '2px 4px', borderRadius: '4px', transition: 'background 0.15s' }}
+                          title="Click để xem chi tiết log"
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          <span className="terminal-time">[{timeStr}]</span>
+                          <span style={{ color: '#FF007F', fontWeight: 'bold', marginRight: '6px' }}>[ADMIN]</span>
+                          <span style={{ color: '#4AF626', fontWeight: 'bold', marginRight: '6px' }}>
+                            [{log.module}]
+                          </span>
+                          <span style={{ color: '#4AF626', fontWeight: 'bold', marginRight: '6px' }}>
+                            {log.user?.fullName || 'Admin'}:
+                          </span>
+                          <span style={{ color: '#4AF626' }}>
+                            {log.action} - {log.description} (IP: {log.ipAddress || 'N/A'})
+                          </span>
+                        </div>
+                      );
+                    }
+
+                    // Default SYSTEM type
+                    const isAi = log.module === 'AI_SERVICE';
+                    return (
+                      <div 
+                        key={log.id} 
+                        className="terminal-line" 
+                        onClick={() => {
+                          setSelectedLogDetail(log);
+                          setShowLogDetailDrawer(true);
+                        }}
+                        style={{ cursor: 'pointer', padding: '2px 4px', borderRadius: '4px', transition: 'background 0.15s' }}
+                        title="Click để xem chi tiết log"
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <span className="terminal-time">[{timeStr}]</span>
+                        {isAi ? (
+                          <span style={{ color: '#00BFFF', fontWeight: 'bold', marginRight: '6px' }}>[AI SYSTEM]</span>
+                        ) : (
+                          <span style={{ color: '#FF007F', fontWeight: 'bold', marginRight: '6px' }}>[SYSTEM]</span>
+                        )}
+                        <span style={{ color: '#4AF626', fontWeight: 'bold', marginRight: '6px' }}>
+                          [{log.level}]
+                        </span>
+                        {log.action && (
+                          <span style={{ color: '#4AF626', fontWeight: 'bold', marginRight: '6px' }}>
+                            {log.action}
+                          </span>
+                        )}
+                        {log.action && <span style={{ color: '#4AF626', marginRight: '6px' }}>-</span>}
+                        <span style={{ color: '#4AF626' }}>
+                          {log.description}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {systemLogsList.length === 0 && (
+                    <div style={{ color: '#7A7A7A', fontStyle: 'italic', textAlign: 'center', padding: '20px' }}>
+                      Không có dữ liệu log phù hợp.
+                    </div>
+                  )}
+                </div>
+
+                {/* Pagination */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: '800', color: '#7A7A7A' }}>
+                    Trang {logsPage} / {logsTotalPages}
+                  </span>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      className="admin-table-btn"
+                      disabled={logsPage === 1}
+                      onClick={() => setLogsPage(prev => Math.max(1, prev - 1))}
+                      style={{ opacity: logsPage === 1 ? 0.5 : 1 }}
+                    >
+                      Trước
+                    </button>
+                    <button
+                      className="admin-table-btn"
+                      disabled={logsPage === logsTotalPages}
+                      onClick={() => setLogsPage(prev => Math.min(logsTotalPages, prev + 1))}
+                      style={{ opacity: logsPage === logsTotalPages ? 0.5 : 1 }}
+                    >
+                      Sau
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          )}
         </div>
-      )}
+      </main>
+
+
 
       {/* ==========================================
           USER DETAIL MODAL
@@ -5625,6 +5827,162 @@ export default function AdminDashboard({
                 </button>
               </footer>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          SYSTEM LOGS DETAIL DRAWER (SLIDE-IN RIGHT)
+          ========================================== */}
+      {showLogDetailDrawer && selectedLogDetail && (
+        <div className="admin-modal-backdrop" style={{ justifyContent: 'flex-end', padding: 0 }} onClick={() => setShowLogDetailDrawer(false)}>
+          <div 
+            style={{
+              width: '550px',
+              height: '100%',
+              backgroundColor: '#FFFFFF',
+              borderLeft: '3px solid #2D3229',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '-6px 0px 0px rgba(45, 50, 41, 0.15)',
+              animation: 'slideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+              overflow: 'hidden'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <header className="admin-modal-header" style={{ borderRadius: 0 }}>
+              <span style={{ fontSize: '15px', fontWeight: '950' }}>📄 CHI TIẾT NHẬT KÝ HỆ THỐNG</span>
+              <button 
+                onClick={() => setShowLogDetailDrawer(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', fontWeight: 'bold' }}
+              >
+                ×
+              </button>
+            </header>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              
+              {/* General Information */}
+              <div style={{ border: '1.5px solid #2D3229', padding: '14px', borderRadius: '12px', background: '#FCFBFA', boxShadow: '2px 2px 0px #2D3229' }}>
+                <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: '900', textTransform: 'uppercase', borderBottom: '1px dashed #2D3229', paddingBottom: '4px' }}>
+                  Thông tin chung
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12.5px', fontWeight: '700' }}>
+                  <div><strong>Mã Log:</strong> #{selectedLogDetail.id}</div>
+                  <div><strong>Thời gian:</strong> {new Date(selectedLogDetail.createdAt).toLocaleString('vi-VN')}</div>
+                  <div>
+                    <strong>Mức độ:</strong>{' '}
+                    <span style={{
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      border: '1px solid #000',
+                      fontSize: '10px',
+                      fontWeight: '800',
+                      background: selectedLogDetail.level === 'INFO' ? '#D1FAE5' : selectedLogDetail.level === 'WARNING' ? '#FEF3C7' : selectedLogDetail.level === 'ERROR' ? '#FEE2E2' : '#FCE7F3',
+                      color: selectedLogDetail.level === 'INFO' ? '#065F46' : selectedLogDetail.level === 'WARNING' ? '#D97706' : selectedLogDetail.level === 'ERROR' || selectedLogDetail.level === 'CRITICAL' ? '#991B1B' : '#9D174D'
+                    }}>
+                      {selectedLogDetail.level}
+                    </span>
+                  </div>
+                  <div>
+                    <strong>Loại Log:</strong>{' '}
+                    <span style={{
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      border: '1px solid #000',
+                      fontSize: '10px',
+                      fontWeight: '800',
+                      background: '#E0E7FF',
+                      color: '#4F46E5'
+                    }}>
+                      {selectedLogDetail.type}
+                    </span>
+                  </div>
+                  <div><strong>Module / Dịch vụ:</strong> <code style={{ background: '#F1F5F9', padding: '2px 4px', borderRadius: '4px', border: '1px solid #CBD5E1' }}>{selectedLogDetail.module}</code></div>
+                </div>
+              </div>
+
+              {/* User Details */}
+              <div style={{ border: '1.5px solid #2D3229', padding: '14px', borderRadius: '12px', background: '#FCFBFA', boxShadow: '2px 2px 0px #2D3229' }}>
+                <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: '900', textTransform: 'uppercase', borderBottom: '1px dashed #2D3229', paddingBottom: '4px' }}>
+                  Người thực hiện
+                </h4>
+                {selectedLogDetail.user ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12.5px', fontWeight: '700' }}>
+                    <div><strong>Họ và tên:</strong> {selectedLogDetail.user.fullName}</div>
+                    <div><strong>Email:</strong> {selectedLogDetail.user.email}</div>
+                    <div><strong>Vai trò:</strong> {selectedLogDetail.user.role}</div>
+                    <div><strong>Mã ID:</strong> {selectedLogDetail.userId}</div>
+                  </div>
+                ) : (
+                  <div style={{ fontStyle: 'italic', color: '#7A7A7A', fontSize: '12.5px', fontWeight: '700' }}>
+                    Khách vãng lai (Chưa đăng nhập / Hệ thống tự động)
+                  </div>
+                )}
+              </div>
+
+              {/* Event Details */}
+              <div style={{ border: '1.5px solid #2D3229', padding: '14px', borderRadius: '12px', background: '#FCFBFA', boxShadow: '2px 2px 0px #2D3229' }}>
+                <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: '900', textTransform: 'uppercase', borderBottom: '1px dashed #2D3229', paddingBottom: '4px' }}>
+                  Chi tiết sự kiện
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12.5px', fontWeight: '700' }}>
+                  <div><strong>Hành động:</strong> {selectedLogDetail.action}</div>
+                  <div><strong>Mô tả:</strong> {selectedLogDetail.description}</div>
+                </div>
+              </div>
+
+              {/* Connection & User Agent */}
+              <div style={{ border: '1.5px solid #2D3229', padding: '14px', borderRadius: '12px', background: '#FCFBFA', boxShadow: '2px 2px 0px #2D3229' }}>
+                <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: '900', textTransform: 'uppercase', borderBottom: '1px dashed #2D3229', paddingBottom: '4px' }}>
+                  Thiết bị & Kết nối
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12.5px', fontWeight: '700' }}>
+                  <div><strong>Địa chỉ IP:</strong> {selectedLogDetail.ipAddress || 'Không rõ'}</div>
+                  <div><strong>Thiết bị:</strong> {selectedLogDetail.device || 'Không rõ'}</div>
+                  <div><strong>Hệ điều hành (OS):</strong> {selectedLogDetail.operatingSystem || 'Không rõ'}</div>
+                  <div><strong>Trình duyệt (Browser):</strong> {selectedLogDetail.browser || 'Không rõ'}</div>
+                  <div style={{ fontSize: '11px', color: '#64748B', wordBreak: 'break-all', marginTop: '4px' }}>
+                    <strong>User Agent:</strong> {selectedLogDetail.userAgent}
+                  </div>
+                </div>
+              </div>
+
+              {/* Metadata Block */}
+              {selectedLogDetail.metadata && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: '900', color: '#2D3229', textTransform: 'uppercase' }}>Dữ liệu mở rộng (Metadata):</span>
+                  <pre style={{
+                    margin: 0,
+                    padding: '12px',
+                    background: '#0E100D',
+                    color: '#4AF626',
+                    border: '1.5px solid #2D3229',
+                    borderRadius: '8px',
+                    fontSize: '11.5px',
+                    fontFamily: 'monospace',
+                    maxHeight: '240px',
+                    overflow: 'auto',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-all'
+                  }}>
+                    {JSON.stringify(selectedLogDetail.metadata, null, 2)}
+                  </pre>
+                </div>
+              )}
+
+            </div>
+
+            <footer className="admin-modal-footer" style={{ borderRadius: 0 }}>
+              <button 
+                type="button" 
+                className="admin-back-btn" 
+                style={{ background: '#1C2B17', color: '#FFFFFF', width: 'auto', margin: 0, boxShadow: 'none' }}
+                onClick={() => setShowLogDetailDrawer(false)}
+              >
+                Đóng Chi tiết
+              </button>
+            </footer>
           </div>
         </div>
       )}

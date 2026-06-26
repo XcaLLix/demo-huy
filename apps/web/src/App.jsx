@@ -1299,38 +1299,7 @@ export default function App() {
     ];
   });
 
-  // Dynamic Recommended Books List state lifted from AdminDashboard
-  const [booksList, setBooksList] = useState(() => {
-    return JSON.parse(localStorage.getItem('admin_books_rec')) || [
-      {
-        id: 1,
-        title: "Bộ đề ôn luyện THPTQG môn Toán 2026",
-        author: "Thầy Thế Anh",
-        coverUrl: "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&q=80&w=200",
-        description: "Tổng hợp 20 đề thi thử bám sát cấu trúc mới nhất của Bộ GD&ĐT kèm giải chi tiết và kỹ thuật bấm máy nhanh.",
-        price: "129.000đ",
-        link: "https://shopee.vn"
-      },
-      {
-        id: 2,
-        title: "Chinh phục Ngữ pháp Tiếng Anh THPTQG",
-        author: "Cô Quỳnh Chi",
-        coverUrl: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=200",
-        description: "Hệ thống hóa toàn bộ kiến thức ngữ pháp trọng tâm và các phương pháp giải nhanh điểm 9+.",
-        price: "99.000đ",
-        link: "https://tiki.vn"
-      },
-      {
-        id: 3,
-        title: "Sổ tay công thức nhanh Vật Lý 12",
-        author: "Cô Thu Hương",
-        coverUrl: "https://images.unsplash.com/photo-1506880018603-83d5b814b5a6?auto=format&fit=crop&q=80&w=200",
-        description: "Tóm gọn toàn bộ công thức cốt lõi và các dạng bài tập chuyên đề dao động, sóng cơ, sóng điện từ.",
-        price: "79.000đ",
-        link: "https://shopee.vn"
-      }
-    ];
-  });
+
 
   const [notifications, setNotifications] = useState(() => JSON.parse(localStorage.getItem('app_notifications')) || [
     { id: 1, text: "Chào mừng bạn gia nhập EduPath AI! Hãy bắt đầu khám phá lộ trình của bạn.", time: "Vừa xong", read: false }
@@ -1553,8 +1522,7 @@ export default function App() {
     localStorage.setItem('app_approvals', JSON.stringify(courseApprovals));
     localStorage.setItem('app_forum_posts', JSON.stringify(forumPosts));
     localStorage.setItem('admin_leads', JSON.stringify(leadsList));
-    localStorage.setItem('admin_books_rec', JSON.stringify(booksList));
-  }, [currentUser, role, theme, usersList, courses, questionBank, submissions, notifications, systemLogs, courseApprovals, forumPosts, leadsList, booksList]);
+  }, [currentUser, role, theme, usersList, courses, questionBank, submissions, notifications, systemLogs, courseApprovals, forumPosts, leadsList]);
 
   // Dark theme trigger
   useEffect(() => {
@@ -3734,8 +3702,6 @@ export default function App() {
                   submissions={submissions}
                   leadsList={leadsList}
                   setLeadsList={setLeadsList}
-                  booksList={booksList}
-                  setBooksList={setBooksList}
                   featureFlags={featureFlags}
                   setFeatureFlags={setFeatureFlags}
                 />

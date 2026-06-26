@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import type { AuthRequest } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
 import { incrementBothStats } from '../lib/monthlyStats.js';
+import { logSystemEvent } from '../utils/logger.js';
 import fs from 'fs';
 import path from 'path';
 import mammoth from 'mammoth';
@@ -1126,6 +1127,16 @@ async function callOpenRouter(prompt: string, maxTokens = 1500, temp = 0.5) {
 
   if (!response.ok) {
     const errText = await response.text();
+    const isTimeout = response.status === 408 || errText.includes('timeout') || errText.includes('Timeout');
+    await logSystemEvent(null, {
+      type: 'SYSTEM',
+      action: isTimeout ? 'AI_TIMEOUT' : 'AI_NO_RESPONSE',
+      module: 'AI_SERVICE',
+      description: `Lỗi kết nối AI (${response.status}): ${errText.substring(0, 300)}`,
+      metadata: { status: response.status, error: errText },
+      level: 'ERROR'
+    }).catch(logErr => console.error('Failed to log AI error:', logErr));
+
     throw new Error(`OpenRouter error: ${errText}`);
   }
 
@@ -1135,6 +1146,15 @@ async function callOpenRouter(prompt: string, maxTokens = 1500, temp = 0.5) {
     return (data.choices?.[0]?.message?.content || '').trim();
   } catch (e) {
     console.error("OpenRouter response was not valid JSON:", resText);
+    logSystemEvent(null, {
+      type: 'SYSTEM',
+      action: 'AI_NO_RESPONSE',
+      module: 'AI_SERVICE',
+      description: `Lỗi phản hồi AI: Phản hồi không phải JSON hợp lệ.`,
+      metadata: { responseText: resText.substring(0, 1000) },
+      level: 'ERROR'
+    }).catch(logErr => console.error('Failed to log AI parse error:', logErr));
+
     throw new Error(`OpenRouter response was not valid JSON: ${resText.substring(0, 200)}`);
   }
 }

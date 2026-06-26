@@ -8,6 +8,7 @@ import { incrementBothStats } from '../lib/monthlyStats.js';
 import { sendOTPEmail, sendResetPasswordEmail, sendResetPasswordOTPEmail, sendRoleChangeNotification, isRealSmtpActive } from '../lib/mailer.js';
 import { isDisposableEmail, isValidEmailFormat } from '../lib/disposable-domains.js';
 import { checkOtpSendRateLimit, recordOtpSend, checkResendCooldown, recordResendCooldown } from '../lib/rate-limiter.js';
+import { logSystemEvent } from '../utils/logger.js';
 
 if (!process.env.JWT_SECRET) {
   throw new Error('FATAL: JWT_SECRET environment variable is missing!');
@@ -112,11 +113,42 @@ export async function login(req: Request, res: Response) {
       });
     }
 
-    if (!user || (!isBypass && !(await bcrypt.compare(password, user.passwordHash)))) {
+    if (!user) {
+      await logSystemEvent(req, {
+        type: 'LOGIN',
+        action: 'LOGIN_FAILED',
+        module: 'AUTH',
+        userId: null,
+        description: `Đăng nhập thất bại: Không tồn tại tài khoản (${email})`,
+        metadata: { email, reason: 'Không tồn tại tài khoản' },
+        level: 'WARNING'
+      });
+      return res.status(400).json({ success: false, error: 'Tên đăng nhập hoặc mật khẩu không chính xác!' });
+    }
+
+    if (!isBypass && !(await bcrypt.compare(password, user.passwordHash))) {
+      await logSystemEvent(req, {
+        type: 'LOGIN',
+        action: 'LOGIN_FAILED',
+        module: 'AUTH',
+        userId: user.id,
+        description: `Đăng nhập thất bại: Sai mật khẩu (${email})`,
+        metadata: { email, userId: user.id, reason: 'Sai mật khẩu' },
+        level: 'WARNING'
+      });
       return res.status(400).json({ success: false, error: 'Tên đăng nhập hoặc mật khẩu không chính xác!' });
     }
 
     if (!user.isActive || user.status === 'BLOCKED') {
+      await logSystemEvent(req, {
+        type: 'LOGIN',
+        action: 'LOGIN_FAILED',
+        module: 'AUTH',
+        userId: user.id,
+        description: `Đăng nhập thất bại: Tài khoản bị khóa (${email})`,
+        metadata: { email, userId: user.id, reason: 'Tài khoản bị khóa' },
+        level: 'WARNING'
+      });
       return res.status(403).json({ success: false, error: 'Tài khoản của bạn đã bị khóa!' });
     }
 
@@ -136,6 +168,16 @@ export async function login(req: Request, res: Response) {
     }
 
     const tokens = signTokens({ id: user.id, email: user.email, fullName: user.fullName, role: user.role });
+
+    await logSystemEvent(req, {
+      type: 'LOGIN',
+      action: 'LOGIN_SUCCESS',
+      module: 'AUTH',
+      userId: user.id,
+      description: `Đăng nhập thành công: ${user.fullName} (${user.email})`,
+      metadata: { email: user.email, role: user.role },
+      level: 'INFO'
+    });
 
     return res.status(200).json({
       success: true,
@@ -605,6 +647,16 @@ export async function verifyOtpRegister(req: Request, res: Response) {
 
     const tokens = signTokens({ id: user.id, email: user.email, fullName: user.fullName, role: user.role });
 
+    await logSystemEvent(req, {
+      type: 'LOGIN',
+      action: 'LOGIN_SUCCESS',
+      module: 'AUTH',
+      userId: user.id,
+      description: `Đăng ký & Đăng nhập thành công qua OTP: ${user.fullName} (${user.email})`,
+      metadata: { email: user.email, role: user.role, provider: 'otp', isNewUser: true },
+      level: 'INFO'
+    });
+
     return res.status(201).json({
       success: true,
       data: {
@@ -645,6 +697,15 @@ export async function googleAuth(req: Request, res: Response) {
       }
 
       if (!user.isActive || user.status === 'BLOCKED') {
+        await logSystemEvent(req, {
+          type: 'LOGIN',
+          action: 'LOGIN_FAILED',
+          module: 'AUTH',
+          userId: user.id,
+          description: `Đăng nhập Google thất bại: Tài khoản bị khóa (${email})`,
+          metadata: { email, userId: user.id, reason: 'Tài khoản bị khóa', provider: 'google' },
+          level: 'WARNING'
+        });
         return res.status(403).json({ success: false, error: 'Tài khoản đã bị khóa!' });
       }
       if (user.role === 'TEACHER' && user.teacher && !user.teacher.isApproved) {
@@ -662,6 +723,16 @@ export async function googleAuth(req: Request, res: Response) {
       }
 
       const tokens = signTokens({ id: user.id, email: user.email, fullName: user.fullName, role: user.role });
+
+      await logSystemEvent(req, {
+        type: 'LOGIN',
+        action: 'LOGIN_SUCCESS',
+        module: 'AUTH',
+        userId: user.id,
+        description: `Đăng nhập Google thành công: ${user.fullName} (${user.email})`,
+        metadata: { email: user.email, role: user.role, provider: 'google' },
+        level: 'INFO'
+      });
 
       return res.status(200).json({
         success: true,
@@ -805,6 +876,16 @@ export async function googleCompleteOnboarding(req: Request, res: Response) {
       console.error('[MonthlyStats] Lỗi cập nhật newUsers (Google):', e);
     }
     const tokens = signTokens({ id: user.id, email: user.email, fullName: user.fullName, role: user.role });
+
+    await logSystemEvent(req, {
+      type: 'LOGIN',
+      action: 'LOGIN_SUCCESS',
+      module: 'AUTH',
+      userId: user.id,
+      description: `Đăng ký & Đăng nhập Google thành công: ${user.fullName} (${user.email})`,
+      metadata: { email: user.email, role: user.role, provider: 'google', isNewUser: true },
+      level: 'INFO'
+    });
 
     return res.status(201).json({
       success: true,
@@ -1214,6 +1295,17 @@ export async function refreshToken(req: Request, res: Response) {
     });
   } catch (err: any) {
     console.error('[auth] Refresh token validation failed:', err.message);
+    if (err.name === 'TokenExpiredError') {
+      await logSystemEvent(req, {
+        type: 'LOGIN',
+        action: 'LOGIN_FAILED',
+        module: 'AUTH',
+        userId: null,
+        description: 'Đăng nhập thất bại: Token hết hạn',
+        metadata: { reason: 'Token hết hạn' },
+        level: 'WARNING'
+      });
+    }
     return res.status(401).json({ success: false, error: 'Mã refresh token không hợp lệ hoặc đã hết hạn!' });
   }
 }
