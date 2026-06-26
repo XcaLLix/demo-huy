@@ -3,13 +3,13 @@
    ========================================================================== */
 
 :root {
-  --fc-bg-dark: #FAF8F2;
-  --fc-card-dark: #FFFFFF;
-  --fc-gold: #F59E0B;
-  --fc-gold-hover: #D97706;
-  --fc-border-dark: #E5E7EB;
-  --fc-text-primary: #1F2937;
-  --fc-text-secondary: #4B5563;
+  --fc-bg-dark: #141410;
+  --fc-card-dark: #1E1E18;
+  --fc-gold: #FFE259;
+  --fc-gold-hover: #FADB3B;
+  --fc-border-dark: #2F2F26;
+  --fc-text-primary: #F3F4F6;
+  --fc-text-secondary: #9CA3AF;
   --fc-starry-bg: linear-gradient(135deg, #0A0F1D, #161F38);
 }
 
@@ -117,7 +117,7 @@
 }
 
 .flashcard-menu-item:hover {
-  background: rgba(0, 0, 0, 0.03);
+  background: rgba(255, 255, 255, 0.03);
   color: var(--fc-text-primary);
 }
 
@@ -140,7 +140,7 @@
 .flashcard-menu-item-counter {
   font-size: 11px;
   font-weight: 800;
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.08);
   padding: 2px 8px;
   border-radius: 10px;
   color: var(--fc-text-primary);
@@ -153,8 +153,8 @@
 
 /* Streak card at bottom left */
 .flashcard-streak-card {
-  background: #FEF3C7;
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: #25251E;
+  border: 1px solid var(--fc-border-dark);
   border-radius: 16px;
   padding: 14px;
   display: flex;
@@ -311,9 +311,6 @@
   align-items: center;
   background: var(--fc-starry-bg);
   overflow: hidden;
-  --fc-text-primary: #F3F4F6;
-  --fc-text-secondary: #9CA3AF;
-  --fc-gold: #FFE259;
 }
 
 /* Background star sparkles */
@@ -548,7 +545,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(0, 0, 0, 0.02);
+  background: rgba(0, 0, 0, 0.1);
   position: relative;
   flex-shrink: 0;
 }
@@ -557,7 +554,7 @@
   font-size: 11.5px;
   font-weight: 900;
   letter-spacing: 1.5px;
-  color: #B45309;
+  color: var(--fc-gold);
   text-transform: uppercase;
   margin: 0;
 }
@@ -626,7 +623,7 @@
 
 .flashcard-chat-bubble--bot {
   align-self: flex-start;
-  background: rgba(0, 0, 0, 0.03);
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--fc-border-dark);
   color: var(--fc-text-primary);
   border-bottom-left-radius: 2px;
@@ -636,7 +633,7 @@
   align-self: flex-end;
   background: rgba(255, 226, 89, 0.12);
   border: 1px solid rgba(255, 226, 89, 0.25);
-  color: #78350F;
+  color: var(--fc-gold);
   border-bottom-right-radius: 2px;
 }
 
@@ -716,7 +713,7 @@
 }
 
 .flashcard-chat-chip {
-  background: rgba(0, 0, 0, 0.03);
+  background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--fc-border-dark);
   color: var(--fc-text-primary);
   padding: 5px 10px;
@@ -732,7 +729,7 @@
 .flashcard-chat-chip:hover {
   background: rgba(255, 226, 89, 0.08);
   border-color: rgba(255, 226, 89, 0.4);
-  color: #B45309;
+  color: var(--fc-gold);
   transform: translateY(-1px);
 }
 
@@ -743,13 +740,13 @@
   display: flex;
   gap: 8px;
   align-items: flex-end;
-  background: rgba(0, 0, 0, 0.02);
+  background: rgba(0, 0, 0, 0.15);
   flex-shrink: 0;
 }
 
 .flashcard-chat-input-field {
   flex: 1;
-  background: var(--fc-bg-dark);
+  background: #141410;
   border: 1px solid var(--fc-border-dark);
   border-radius: 12px;
   padding: 10px 12px;
@@ -1352,7 +1349,7 @@
   overflow-x: auto;
   border-radius: 12px;
   border: 1px solid var(--fc-border-dark);
-  background: #FFFFFF;
+  background: rgba(0, 0, 0, 0.15);
 }
 
 .flashcard-list-table {
@@ -1363,7 +1360,7 @@
 }
 
 .flashcard-list-header-row {
-  background: rgba(0, 0, 0, 0.03);
+  background: rgba(0, 0, 0, 0.3);
   border-bottom: 1px solid var(--fc-border-dark);
 }
 
@@ -1386,7 +1383,7 @@
 }
 
 .flashcard-list-row:hover {
-  background: rgba(0, 0, 0, 0.015);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .flashcard-list-cell {
@@ -1397,13 +1394,13 @@
 
 .flashcard-list-cell--front {
   font-weight: bold;
-  color: var(--fc-text-primary);
+  color: #ffffff;
   word-break: break-all;
 }
 
 .flashcard-list-cell--back {
   word-break: break-word;
-  color: var(--fc-text-secondary);
+  color: rgba(243, 244, 246, 0.85);
   line-height: 1.5;
 }
 
@@ -1511,13 +1508,14 @@
 .new-fc-card {
   position: relative;
   border-radius: 24px;
-  padding: 22px;
+  padding: 16px 18px;
   color: #ffffff;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: 180px;
+  height: 165px;
+  min-height: 165px;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
   transition: transform 0.25s ease, box-shadow 0.25s ease;
   box-sizing: border-box;
@@ -1533,66 +1531,66 @@
 /* Card Theme classes matching target screenshot colors & patterns */
 
 .new-fc-card--green {
-  --fc-accent: #10b981;
-  --fc-accent-rgb: 16, 185, 129;
-  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
-  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='1.5' fill='rgba%28255,255,255,0.08%29'/%3E%3C/svg%3E");
+  --fc-accent: #4E6533;
+  --fc-accent-rgb: 78, 101, 51;
+  background: #4E6533;
+  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22'%3E%3Ccircle cx='11' cy='11' r='2' fill='rgba%28255,255,255,0.18%29'/%3E%3C/svg%3E");
 }
 
 .new-fc-card--orange {
-  --fc-accent: #f97316;
-  --fc-accent-rgb: 249, 115, 22;
-  background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
-  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 30 30'%3E%3Cline x1='0' y1='30' x2='30' y2='0' stroke='rgba%28255,255,255,0.08%29' stroke-width='4'/%3E%3C/svg%3E");
+  --fc-accent: #E28D32;
+  --fc-accent-rgb: 226, 141, 50;
+  background: #E28D32;
+  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cline x1='0' y1='24' x2='24' y2='0' stroke='rgba%28255,255,255,0.18%29' stroke-width='4.5'/%3E%3C/svg%3E");
 }
 
 .new-fc-card--teal {
-  --fc-accent: #06b6d4;
-  --fc-accent-rgb: 6, 182, 212;
-  background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%);
-  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Crect width='10' height='10' fill='rgba%28255,255,255,0.05%29'/%3E%3C/svg%3E");
+  --fc-accent: #1A9F88;
+  --fc-accent-rgb: 26, 159, 136;
+  background: #1A9F88;
+  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cpath d='M0,10 Q10,0 20,10 T40,10' fill='none' stroke='rgba%28255,255,255,0.16%29' stroke-width='3.5'/%3E%3Cpath d='M0,30 Q10,20 20,30 T40,30' fill='none' stroke='rgba%28255,255,255,0.16%29' stroke-width='3.5'/%3E%3C/svg%3E");
 }
 
 .new-fc-card--red {
-  --fc-accent: #ef4444;
-  --fc-accent-rgb: 239, 68, 68;
-  background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
-  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Ccircle cx='10' cy='10' r='1.5' fill='rgba%28255,255,255,0.08%29'/%3E%3C/svg%3E");
+  --fc-accent: #B8554F;
+  --fc-accent-rgb: 184, 85, 79;
+  background: #B8554F;
+  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Crect width='20' height='20' fill='none' stroke='rgba%28255,255,255,0.15%29' stroke-width='2'/%3E%3C/svg%3E");
 }
 
 .new-fc-card--gold {
-  --fc-accent: #eab308;
-  --fc-accent-rgb: 234, 179, 8;
-  background: linear-gradient(135deg, #fde047 0%, #ca8a04 100%);
-  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='40' viewBox='0 0 10 40'%3E%3Cline x1='5' y1='0' x2='5' y2='40' stroke='rgba%28255,255,255,0.06%29' stroke-width='2'/%3E%3C/svg%3E");
+  --fc-accent: #C69031;
+  --fc-accent-rgb: 198, 144, 49;
+  background: #C69031;
+  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cline x1='0' y1='24' x2='24' y2='0' stroke='rgba%28255,255,255,0.16%29' stroke-width='3.5'/%3E%3Cline x1='0' y1='0' x2='24' y2='24' stroke='rgba%28255,255,255,0.16%29' stroke-width='3.5'/%3E%3C/svg%3E");
 }
 
 .new-fc-card--pink {
-  --fc-accent: #ec4899;
-  --fc-accent-rgb: 236, 72, 153;
-  background: linear-gradient(135deg, #f472b6 0%, #ec4899 100%);
-  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Crect x='0' y='0' width='8' height='8' fill='rgba%28255,255,255,0.04%29'/%3E%3Crect x='8' y='8' width='8' height='8' fill='rgba%28255,255,255,0.04%29'/%3E%3C/svg%3E");
+  --fc-accent: #B64F8C;
+  --fc-accent-rgb: 182, 79, 140;
+  background: #B64F8C;
+  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='15' viewBox='0 0 30 15'%3E%3Cpath d='M0 0 L15 15 L30 0' fill='none' stroke='rgba%28255,255,255,0.18%29' stroke-width='4'/%3E%3C/svg%3E");
 }
 
 .new-fc-card--blue {
-  --fc-accent: #3b82f6;
-  --fc-accent-rgb: 59, 130, 246;
-  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
-  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='30' viewBox='0 0 10 30'%3E%3Cline x1='0' y1='15' x2='10' y2='15' stroke='rgba%28255,255,255,0.06%29' stroke-width='2'/%3E%3C/svg%3E");
+  --fc-accent: #3F6BC8;
+  --fc-accent-rgb: 63, 107, 200;
+  background: #3F6BC8;
+  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cline x1='0' y1='10' x2='20' y2='10' stroke='rgba%28255,255,255,0.16%29' stroke-width='3.5'/%3E%3C/svg%3E");
 }
 
 .new-fc-card--purple {
-  --fc-accent: #8b5cf6;
-  --fc-accent-rgb: 139, 92, 246;
-  background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
-  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Ccircle cx='5' cy='5' r='1.5' fill='rgba%28255,255,255,0.08%29'/%3E%3Ccircle cx='15' cy='15' r='1.5' fill='rgba%28255,255,255,0.08%29'/%3E%3C/svg%3E");
+  --fc-accent: #7356C1;
+  --fc-accent-rgb: 115, 86, 193;
+  background: #7356C1;
+  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='2.5' fill='rgba%28255,255,255,0.18%29'/%3E%3C/svg%3E");
 }
 
 .new-fc-card--seagreen {
-  --fc-accent: #14b8a6;
-  --fc-accent-rgb: 20, 184, 166;
-  background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%);
-  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cline x1='0' y1='40' x2='40' y2='0' stroke='rgba%28255,255,255,0.08%29' stroke-width='4'/%3E%3C/svg%3E");
+  --fc-accent: #2F8E89;
+  --fc-accent-rgb: 47, 142, 137;
+  background: #2F8E89;
+  --fc-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cline x1='10' y1='0' x2='10' y2='20' stroke='rgba%28255,255,255,0.15%29' stroke-width='3.5'/%3E%3C/svg%3E");
 }
 
 .new-fc-card-pattern {
@@ -1602,6 +1600,45 @@
   opacity: 0.95;
   z-index: 1;
   pointer-events: none;
+}
+
+.new-fc-card-cloud-watermark {
+  position: absolute;
+  bottom: -15px;
+  right: -15px;
+  width: 140px;
+  height: 100px;
+  z-index: 1;
+  pointer-events: none;
+  color: #ffffff;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  opacity: 0.15;
+}
+
+.new-fc-card-btn-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 6px;
+  transition: all 0.2s ease;
+  width: fit-content;
+  outline: none;
+}
+
+.new-fc-card-btn-add:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: scale(1.02);
 }
 
 .new-fc-card > * {
@@ -1614,7 +1651,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 14px;
+  margin-bottom: 8px;
 }
 
 .new-fc-card-meta {
@@ -1625,35 +1662,42 @@
 }
 
 .new-fc-card-icon-badge {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
+  width: 32px;
+  height: 32px;
   background: #ffffff;
   color: var(--fc-accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11.5px;
+  font-size: 13.5px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  clip-path: polygon(
+    50% 0%, 58% 3%, 67% 2%, 73% 8%, 81% 9%, 86% 16%, 91% 20%, 93% 29%, 
+    98% 34%, 97% 43%, 100% 50%, 97% 57%, 98% 66%, 93% 71%, 91% 80%, 
+    86% 84%, 81% 91%, 73% 92%, 67% 98%, 58% 97%, 50% 100%, 42% 97%, 
+    33% 98%, 27% 92%, 19% 91%, 14% 84%, 9% 80%, 7% 71%, 2% 66%, 
+    3% 57%, 0% 50%, 3% 43%, 2% 34%, 7% 29%, 9% 20%, 14% 16%, 
+    19% 9%, 27% 8%, 33% 2%, 42% 3%
+  );
 }
 
 /* Body inside card */
 .new-fc-card-body {
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
 .new-fc-card-title {
-  font-size: 18px;
+  font-size: 16.5px;
   font-weight: 800;
   line-height: 1.3;
   color: #ffffff;
-  margin: 0 0 4px 0;
+  margin: 0 0 2px 0;
 }
 
 .new-fc-card-description {
-  font-size: 12.5px;
+  font-size: 11.5px;
   font-weight: 500;
-  line-height: 1.4;
+  line-height: 1.35;
   color: rgba(255, 255, 255, 0.85);
   margin: 0;
   display: -webkit-box;
@@ -1661,7 +1705,7 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-height: 35px;
+  min-height: 32px;
 }
 
 /* Footer inside card */
@@ -1726,6 +1770,27 @@
   background: #ef4444 !important;
   border-color: #ef4444 !important;
   color: #ffffff !important;
+}
+
+.new-fc-card-btn-delete-icon {
+  background: transparent !important;
+  border: none !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+  font-size: 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 4px !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  transition: color 0.2s, background-color 0.2s, transform 0.2s !important;
+  z-index: 5 !important;
+}
+
+.new-fc-card-btn-delete-icon:hover {
+  color: #ef4444 !important;
+  background-color: rgba(239, 68, 68, 0.15) !important;
+  transform: scale(1.1);
 }
 
 

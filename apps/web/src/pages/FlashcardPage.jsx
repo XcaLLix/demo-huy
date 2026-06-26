@@ -1169,8 +1169,8 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
             >
               <img src={sunLogoImg} alt="EduPath AI" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
             </div>
-            <span style={{ fontWeight: 800, fontSize: '15px', color: 'var(--fc-text-primary)', letterSpacing: '0.3px', fontFamily: "'Outfit', sans-serif" }}>
-              EduPath <em style={{ fontStyle: 'normal', color: 'var(--fc-gold)' }}>AI</em>
+            <span style={{ fontWeight: 800, fontSize: '15px', color: '#fff', letterSpacing: '0.3px', fontFamily: "'Outfit', sans-serif" }}>
+              EduPath <em style={{ fontStyle: 'normal', color: '#FFD234' }}>AI</em>
             </span>
           </div>
 
@@ -1360,7 +1360,7 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
               <div className="flashcard-decks-selector animate-in" style={{ padding: '8px 4px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
                   <div>
-                    <h2 style={{ fontSize: '22px', fontWeight: '900', color: 'var(--fc-text-primary)', margin: 0 }}>Chọn bộ từ để bắt đầu học</h2>
+                    <h2 style={{ fontSize: '22px', fontWeight: '900', color: '#ffffff', margin: 0 }}>Chọn bộ từ để bắt đầu học</h2>
                   </div>
                   <span className="new-fc-total-badge">{totalDecksCount} bộ • {totalWordsCount} từ</span>
                 </div>
@@ -1385,9 +1385,15 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
                     }}
                   >
                     <div className="new-fc-card-pattern" />
+                    <div className="new-fc-card-cloud-watermark">
+                      <svg viewBox="0 0 200 120" fill="currentColor" width="100" height="70">
+                        <path d="M150,60 A30,30 0 0,0 120,35 A45,45 0 0,0 55,45 A35,35 0 0,0 60,100 L150,100 A25,25 0 0,0 150,60 Z" opacity="0.45" />
+                        <path d="M135,70 A22,22 0 0,0 112,50 A32,32 0 0,0 65,58 A25,25 0 0,0 70,100 L135,100 A18,18 0 0,0 135,70 Z" opacity="0.65" />
+                      </svg>
+                    </div>
                     
                     <div className="new-fc-card-header">
-                      <span className="new-fc-card-meta">Cá nhân • 5 từ</span>
+                      <span className="new-fc-card-meta">Cá nhân • {activeDeckId === 'default' ? cards.length : DEFAULT_DECK.length} từ</span>
                       <span className="new-fc-card-icon-badge">
                         <FaPencilAlt />
                       </span>
@@ -1398,26 +1404,14 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
                       <p className="new-fc-card-description">
                         Tự thêm và ôn tập từ vựng của riêng bạn.
                       </p>
-                    </div>
-
-                    <div className="new-fc-card-footer">
                       <button 
-                        className="new-fc-card-btn-action"
+                        className="new-fc-card-btn-add"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setCards(DEFAULT_DECK);
-                          setDeckTitle('Chủ đề Lịch sử & Khảo cổ học');
-                          setActiveDeckId('default');
-                          setCurrentIdx(0);
-                          setIsFlipped(false);
-                          setIsFinished(false);
-                          setLearnedCards(new Set());
-                          setReviewCards(new Set());
-                          setCurrentView('study');
-                          toast('Đã tải bộ thẻ: Bộ từ của bản thân', 'success');
+                          handleCreateNewDeck();
                         }}
                       >
-                        Học ngay
+                        + Thêm từ của bạn
                       </button>
                     </div>
                   </div>
@@ -1443,10 +1437,20 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
                         onClick={() => handleLoadDeck(deck)}
                       >
                         <div className="new-fc-card-pattern" />
+                        <div className="new-fc-card-cloud-watermark">
+                          <svg viewBox="0 0 200 120" fill="currentColor" width="100" height="70">
+                            <path d="M150,60 A30,30 0 0,0 120,35 A45,45 0 0,0 55,45 A35,35 0 0,0 60,100 L150,100 A25,25 0 0,0 150,60 Z" opacity="0.45" />
+                            <path d="M135,70 A22,22 0 0,0 112,50 A32,32 0 0,0 65,58 A25,25 0 0,0 70,100 L135,100 A18,18 0 0,0 135,70 Z" opacity="0.65" />
+                          </svg>
+                        </div>
 
                         <div className="new-fc-card-header">
                           <span className="new-fc-card-meta">
-                            Tự tạo • {deck.cards?.length || 0} từ
+                            {(() => {
+                              const raw = deck.cards?.[0]?.hashtag;
+                              if (raw) return raw.replace('#', '').trim();
+                              return 'IELTS';
+                            })()} • {deck.cards?.length || 0} từ
                           </span>
                           <span className="new-fc-card-icon-badge">
                             {getSubjectIcon(themeCfg.icon)}
@@ -1464,24 +1468,16 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
                           <span className="new-fc-card-progress">
                             <HiBadgeCheck className="new-fc-card-progress-icon" /> 0% thuộc
                           </span>
-                          <div className="new-fc-card-btns-row">
-                            <button 
-                              onClick={(e) => handleDeleteDeck(e, deck.id)}
-                              className="new-fc-card-btn-delete"
-                              title="Xóa bộ thẻ"
-                            >
-                              Xóa
-                            </button>
-                            <button 
-                              className="new-fc-card-btn-action"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleLoadDeck(deck);
-                              }}
-                            >
-                              Học ngay
-                            </button>
-                          </div>
+                          <button 
+                            className="new-fc-card-btn-delete-icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteDeck(e, deck.id);
+                            }}
+                            title="Xóa bộ thẻ"
+                          >
+                            <HiTrash />
+                          </button>
                         </div>
                       </div>
                     );
