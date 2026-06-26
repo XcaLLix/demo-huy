@@ -1487,120 +1487,6 @@
   font-style: italic;
 }
 
-/* ==========================================================================
-   STARRY NIGHT/GOLD THEME OVERRIDES FOR EXAM/DOCUMENT BANK
-   ========================================================================== */
-
-.exambank-page {
-  background: #141410 !important;
-  color: #F3F4F6 !important;
-}
-
-.exambank-hero h1, .exambank-hero__desc, .exambank-subject-section__name {
-  color: #F3F4F6 !important;
-}
-
-.exambank-stat,
-.exambank-filters__inner,
-.exambank-card,
-.exambank-modal,
-.exambank-modal__header,
-.exambank-modal__question {
-  background-color: #1E1E18 !important;
-  background: #1E1E18 !important;
-  border-color: #2F2F26 !important;
-  color: #F3F4F6 !important;
-}
-
-.exambank-stat__number {
-  color: #FFE259 !important;
-}
-
-.exambank-filters__label,
-.exambank-card__title,
-.exambank-modal__header h2,
-.exambank-modal__section h3,
-.exambank-discussion__comment-author,
-.exambank-discussion__comment-text {
-  color: #F3F4F6 !important;
-}
-
-.exambank-stat__label,
-.exambank-card__subtitle,
-.exambank-card__stat-label,
-.exambank-modal__exam-tag,
-.exambank-modal__question-opt,
-.exambank-discussion__comment-date {
-  color: #9CA3AF !important;
-}
-
-.exambank-chip {
-  background: #141410 !important;
-  border-color: #2F2F26 !important;
-  color: #9CA3AF !important;
-}
-.exambank-chip:hover {
-  border-color: #FFE259 !important;
-  color: #FFE259 !important;
-}
-.exambank-chip--active {
-  background: #FFE259 !important;
-  color: #12120e !important;
-  border-color: #FFE259 !important;
-}
-
-.exambank-card__year-badge {
-  background: #FFE259 !important;
-  color: #12120e !important;
-}
-
-.exambank-card__subject-tag {
-  background: rgba(255, 226, 89, 0.08) !important;
-  color: #FFE259 !important;
-  border-color: rgba(255, 226, 89, 0.15) !important;
-}
-
-.exambank-card__btn--download,
-.exambank-modal__btn--primary {
-  background: #FFE259 !important;
-  color: #12120e !important;
-  border: none !important;
-}
-.exambank-card__btn--download:hover,
-.exambank-modal__btn--primary:hover {
-  background: #FADB3B !important;
-  box-shadow: 0 4px 12px rgba(255, 226, 89, 0.3) !important;
-}
-
-.exambank-card__btn--view,
-.exambank-modal__btn--secondary {
-  background: transparent !important;
-  border: 1px solid #2F2F26 !important;
-  color: #F3F4F6 !important;
-}
-.exambank-card__btn--view:hover,
-.exambank-modal__btn--secondary:hover {
-  border-color: #FFE259 !important;
-  color: #FFE259 !important;
-}
-
-.exambank-filters__search input {
-  background: #141410 !important;
-  border-color: #2F2F26 !important;
-  color: #F3F4F6 !important;
-}
-.exambank-filters__search input:focus {
-  border-color: #FFE259 !important;
-}
-
-.exambank-modal__question {
-  background: #141410 !important;
-  border-color: #2F2F26 !important;
-}
-.exambank-modal__question-num {
-  color: #FFE259 !important;
-}
-
 /* ============================================================
    QUICK DOCUMENT SEARCH & QA ADDITIONS
    ============================================================ */
@@ -1613,20 +1499,20 @@
   top: 100%;
   left: 0;
   right: 0;
-  background-color: #1E1E18;
-  border: 1.5px solid #2F2F26;
+  background-color: #ffffff;
+  border: 1.5px solid #e8e2d6;
   border-radius: 12px;
   margin-top: 6px;
   max-height: 250px;
   overflow-y: auto;
   z-index: 100;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
 }
 
 .exambank-ai-suggestion-item {
   padding: 12px 16px;
   cursor: pointer;
-  border-bottom: 1px solid #2F2F26;
+  border-bottom: 1px solid #e8e2d6;
   transition: all 0.2s;
   text-align: left;
 }
@@ -1636,13 +1522,13 @@
 }
 
 .exambank-ai-suggestion-item:hover {
-  background-color: rgba(255, 226, 89, 0.08);
+  background-color: rgba(5, 150, 105, 0.05);
 }
 
 .exambank-ai-suggestion-title {
   font-size: 13.5px;
   font-weight: 700;
-  color: #F3F4F6;
+  color: #1a1a2e;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1651,7 +1537,7 @@
 
 .exambank-ai-suggestion-meta {
   font-size: 11px;
-  color: #9CA3AF;
+  color: #64748b;
   display: flex;
   gap: 8px;
   align-items: center;
@@ -1666,7 +1552,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1.5px solid #2F2F26;
+  border-bottom: 1.5px solid #e8e2d6;
   padding-bottom: 12px;
   gap: 12px;
 }
@@ -1681,27 +1567,27 @@
 .exambank-direct-chat__doc-title {
   font-size: 14.5px;
   font-weight: 800;
-  color: #FFE259;
+  color: #059669;
   margin: 0 0 3px;
   text-align: left;
 }
 
 .exambank-direct-chat__doc-title span {
-  color: #F3F4F6;
+  color: #1a1a2e;
   font-weight: 600;
 }
 
 .exambank-direct-chat__doc-meta {
   font-size: 12px;
-  color: #9CA3AF;
+  color: #64748b;
   margin: 0;
   text-align: left;
 }
 
 .exambank-direct-chat__btn-back {
-  background: rgba(255, 226, 89, 0.1);
-  border: 1px dashed #FFE259;
-  color: #FFE259;
+  background: rgba(5, 150, 105, 0.1);
+  border: 1px dashed #059669;
+  color: #059669;
   padding: 8px 16px;
   border-radius: 8px;
   font-size: 12.5px;
@@ -1712,81 +1598,11 @@
 }
 
 .exambank-direct-chat__btn-back:hover {
-  background: #FFE259;
-  color: #12120e;
+  background: #059669;
+  color: white;
 }
 
-/* Chat Overrides for Premium Dark-Gold Theme */
-.exambank-page .exambank-chat {
-  background-color: #1E1E18 !important;
-  border-color: #2F2F26 !important;
-}
 
-.exambank-page .exambank-chat__history {
-  background-color: #141410 !important;
-}
-
-.exambank-page .exambank-chat__bubble--assistant .exambank-chat__msg-content {
-  background-color: #1E1E18 !important;
-  color: #F3F4F6 !important;
-  border-color: #2F2F26 !important;
-}
-
-.exambank-page .exambank-chat__bubble--user .exambank-chat__msg-content {
-  background-color: #FFE259 !important;
-  color: #12120e !important;
-}
-
-.exambank-page .exambank-chat__suggestions {
-  background-color: #1E1E18 !important;
-  border-top-color: #2F2F26 !important;
-}
-
-.exambank-page .exambank-chat__suggestion-btn {
-  background-color: #141410 !important;
-  border-color: #2F2F26 !important;
-  color: #F3F4F6 !important;
-}
-
-.exambank-page .exambank-chat__suggestion-btn:hover {
-  border-color: #FFE259 !important;
-  color: #FFE259 !important;
-}
-
-.exambank-page .exambank-chat__form {
-  background-color: #1E1E18 !important;
-  border-top-color: #2F2F26 !important;
-}
-
-.exambank-page .exambank-chat__input {
-  background-color: #141410 !important;
-  border-color: #2F2F26 !important;
-  color: #F3F4F6 !important;
-}
-
-.exambank-page .exambank-chat__input:focus {
-  border-color: #FFE259 !important;
-}
-
-.exambank-page .exambank-chat__btn-send {
-  background-color: #FFE259 !important;
-  color: #12120e !important;
-}
-
-.exambank-page .exambank-chat__btn-send:hover {
-  background-color: #FADB3B !important;
-}
-
-.exambank-page .exambank-chat__bubble--user .exambank-chat__avatar {
-  background-color: #2F2F26 !important;
-  color: #F3F4F6 !important;
-}
-
-.exambank-page .exambank-chat__bubble--assistant .exambank-chat__avatar {
-  background-color: rgba(255, 226, 89, 0.08) !important;
-  color: #FFE259 !important;
-  border-color: rgba(255, 226, 89, 0.15) !important;
-}
 
 /* ---------- Pagination ---------- */
 .exambank-pagination {
@@ -1844,36 +1660,7 @@
   text-align: center;
 }
 
-/* Starry Night Dark Theme Override for Pagination */
-.exambank-page .exambank-pagination__btn {
-  background: #FFFFFF !important;
-  border-color: #FFFFFF !important;
-  color: #12120e !important;
-}
 
-.exambank-page .exambank-pagination__btn:hover:not(:disabled) {
-  background: #FFE259 !important;
-  border-color: #FFE259 !important;
-  color: #12120e !important;
-}
-
-.exambank-page .exambank-pagination__btn--active {
-  background: #5b75f3 !important; /* purple-blue color from screenshot */
-  color: #FFFFFF !important;
-  border-color: #5b75f3 !important;
-  box-shadow: 0 4px 12px rgba(91, 117, 243, 0.3) !important;
-}
-
-.exambank-page .exambank-pagination__btn:disabled {
-  background: #2F2F26 !important;
-  border-color: #2F2F26 !important;
-  color: #55554a !important;
-  opacity: 0.7 !important;
-}
-
-.exambank-page .exambank-pagination__ellipsis {
-  color: #F3F4F6 !important;
-}
 
 
 

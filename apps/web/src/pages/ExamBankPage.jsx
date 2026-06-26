@@ -530,17 +530,7 @@ export default function ExamBankPage({ currentUser, navigateTo, hideHeader }) {
       )}
 
       {/* Hero */}
-      <div className="exambank-hero">
-        <div className="exambank-hero__badge">
-          <HiAcademicCap /> Ngân hàng tài liệu học tập
-        </div>
-        <h1>
-          Ngân hàng tài liệu <span>EduPath AI</span>
-        </h1>
-        <p className="exambank-hero__desc">
-          Thư viện tích hợp hàng ngàn tài liệu học tập, chuyên đề ôn thi thử, ebook công thức toán học và từ vựng phong phú.
-          Truy cập Google Drive để xem và tải về miễn phí.
-        </p>
+      <div className="exambank-hero" style={{ padding: '24px 40px 16px' }}>
 
         <div className="exambank-stats">
           <div className="exambank-stat">
@@ -567,30 +557,7 @@ export default function ExamBankPage({ currentUser, navigateTo, hideHeader }) {
       {/* Filters */}
       <div className="exambank-filters">
         <div className="exambank-filters__inner">
-          {/* Subject Filter */}
-          <div className="exambank-filters__row">
-            <span className="exambank-filters__label">📚 Môn học</span>
-            <div className="exambank-filters__chips">
-              <button
-                className={`exambank-chip ${selectedSubject === 'all' ? 'exambank-chip--active' : ''}`}
-                onClick={() => setSelectedSubject('all')}
-              >
-                Tất cả
-              </button>
-              {SUBJECTS.map(s => (
-                <button
-                  key={s.id}
-                  className={`exambank-chip ${selectedSubject === s.id ? 'exambank-chip--active' : ''}`}
-                  style={selectedSubject === s.id ? { background: s.color, borderColor: s.color } : {}}
-                  onClick={() => setSelectedSubject(s.id)}
-                >
-                  {s.emoji} {s.name}
-                </button>
-              ))}
-            </div>
-          </div>
 
-          <div className="exambank-filters__divider" />
 
           {/* Level + Price Tier + Search */}
           <div className="exambank-filters__row">
