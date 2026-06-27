@@ -1129,9 +1129,13 @@ model SystemLog {
   metadata        Json?
   level           LogLevel
   createdAt       DateTime   @default(now())
+  syncedToGoogle  Boolean    @default(false)
+  syncedAt        DateTime?
 
   @@map("system_logs")
 }
+
+
 
 enum LogType {
   LOGIN

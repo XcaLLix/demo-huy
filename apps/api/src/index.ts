@@ -86,6 +86,7 @@ import {
   getLeaderboard as getForumLeaderboard, getUserGamificationProfile,
   downloadResource, createReport, getReports, resolveReport
 } from './controllers/forum.js';
+import { initCronJobs } from './cron/index.js';
 // Environment variables are loaded at the top of the file via import './env.js'
 
 const app = express();
@@ -429,6 +430,7 @@ if (!process.env.VERCEL) {
   server.listen(PORT, () => {
     console.log(`[API] EduPath Server is running on port: ${PORT}`);
   });
+  initCronJobs();
 }
 
 async function seedDefaultCategories() {
