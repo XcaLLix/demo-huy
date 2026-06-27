@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from '../utils/toast';
 import { 
   HiChartBar, 
@@ -17,12 +17,67 @@ import {
   HiArrowLeft,
   HiShieldCheck,
   HiCurrencyDollar,
-  HiAcademicCap
+  HiAcademicCap,
+  HiChevronDown
 } from 'react-icons/hi';
 import { AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { api } from '../api';
 import { mockExamService } from '../services/mockExamService';
 import Header from './Header';
+
+// Custom Neo-Brutalist Select component with rounded corners and theme support
+const NeoSelect = ({ value, onChange, options, placeholder = 'Chọn...' }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(opt => opt.value === value);
+
+  return (
+    <div ref={dropdownRef} className="neo-select-container">
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        className="neo-select-trigger"
+      >
+        <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <HiChevronDown style={{ 
+          transform: isOpen ? 'rotate(180deg)' : 'none', 
+          transition: 'transform 0.2s', 
+          fontSize: '16px',
+          flexShrink: 0
+        }} />
+      </div>
+
+      {isOpen && (
+        <div className="neo-select-options">
+          {options.map(opt => (
+            <div
+              key={opt.value}
+              onClick={() => {
+                onChange(opt.value);
+                setIsOpen(false);
+              }}
+              className={`neo-select-option ${opt.value === value ? 'selected' : ''}`}
+            >
+              {opt.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const financeData = [
   { name: 'Tháng 1', revenue: 15.4 },
@@ -189,8 +244,8 @@ export default function AdminDashboard({
     try {
       setLogsLoading(true);
       const data = await api.getAdminLogs({
-        page: logsPage,
-        limit: 10,
+        page: 1,
+        limit: 1000,
         search: logsSearch,
         type: logsTypeFilter,
         level: logsLevelFilter,
@@ -200,7 +255,7 @@ export default function AdminDashboard({
       });
       if (data) {
         setSystemLogsList(data.logs || []);
-        setLogsTotalPages(data.pagination?.totalPages || 1);
+        setLogsTotalPages(1);
       }
     } catch (err) {
       console.error('[AdminDashboard] Lỗi tải danh sách logs:', err);
@@ -219,7 +274,7 @@ export default function AdminDashboard({
     if (activeTab === 'system-logs') {
       fetchSystemLogs();
     }
-  }, [activeTab, logsPage, logsTypeFilter, logsLevelFilter, logsModuleFilter, logsFromDate, logsToDate]);
+  }, [activeTab, logsTypeFilter, logsLevelFilter, logsModuleFilter, logsFromDate, logsToDate]);
 
   // Debounced search logic for logs search input
   useEffect(() => {
@@ -237,8 +292,7 @@ export default function AdminDashboard({
     { key: 'SYSTEM', label: 'Nhật ký hệ thống' }
   ];
   
-  // Sub-tabs for Content ('content')
-  const [contentSubTab, setContentSubTab] = useState('approvals'); // approvals, logs, announcements
+
   
   // Dynamic stats state from Supabase
   const [stats, setStats] = useState({
@@ -1998,6 +2052,107 @@ export default function AdminDashboard({
           outline: none;
         }
 
+        select.admin-form-input {
+          appearance: none;
+          -webkit-appearance: none;
+          -moz-appearance: none;
+          background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%232D3229%22%20stroke-width%3D%223%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E");
+          background-repeat: no-repeat;
+          background-position: right 12px center;
+          background-size: 14px;
+          padding-right: 36px !important;
+          cursor: pointer;
+        }
+
+        .dark-theme select.admin-form-input {
+          background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23E2E8F0%22%20stroke-width%3D%223%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E") !important;
+        }
+
+        /* ── CUSTOM NEO SELECT ── */
+        .neo-select-container {
+          position: relative;
+          width: 100%;
+        }
+
+        .neo-select-trigger {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          cursor: pointer;
+          height: 40px;
+          padding: 0 12px;
+          background: #FFFFFF;
+          border: 1.5px solid #2D3229;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 700;
+          box-sizing: border-box;
+          user-select: none;
+          color: #2D3229;
+          transition: all 0.15s;
+        }
+        
+        .dark-theme .neo-select-trigger {
+          background: #151A22;
+          border-color: #4A5568;
+          color: #E2E8F0;
+        }
+
+        .neo-select-trigger:focus, .neo-select-trigger:hover {
+          box-shadow: 2px 2px 0px #2D3229;
+        }
+
+        .dark-theme .neo-select-trigger:focus, .dark-theme .neo-select-trigger:hover {
+          box-shadow: 2px 2px 0px #4A5568;
+        }
+
+        .neo-select-options {
+          position: absolute;
+          top: calc(100% + 6px);
+          left: 0;
+          right: 0;
+          z-index: 999;
+          background: #FFFFFF;
+          border: 2px solid #2D3229;
+          border-radius: 10px;
+          box-shadow: 3px 3px 0px #2D3229;
+          overflow: hidden;
+          padding: 4px 0;
+        }
+
+        .dark-theme .neo-select-options {
+          background: #151A22;
+          border-color: #4A5568;
+          box-shadow: 3px 3px 0px #4A5568;
+        }
+
+        .neo-select-option {
+          padding: 8px 12px;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+          color: #2D3229;
+          transition: background 0.1s;
+          text-align: left;
+        }
+
+        .dark-theme .neo-select-option {
+          color: #E2E8F0;
+        }
+
+        .neo-select-option:hover {
+          background-color: #F3F4F6;
+        }
+
+        .dark-theme .neo-select-option:hover {
+          background-color: #2D3748;
+        }
+
+        .neo-select-option.selected {
+          background-color: #6c5ce7 !important;
+          color: #FFFFFF !important;
+        }
+
         .admin-form-input:focus, .admin-form-textarea:focus {
           box-shadow: 2px 2px 0px #2D3229;
         }
@@ -2096,16 +2251,6 @@ export default function AdminDashboard({
             <HiBookOpen style={{ fontSize: '18px' }} /> Quản lý đề
           </button>
           <button 
-            className={`admin-menu-item ${activeTab === 'content' ? 'active' : ''}`}
-            onClick={() => setActiveTab('content')}
-          >
-            <HiClipboardCheck style={{ fontSize: '18px' }} /> Nội dung
-            {courseApprovals.length > 0 && (
-              <span className="admin-menu-badge">{courseApprovals.length}</span>
-            )}
-          </button>
-
-          <button 
             className={`admin-menu-item ${activeTab === 'users' ? 'active' : ''}`}
             onClick={() => setActiveTab('users')}
           >
@@ -2134,6 +2279,12 @@ export default function AdminDashboard({
             onClick={() => setActiveTab('features')}
           >
             <HiAdjustments style={{ fontSize: '18px' }} /> Quản lý chức năng
+          </button>
+          <button 
+            className={`admin-menu-item ${activeTab === 'announcements' ? 'active' : ''}`}
+            onClick={() => setActiveTab('announcements')}
+          >
+            <HiGlobeAlt style={{ fontSize: '18px' }} /> Thông báo hệ thống
           </button>
           <button 
             className={`admin-menu-item ${activeTab === 'moderation' ? 'active' : ''}`}
@@ -2200,12 +2351,12 @@ export default function AdminDashboard({
               <h2 className="admin-header-title">
                 {activeTab === 'stats' && 'Dashboard Thống kê'}
                 {activeTab === 'exams' && 'QUẢN LÝ ĐỀ THI'}
-                {activeTab === 'content' && 'QUẢN TRỊ NỘI DUNG'}
                 {activeTab === 'users' && 'QUẢN LÝ NGƯỜI DÙNG'}
                 {activeTab === 'teachers' && 'QUẢN LÝ GIÁO VIÊN'}
                 {activeTab === 'courses' && 'QUẢN LÝ KHÓA HỌC'}
                 {activeTab === 'leads' && 'QUẢN LÝ ĐĂNG KÝ HỌC VIÊN (LEADS)'}
                 {activeTab === 'features' && 'QUẢN LÝ CÁC CHỨC NĂNG HỆ THỐNG'}
+                {activeTab === 'announcements' && 'GỬI THÔNG BÁO HỆ THỐNG'}
                 {activeTab === 'moderation' && 'KIỂM DUYỆT BÁO CÁO VI PHẠM'}
                 {activeTab === 'roles' && 'PHÊ DUYỆT NÂNG CẤP QUYỀN'}
                 {activeTab === 'finance' && 'QUẢN LÝ TÀI CHÍNH & CHI TRẢ'}
@@ -2390,131 +2541,33 @@ export default function AdminDashboard({
             <AdminExamManager addLog={addLog} />
           )}
 
+
+
           {/* ==========================================
-              TAB: NỘI DUNG & SYSTEM ADMIN (SUB-TABS)
+              TAB: GỬI THÔNG BÁO HỆ THỐNG (SYSTEM ANNOUNCEMENTS)
               ========================================== */}
-          {activeTab === 'content' && (
-            <div>
-              {/* Sub navigation bar inside Content */}
-              <div className="admin-sub-tabs">
-                <button 
-                  className={`admin-sub-tab-btn ${contentSubTab === 'approvals' ? 'active' : ''}`}
-                  onClick={() => setContentSubTab('approvals')}
-                >
-                  Phê duyệt khóa học ({courseApprovals.length})
-                </button>
-                <button 
-                  className={`admin-sub-tab-btn ${contentSubTab === 'logs' ? 'active' : ''}`}
-                  onClick={() => setContentSubTab('logs')}
-                >
-                  <HiTerminal /> Nhật ký hệ thống (Logs)
-                </button>
-                <button 
-                  className={`admin-sub-tab-btn ${contentSubTab === 'announcements' ? 'active' : ''}`}
-                  onClick={() => setContentSubTab('announcements')}
-                >
-                  <HiGlobeAlt /> Gửi thông báo hệ thống
-                </button>
-              </div>
-
-              {/* Sub-tab: Phê duyệt khóa học */}
-              {contentSubTab === 'approvals' && (
-                <div className="admin-card">
-                  <h3 className="chart-card-title">KIỂM DUYỆT KHÓA HỌC MỚI</h3>
-                  {courseApprovals.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                      {courseApprovals.map(c => (
-                        <div key={c.id} style={{ padding: '16px', border: '2px solid #000000', borderRadius: '12px', background: '#FCFBFA', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div>
-                            <span style={{ background: '#E8ECF1', border: '1.5px solid #000000', color: '#000000', fontSize: '10px', fontWeight: '800', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
-                              {c.subject}
-                            </span>
-                            <h4 style={{ fontSize: '15px', fontWeight: '900', marginTop: '8px', marginBottom: '4px' }}>{c.title}</h4>
-                            <p style={{ fontSize: '12px', color: '#7A7A7A', fontWeight: '700' }}>Giảng viên: {c.teacherName} • Giá bán học phí: {c.price} VNĐ</p>
-                          </div>
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <button
-                              className="admin-back-btn"
-                              style={{ background: '#10B981', color: '#FFFFFF', borderColor: '#000000', padding: '8px 16px', boxShadow: 'none' }}
-                              onClick={() => {
-                                onApproveCourse(c.id);
-                                addLog(`Quản trị viên KIỂM DUYỆT PHÊ DUYỆT khóa học "${c.title}" lên trang Landing chính`, 'sys');
-                              }}
-                            >
-                              Phê duyệt phát hành
-                            </button>
-                            <button
-                              className="admin-back-btn"
-                              style={{ background: '#EF4444', color: '#FFFFFF', borderColor: '#000000', padding: '8px 16px', boxShadow: 'none' }}
-                              onClick={() => {
-                                onRejectCourse(c.id);
-                                addLog(`Quản trị viên TỪ CHỐI phê duyệt khóa học "${c.title}"`, 'sys');
-                              }}
-                            >
-                              Từ chối kiểm duyệt
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{ textAlign: 'center', padding: '32px', background: '#FCFBFA', border: '2px dashed #000000', borderRadius: '12px' }}>
-                      <span style={{ fontSize: '28px' }}>📝</span>
-                      <p style={{ fontSize: '13px', color: '#7A7A7A', fontWeight: '700', marginTop: '8px', margin: 0 }}>Không có khóa học nào đang chờ phê duyệt duyệt.</p>
-                    </div>
-                  )}
+          {activeTab === 'announcements' && (
+            <div className="admin-card" style={{ maxWidth: '600px' }}>
+              <h3 className="chart-card-title">Gửi thông báo hệ thống</h3>
+              <p style={{ fontSize: '13px', color: '#7A7A7A', marginBottom: '20px', fontWeight: '700' }}>
+                Phát tin nhắn thông báo khẩn cấp tới toàn bộ học sinh và giáo viên trên hệ thống.
+              </p>
+              <form onSubmit={handleSendAnnouncement} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div className="admin-form-group">
+                  <label style={{ fontSize: '12px', fontWeight: '850', display: 'block', marginBottom: '8px' }}>Nội dung thông báo (Toàn bộ người dùng):</label>
+                  <textarea
+                    className="admin-form-textarea"
+                    rows="5"
+                    placeholder="Nhập thông báo gửi đến toàn bộ học sinh và giáo viên trên hệ thống..."
+                    value={annText}
+                    onChange={e => setAnnText(e.target.value)}
+                    required
+                  />
                 </div>
-              )}
-
-              {/* Sub-tab: Logs */}
-              {contentSubTab === 'logs' && (
-                <div className="admin-card">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                    <h3 className="chart-card-title" style={{ margin: 0 }}>Nhật ký Live Logs hệ thống</h3>
-                    <span style={{ fontSize: '11px', color: '#10B981', fontWeight: '800' }}>● ĐANG THEO DÕI LIVE MONITOR PORT (8080)</span>
-                  </div>
-                  <p style={{ fontSize: '12.5px', color: '#7A7A7A', marginBottom: '16px', fontWeight: '700' }}>
-                    Nhật ký log hiển thị toàn bộ hoạt động của học sinh, giáo viên, tiến trình phân tích của AI System và giao dịch của Payment System theo thời gian thực.
-                  </p>
-                  <div className="admin-terminal">
-                    {systemLogs.map((log) => (
-                      <div key={log.id} className="terminal-line">
-                        <span className="terminal-time">[{log.time}]</span>
-                        {log.tag === 'ai' ? (
-                          <span className="terminal-tag-ai">[AI SYSTEM] </span>
-                        ) : (
-                          <span className="terminal-tag-sys">[SYSTEM] </span>
-                        )}
-                        <span>{log.text}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Sub-tab: Announcements */}
-              {contentSubTab === 'announcements' && (
-                <div className="admin-card" style={{ maxWidth: '600px' }}>
-                  <h3 className="chart-card-title">Gửi thông báo hệ thống</h3>
-                  <form onSubmit={handleSendAnnouncement} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <div className="admin-form-group">
-                      <label>Nội dung thông báo (Toàn bộ người dùng):</label>
-                      <textarea
-                        className="admin-form-textarea"
-                        rows="5"
-                        placeholder="Nhập thông báo gửi đến toàn bộ học sinh và giáo viên trên hệ thống..."
-                        value={annText}
-                        onChange={e => setAnnText(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <button type="submit" className="admin-back-btn" style={{ alignSelf: 'flex-start', background: '#6c5ce7', color: '#FFFFFF' }}>
-                      Phát thông báo ngay ⚡
-                    </button>
-                  </form>
-                </div>
-              )}
-
+                <button type="submit" className="admin-back-btn" style={{ alignSelf: 'flex-start', background: '#6c5ce7', color: '#FFFFFF' }}>
+                  Phát thông báo ngay ⚡
+                </button>
+              </form>
             </div>
           )}
 
@@ -3169,18 +3222,16 @@ export default function AdminDashboard({
                   <table className="leads-table">
                     <thead>
                       <tr>
-                        <th style={{ width: '80px', textAlign: 'center' }}>Ảnh bìa</th>
-                        <th>Tên khóa học</th>
-                        <th>Giáo viên</th>
-                        <th>Môn học</th>
-                        <th>Giá bán</th>
-                        <th style={{ textAlign: 'center' }}>Học viên</th>
-                        <th style={{ textAlign: 'center' }}>Hoàn thành</th>
-                        <th style={{ textAlign: 'center' }}>Tỷ lệ</th>
-                        <th>Doanh thu</th>
-                        <th style={{ textAlign: 'center' }}>Phê duyệt</th>
-                        <th style={{ textAlign: 'center' }}>Hiển thị</th>
-                        <th style={{ textAlign: 'center', width: '220px' }}>Thao tác</th>
+                        <th style={{ width: '60px', textAlign: 'center', whiteSpace: 'nowrap' }}>Ảnh bìa</th>
+                        <th style={{ whiteSpace: 'nowrap' }}>Tên khóa học</th>
+                        <th style={{ whiteSpace: 'nowrap' }}>Giáo viên</th>
+                        <th style={{ whiteSpace: 'nowrap' }}>Môn học</th>
+                        <th style={{ whiteSpace: 'nowrap' }}>Giá bán</th>
+                        <th style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>Học viên</th>
+                        <th style={{ whiteSpace: 'nowrap' }}>Doanh thu</th>
+                        <th style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>Phê duyệt</th>
+                        <th style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>Hiển thị</th>
+                        <th style={{ textAlign: 'center', width: '180px', whiteSpace: 'nowrap' }}>Thao tác</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -3213,17 +3264,17 @@ export default function AdminDashboard({
                                 </div>
                               )}
                             </td>
-                            <td style={{ fontWeight: '800', fontSize: '13.5px', maxWidth: '240px' }} title={course.title}>
+                            <td style={{ fontWeight: '850', fontSize: '13.5px', maxWidth: '200px' }} title={course.title}>
                               <div style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                                 {course.title}
                               </div>
                             </td>
                             <td>
-                              <div style={{ fontWeight: '700' }}>{course.teacherName}</div>
-                              <div style={{ fontSize: '10.5px', color: '#7A7A7A' }}>{course.teacherEmail}</div>
+                              <div style={{ fontWeight: '700', whiteSpace: 'nowrap' }}>{course.teacherName}</div>
+                              <div style={{ fontSize: '10.5px', color: '#7A7A7A', whiteSpace: 'nowrap' }}>{course.teacherEmail}</div>
                             </td>
-                            <td style={{ fontWeight: '700' }}>{course.subject}</td>
-                            <td style={{ fontWeight: '850', color: '#1C2B17' }}>
+                            <td style={{ fontWeight: '700', whiteSpace: 'nowrap' }}>{course.subject}</td>
+                            <td style={{ fontWeight: '850', color: '#1C2B17', whiteSpace: 'nowrap' }}>
                               {course.discount > 0 ? (
                                 <div>
                                   <div style={{ fontSize: '11px', textDecoration: 'line-through', color: '#7A7A7A' }}>{formatCurrency(course.price)}</div>
@@ -3233,22 +3284,16 @@ export default function AdminDashboard({
                                 formatCurrency(course.price)
                               )}
                             </td>
-                            <td style={{ textAlign: 'center', fontWeight: '800' }}>{course.enrolledCount}</td>
-                            <td style={{ textAlign: 'center', fontWeight: '800', color: '#10B981' }}>{course.completedCount}</td>
-                            <td style={{ textAlign: 'center', fontWeight: '850' }}>
-                              <span style={{
-                                padding: '2px 6px',
-                                borderRadius: '4px',
-                                background: course.completionRate >= 50 ? '#D1FAE5' : '#FEF3C7',
-                                color: course.completionRate >= 50 ? '#065F46' : '#D97706',
-                                border: '1px solid currentColor',
-                                fontSize: '11px'
-                              }}>
-                                {course.completionRate}%
-                              </span>
+                            <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                              <div style={{ fontWeight: '800', fontSize: '13.5px' }}>
+                                {course.enrolledCount} / {course.completedCount}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#6B7280', fontWeight: '700' }}>
+                                {course.completionRate}% hoàn thành
+                              </div>
                             </td>
-                            <td style={{ fontWeight: '850', color: '#2563EB' }}>{formatCurrency(course.revenue)}</td>
-                            <td style={{ textAlign: 'center' }}>
+                            <td style={{ fontWeight: '850', color: '#2563EB', whiteSpace: 'nowrap' }}>{formatCurrency(course.revenue)}</td>
+                            <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                               <span style={{
                                 display: 'inline-block',
                                 padding: '4px 8px',
@@ -3257,12 +3302,13 @@ export default function AdminDashboard({
                                 fontWeight: '850',
                                 border: '1.5px solid #000',
                                 background: course.status === 'APPROVED' ? '#D1FAE5' : course.status === 'PENDING' ? '#FEF3C7' : '#FEE2E2',
-                                color: course.status === 'APPROVED' ? '#065F46' : course.status === 'PENDING' ? '#D97706' : '#991B1B'
+                                color: course.status === 'APPROVED' ? '#065F46' : course.status === 'PENDING' ? '#D97706' : '#991B1B',
+                                whiteSpace: 'nowrap'
                               }}>
                                 {course.status === 'APPROVED' ? 'ĐÃ DUYỆT' : course.status === 'PENDING' ? 'CHỜ DUYỆT' : 'BỊ TỪ CHỐI'}
                               </span>
                             </td>
-                            <td style={{ textAlign: 'center' }}>
+                            <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                               <span style={{
                                 display: 'inline-block',
                                 padding: '4px 8px',
@@ -3271,12 +3317,13 @@ export default function AdminDashboard({
                                 fontWeight: '850',
                                 border: '1.5px solid #000',
                                 background: course.visibility === 'VISIBLE' ? '#D1FAE5' : '#F3F4F6',
-                                color: course.visibility === 'VISIBLE' ? '#065F46' : '#374151'
+                                color: course.visibility === 'VISIBLE' ? '#065F46' : '#374151',
+                                whiteSpace: 'nowrap'
                               }}>
                                 {course.visibility === 'VISIBLE' ? 'HIỂN THỊ' : 'ẨN'}
                               </span>
                             </td>
-                            <td style={{ textAlign: 'center' }}>
+                            <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                               <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', flexWrap: 'nowrap' }}>
                                 <button
                                   className="admin-table-btn"
@@ -3329,7 +3376,7 @@ export default function AdminDashboard({
                       })}
                       {adminCourses.length === 0 && (
                         <tr>
-                          <td colSpan="12" style={{ textAlign: 'center', padding: '36px', color: '#7A7A7A', fontWeight: 'bold' }}>
+                          <td colSpan="10" style={{ textAlign: 'center', padding: '36px', color: '#7A7A7A', fontWeight: 'bold' }}>
                             Không tìm thấy khóa học nào phù hợp với bộ lọc.
                           </td>
                         </tr>
@@ -3895,15 +3942,6 @@ export default function AdminDashboard({
           {activeTab === 'system-logs' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               
-              {/* Statistics Cards */}
-              <div className="stats-row-6col" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px', marginBottom: '8px' }}>
-                {renderLogKpiCard('Tổng Log Hôm Nay', <HiTerminal />, systemLogsStats.totalToday || 0, 'blue')}
-                {renderLogKpiCard('Số Lượt Đăng Nhập', <HiUsers />, systemLogsStats.loginToday || 0, 'green')}
-                {renderLogKpiCard('Thao Tác Quản Trị', <HiAdjustments />, systemLogsStats.adminToday || 0, 'indigo')}
-                {renderLogKpiCard('Lỗi Hệ Thống', <HiShieldCheck />, systemLogsStats.systemToday || 0, 'purple')}
-                {renderLogKpiCard('Lỗi AI Coach', <HiTerminal />, systemLogsStats.aiErrorsToday || 0, 'amber')}
-                {renderLogKpiCard('Lỗi Thanh Toán', <HiCurrencyDollar />, systemLogsStats.paymentErrorsToday || 0, 'red')}
-              </div>
 
               {/* Filtering Controls */}
               <div className="admin-card" style={{ marginBottom: '0', border: '2px solid #000', boxShadow: '3px 3px 0px #000', borderRadius: '12px' }}>
@@ -3922,63 +3960,64 @@ export default function AdminDashboard({
                   </div>
 
                   {/* Log Type filter */}
-                  <select
-                    className="admin-form-input"
+                  {/* Log Type filter */}
+                  <NeoSelect
                     value={logsTypeFilter}
-                    onChange={(e) => { 
-                      setLogsTypeFilter(e.target.value); 
+                    onChange={(val) => { 
+                      setLogsTypeFilter(val); 
                       setLogsModuleFilter('ALL'); 
                       setLogsPage(1); 
                     }}
-                    style={{ height: '40px', padding: '0 10px' }}
-                  >
-                    <option value="ALL">Tất cả loại nhật ký</option>
-                    <option value="LOGIN">Nhật ký đăng nhập</option>
-                    <option value="ADMIN">Nhật ký quản trị</option>
-                    <option value="SYSTEM">Nhật ký hệ thống</option>
-                  </select>
+                    options={[
+                      { value: 'ALL', label: 'Tất cả loại nhật ký' },
+                      { value: 'LOGIN', label: 'Nhật ký đăng nhập' },
+                      { value: 'ADMIN', label: 'Nhật ký quản trị' },
+                      { value: 'SYSTEM', label: 'Nhật ký hệ thống' }
+                    ]}
+                  />
 
                   {/* Level filter */}
-                  <select
-                    className="admin-form-input"
+                  <NeoSelect
                     value={logsLevelFilter}
-                    onChange={(e) => { setLogsLevelFilter(e.target.value); setLogsPage(1); }}
-                    style={{ height: '40px', padding: '0 10px' }}
-                  >
-                    <option value="ALL">Tất cả mức độ</option>
-                    <option value="INFO">Thông tin (INFO)</option>
-                    <option value="WARNING">Cảnh báo (WARNING)</option>
-                    <option value="ERROR">Lỗi (ERROR)</option>
-                    <option value="CRITICAL">Nghiêm trọng (CRITICAL)</option>
-                  </select>
+                    onChange={(val) => { setLogsLevelFilter(val); setLogsPage(1); }}
+                    options={[
+                      { value: 'ALL', label: 'Tất cả mức độ' },
+                      { value: 'INFO', label: 'Thông tin (INFO)' },
+                      { value: 'WARNING', label: 'Cảnh báo (WARNING)' },
+                      { value: 'ERROR', label: 'Lỗi (ERROR)' },
+                      { value: 'CRITICAL', label: 'Nghiêm trọng (CRITICAL)' }
+                    ]}
+                  />
 
                   {/* Module filter */}
-                  <select
-                    className="admin-form-input"
-                    value={logsModuleFilter}
-                    onChange={(e) => { setLogsModuleFilter(e.target.value); setLogsPage(1); }}
-                    style={{ height: '40px', padding: '0 10px' }}
-                  >
-                    <option value="ALL">Tất cả chức năng</option>
-                    {(logsTypeFilter === 'ALL' || logsTypeFilter === 'LOGIN') && (
-                      <option value="AUTH_SERVICE">Xác thực (AUTH_SERVICE)</option>
-                    )}
-                    {(logsTypeFilter === 'ALL' || logsTypeFilter === 'ADMIN') && (
-                      <>
-                        <option value="ADMIN_SERVICE">Quản trị chung (ADMIN_SERVICE)</option>
-                        <option value="TEACHER_SERVICE">Giáo viên (TEACHER_SERVICE)</option>
-                        <option value="COURSE_SERVICE">Khóa học (COURSE_SERVICE)</option>
-                        <option value="MODERATION_SERVICE">Báo cáo vi phạm (MODERATION_SERVICE)</option>
-                      </>
-                    )}
-                    {(logsTypeFilter === 'ALL' || logsTypeFilter === 'SYSTEM') && (
-                      <>
-                        <option value="AI_SERVICE">Dịch vụ AI (AI_SERVICE)</option>
-                        <option value="PAYMENT_SERVICE">Thanh toán (PAYMENT_SERVICE)</option>
-                        <option value="SYSTEM_SERVICE">Nhân hệ thống (SYSTEM_SERVICE)</option>
-                      </>
-                    )}
-                  </select>
+                  {(() => {
+                    const moduleOpts = [{ value: 'ALL', label: 'Tất cả chức năng' }];
+                    if (logsTypeFilter === 'ALL' || logsTypeFilter === 'LOGIN') {
+                      moduleOpts.push({ value: 'AUTH_SERVICE', label: 'Xác thực (AUTH_SERVICE)' });
+                    }
+                    if (logsTypeFilter === 'ALL' || logsTypeFilter === 'ADMIN') {
+                      moduleOpts.push(
+                        { value: 'ADMIN_SERVICE', label: 'Quản trị chung (ADMIN_SERVICE)' },
+                        { value: 'TEACHER_SERVICE', label: 'Giáo viên (TEACHER_SERVICE)' },
+                        { value: 'COURSE_SERVICE', label: 'Khóa học (COURSE_SERVICE)' },
+                        { value: 'MODERATION_SERVICE', label: 'Báo cáo vi phạm (MODERATION_SERVICE)' }
+                      );
+                    }
+                    if (logsTypeFilter === 'ALL' || logsTypeFilter === 'SYSTEM') {
+                      moduleOpts.push(
+                        { value: 'AI_SERVICE', label: 'Dịch vụ AI (AI_SERVICE)' },
+                        { value: 'PAYMENT_SERVICE', label: 'Thanh toán (PAYMENT_SERVICE)' },
+                        { value: 'SYSTEM_SERVICE', label: 'Nhân hệ thống (SYSTEM_SERVICE)' }
+                      );
+                    }
+                    return (
+                      <NeoSelect
+                        value={logsModuleFilter}
+                        onChange={(val) => { setLogsModuleFilter(val); setLogsPage(1); }}
+                        options={moduleOpts}
+                      />
+                    );
+                  })()}
 
                   {/* Date range filter */}
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -4031,7 +4070,7 @@ export default function AdminDashboard({
                   {logsLoading && <div className="stats-spinner" style={{ width: '20px', height: '20px' }} />}
                 </div>
 
-                <div className="admin-terminal" style={{ height: '450px', cursor: 'default' }}>
+                <div className="admin-terminal" style={{ height: 'calc(100vh - 440px)', minHeight: '350px', cursor: 'default' }}>
                   {systemLogsList.map((log) => {
                     const timeStr = new Date(log.createdAt).toLocaleTimeString('vi-VN');
                     
@@ -4134,30 +4173,7 @@ export default function AdminDashboard({
                   )}
                 </div>
 
-                {/* Pagination */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
-                  <span style={{ fontSize: '13px', fontWeight: '800', color: '#7A7A7A' }}>
-                    Trang {logsPage} / {logsTotalPages}
-                  </span>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button
-                      className="admin-table-btn"
-                      disabled={logsPage === 1}
-                      onClick={() => setLogsPage(prev => Math.max(1, prev - 1))}
-                      style={{ opacity: logsPage === 1 ? 0.5 : 1 }}
-                    >
-                      Trước
-                    </button>
-                    <button
-                      className="admin-table-btn"
-                      disabled={logsPage === logsTotalPages}
-                      onClick={() => setLogsPage(prev => Math.min(logsTotalPages, prev + 1))}
-                      style={{ opacity: logsPage === logsTotalPages ? 0.5 : 1 }}
-                    >
-                      Sau
-                    </button>
-                  </div>
-                </div>
+                {/* No pagination for terminal - showing all logs */}
 
               </div>
 
