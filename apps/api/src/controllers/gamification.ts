@@ -229,23 +229,46 @@ export async function getLeaderboardRankings(req: AuthRequest, res: Response) {
       }
     }
 
-    // Dynamic sorting: if a specific subject is filtered, we look for matches on that subject's streak
-    // Otherwise, sort by total XP descending.
-    const ranks = await prisma.userGamification.findMany({
-      where: whereClause,
-      orderBy: { xp: 'desc' },
-      include: {
-        user: {
-          select: {
-            fullName: true,
-            avatarUrl: true,
-            role: true,
-            student: true,
-            subjectStreaks: true
+    let ranks;
+    let totalCount;
+
+    if (!subject) {
+      totalCount = await prisma.userGamification.count({ where: whereClause });
+      ranks = await prisma.userGamification.findMany({
+        where: whereClause,
+        orderBy: { xp: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          user: {
+            select: {
+              fullName: true,
+              avatarUrl: true,
+              role: true,
+              student: true,
+              subjectStreaks: true
+            }
           }
         }
-      }
-    });
+      });
+    } else {
+      ranks = await prisma.userGamification.findMany({
+        where: whereClause,
+        orderBy: { xp: 'desc' },
+        include: {
+          user: {
+            select: {
+              fullName: true,
+              avatarUrl: true,
+              role: true,
+              student: true,
+              subjectStreaks: true
+            }
+          }
+        }
+      });
+      totalCount = ranks.length;
+    }
 
     // Custom formatting and filtering by subject statistics if requested
     let formatted = ranks.map((r) => {
@@ -279,9 +302,8 @@ export async function getLeaderboardRankings(req: AuthRequest, res: Response) {
       });
     }
 
-    // Apply pagination manually after optional custom sorting
-    const totalCount = formatted.length;
-    const paginated = formatted.slice(skip, skip + limit).map((item, idx) => ({
+    // Apply pagination
+    const paginated = (subject ? formatted.slice(skip, skip + limit) : formatted).map((item, idx) => ({
       rank: skip + idx + 1,
       ...item
     }));
@@ -626,9 +648,42 @@ export async function getAttendanceHistory(req: AuthRequest, res: Response) {
   }
 }
 
+// Simple in-memory cache for Leaderboards to avoid DB load on public home page loads
+interface CacheEntry {
+  data: any;
+  timestamp: number;
+}
+
+const leaderboardCache: Record<string, CacheEntry> = {};
+const CACHE_TTL_MS = 60 * 1000; // 1 minute cache duration
+
+function getCachedData(key: string): any | null {
+  const cached = leaderboardCache[key];
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return cached.data;
+  }
+  return null;
+}
+
+function setCachedData(key: string, data: any) {
+  leaderboardCache[key] = {
+    data,
+    timestamp: Date.now()
+  };
+}
+
 // REST Endpoint: Get top 5 efforts leaderboard
 export async function getEffortLeaderboard(req: AuthRequest, res: Response) {
   try {
+    const cacheKey = 'effort_leaderboard';
+    const cached = getCachedData(cacheKey);
+    if (cached) {
+      return res.status(200).json({
+        success: true,
+        data: cached
+      });
+    }
+
     const efforts = await prisma.userEffort.findMany({
       orderBy: { score: 'desc' },
       take: 5,
@@ -643,6 +698,8 @@ export async function getEffortLeaderboard(req: AuthRequest, res: Response) {
       }
     });
 
+    setCachedData(cacheKey, efforts);
+
     return res.status(200).json({
       success: true,
       data: efforts
@@ -656,7 +713,18 @@ export async function getEffortLeaderboard(req: AuthRequest, res: Response) {
 export async function getHighestScoreLeaderboard(req: AuthRequest, res: Response) {
   const subject = req.query.subject ? String(req.query.subject).toLowerCase().trim() : 'toán';
   try {
-    const attempts = await prisma.testAttempt.findMany({
+    const cacheKey = `highest_score_leaderboard_${subject}`;
+    const cached = getCachedData(cacheKey);
+    if (cached) {
+      return res.status(200).json({
+        success: true,
+        data: cached
+      });
+    }
+
+    // 1. Group by studentId to get the highest score for each student in the selected subject
+    const topScores = await prisma.testAttempt.groupBy({
+      by: ['studentId'],
       where: {
         status: 'SUBMITTED',
         exam: {
@@ -666,44 +734,64 @@ export async function getHighestScoreLeaderboard(req: AuthRequest, res: Response
           }
         }
       },
-      orderBy: { score: 'desc' },
-      take: 20, // Fetch more to deduplicate distinct students
-      include: {
-        student: {
-          include: {
-            user: {
-              select: {
-                fullName: true,
-                avatarUrl: true
-              }
+      _max: {
+        score: true
+      },
+      orderBy: {
+        _max: {
+          score: 'desc'
+        }
+      },
+      take: 5
+    });
+
+    const distinctAttempts = [];
+    for (const item of topScores) {
+      const bestAttempt = await prisma.testAttempt.findFirst({
+        where: {
+          studentId: item.studentId,
+          score: item._max.score || 0,
+          status: 'SUBMITTED',
+          exam: {
+            subject: {
+              contains: subject,
+              mode: 'insensitive'
             }
           }
         },
-        exam: {
-          select: {
-            title: true,
-            subject: true
+        include: {
+          student: {
+            include: {
+              user: {
+                select: {
+                  fullName: true,
+                  avatarUrl: true
+                }
+              }
+            }
+          },
+          exam: {
+            select: {
+              title: true,
+              subject: true
+            }
           }
         }
-      }
-    });
-
-    const seenStudents = new Set();
-    const distinctAttempts = [];
-    for (const attempt of attempts) {
-      if (!seenStudents.has(attempt.studentId)) {
-        seenStudents.add(attempt.studentId);
+      });
+      
+      if (bestAttempt) {
         distinctAttempts.push({
-          userId: attempt.studentId,
-          name: attempt.student.user.fullName,
-          avatar: attempt.student.user.avatarUrl,
-          score: attempt.score,
-          examTitle: attempt.exam.title,
-          subject: attempt.exam.subject
+          userId: bestAttempt.studentId,
+          name: bestAttempt.student.user.fullName,
+          avatar: bestAttempt.student.user.avatarUrl,
+          score: bestAttempt.score,
+          examTitle: bestAttempt.exam.title,
+          subject: bestAttempt.exam.subject
         });
       }
-      if (distinctAttempts.length >= 5) break;
     }
+
+    setCachedData(cacheKey, distinctAttempts);
 
     return res.status(200).json({
       success: true,

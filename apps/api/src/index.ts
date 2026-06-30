@@ -38,7 +38,7 @@ import {
 import { getAdminLogs, getAdminLogById, getAdminLogsStatistics } from './controllers/adminLogs.js';
 import { getSettings, updateSettings } from './controllers/systemSettings.js';
 import { SystemSettingService } from './services/systemSetting.service.js';
-import { seedSystemSettings } from '../prisma/seedSettings.js';
+import { seedSystemSettings } from './seedSettings.js';
 
 import {
   getLeaderboardRankings,
