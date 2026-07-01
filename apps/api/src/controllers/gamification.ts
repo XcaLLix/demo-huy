@@ -1,6 +1,7 @@
 import type { Response } from 'express';
 import type { AuthRequest } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
+import { LeaderboardService } from '../services/leaderboard.service.js';
 
 // Helper to calculate level from XP
 export function getLevelFromXP(xp: number): number {
@@ -197,156 +198,31 @@ export async function getLeaderboardRankings(req: AuthRequest, res: Response) {
     const subject = req.query.subject ? String(req.query.subject).toLowerCase().trim() : undefined;
     const province = req.query.province ? String(req.query.province).trim() : undefined;
     const search = req.query.search ? String(req.query.search).trim() : undefined;
-    const sortBy = req.query.sortBy ? String(req.query.sortBy).trim() : 'streak';
+    const sortBy = req.query.sortBy ? (String(req.query.sortBy).trim() as any) : 'streak';
 
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 50;
-    const skip = (page - 1) * limit;
 
-    const cacheKey = `rankings_page_${grade || ''}_${subject || ''}_${province || ''}_${search || ''}_${page}_${limit}_${sortBy}`;
-    const cached = getCachedData(cacheKey);
-    if (cached) {
-      return res.status(200).json({
-        success: true,
-        data: cached
-      });
-    }
-
-    // Build Prisma query condition
-    const whereClause: any = {};
-
-    if (grade !== undefined || province !== undefined || search !== undefined) {
-      whereClause.user = {};
-      
-      const studentFilters: any = {};
-      if (grade !== undefined || province !== undefined) {
-        if (grade !== undefined) {
-          studentFilters.grade = grade;
-        }
-        if (province !== undefined) {
-          studentFilters.province = {
-            contains: province,
-            mode: 'insensitive'
-          };
-        }
-      }
-
-      if (Object.keys(studentFilters).length > 0) {
-        whereClause.user.student = studentFilters;
-      }
-
-      if (search !== undefined) {
-        whereClause.user.fullName = {
-          contains: search,
-          mode: 'insensitive'
-        };
-      }
-    }
-
-    let ranks;
-    let totalCount;
-
-    if (!subject) {
-      totalCount = await prisma.userGamification.count({ where: whereClause });
-      ranks = await prisma.userGamification.findMany({
-        where: whereClause,
-        orderBy: sortBy === 'streak' ? [{ streakDays: 'desc' }, { xp: 'desc' }] : [{ xp: 'desc' }, { streakDays: 'desc' }],
-        skip,
-        take: limit,
-        include: {
-          user: {
-            select: {
-              fullName: true,
-              avatarUrl: true,
-              role: true,
-              student: true,
-              subjectStreaks: true
-            }
-          }
-        }
-      });
-    } else {
-      ranks = await prisma.userGamification.findMany({
-        where: whereClause,
-        orderBy: { xp: 'desc' },
-        include: {
-          user: {
-            select: {
-              fullName: true,
-              avatarUrl: true,
-              role: true,
-              student: true,
-              subjectStreaks: true
-            }
-          }
-        }
-      });
-      totalCount = ranks.length;
-    }
-
-    // Custom formatting and filtering by subject statistics if requested
-    let formatted = ranks.map((r) => {
-      const student = r.user.student;
-      const subStreaks = r.user.subjectStreaks || [];
-      const currentSubStreak = subject
-        ? subStreaks.find((s) => s.subject === subject)?.currentStreak || 0
-        : 0;
-
-      return {
-        userId: r.userId,
-        name: r.user.fullName,
-        avatar: r.user.avatarUrl || '',
-        role: r.user.role,
-        level: r.level,
-        xp: r.xp,
-        streak: r.streakDays,
-        subjectStreak: currentSubStreak,
-        grade: student?.grade || null,
-        province: student?.province || 'Chưa cập nhật'
-      };
+    const startTime = Date.now();
+    const result = await LeaderboardService.getLeaderboardRankings({
+      grade,
+      subject,
+      province,
+      search,
+      sortBy,
+      page,
+      limit
     });
 
-    // If a subject is selected, rank them primarily by subject streak, secondarily by total XP (or vice versa based on sortBy)
-    if (subject) {
-      if (sortBy === 'streak') {
-        formatted.sort((a, b) => {
-          if (b.subjectStreak !== a.subjectStreak) {
-            return b.subjectStreak - a.subjectStreak;
-          }
-          return b.xp - a.xp;
-        });
-      } else {
-        formatted.sort((a, b) => {
-          if (b.xp !== a.xp) {
-            return b.xp - a.xp;
-          }
-          return b.subjectStreak - a.subjectStreak;
-        });
-      }
-    }
-
-    // Apply pagination
-    const paginated = (subject ? formatted.slice(skip, skip + limit) : formatted).map((item, idx) => ({
-      rank: skip + idx + 1,
-      ...item
-    }));
-
-    const responseData = {
-      rankings: paginated,
-      pagination: {
-        page,
-        totalPages: Math.ceil(totalCount / limit),
-        totalCount
-      }
-    };
-
-    setCachedData(cacheKey, responseData);
+    const duration = Date.now() - startTime;
+    console.log(`[GamificationController] getLeaderboardRankings completed in ${duration}ms (sortBy: ${sortBy}, page: ${page})`);
 
     return res.status(200).json({
       success: true,
-      data: responseData
+      data: result
     });
   } catch (err: any) {
+    console.error('[GamificationController] getLeaderboardRankings error:', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 }
@@ -682,68 +558,20 @@ export async function getAttendanceHistory(req: AuthRequest, res: Response) {
   }
 }
 
-// Simple in-memory cache for Leaderboards to avoid DB load on public home page loads
-interface CacheEntry {
-  data: any;
-  timestamp: number;
-}
-
-const leaderboardCache: Record<string, CacheEntry> = {};
-const CACHE_TTL_MS = 60 * 1000; // 1 minute cache duration
-
-function getCachedData(key: string): any | null {
-  const cached = leaderboardCache[key];
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    return cached.data;
-  }
-  return null;
-}
-
-function setCachedData(key: string, data: any) {
-  leaderboardCache[key] = {
-    data,
-    timestamp: Date.now()
-  };
-}
-
 export function clearLeaderboardCache() {
-  console.log('[LeaderboardCache] Invalidating cached leaderboards...');
-  for (const key in leaderboardCache) {
-    delete leaderboardCache[key];
-  }
+  console.log('[LeaderboardCache] Delegating cache invalidation to LeaderboardService...');
+  LeaderboardService.invalidateCache();
 }
 
 // REST Endpoint: Get top 5 efforts leaderboard
 export async function getEffortLeaderboard(req: AuthRequest, res: Response) {
   try {
-    const cacheKey = 'effort_leaderboard';
-    const cached = getCachedData(cacheKey);
-    if (cached) {
-      return res.status(200).json({
-        success: true,
-        data: cached
-      });
-    }
-
-    const efforts = await prisma.userEffort.findMany({
-      orderBy: { score: 'desc' },
-      take: 5,
-      include: {
-        user: {
-          select: {
-            fullName: true,
-            avatarUrl: true,
-            role: true
-          }
-        }
-      }
-    });
-
-    setCachedData(cacheKey, efforts);
-
+    const start = Date.now();
+    const result = await LeaderboardService.getEffortLeaderboard();
+    console.log(`[GamificationController] getEffortLeaderboard completed in ${Date.now() - start}ms`);
     return res.status(200).json({
       success: true,
-      data: efforts
+      data: result
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
@@ -754,89 +582,12 @@ export async function getEffortLeaderboard(req: AuthRequest, res: Response) {
 export async function getHighestScoreLeaderboard(req: AuthRequest, res: Response) {
   const subject = req.query.subject ? String(req.query.subject).toLowerCase().trim() : 'toán';
   try {
-    const cacheKey = `highest_score_leaderboard_${subject}`;
-    const cached = getCachedData(cacheKey);
-    if (cached) {
-      return res.status(200).json({
-        success: true,
-        data: cached
-      });
-    }
-
-    // 1. Group by studentId to get the highest score for each student in the selected subject
-    const topScores = await prisma.testAttempt.groupBy({
-      by: ['studentId'],
-      where: {
-        status: 'SUBMITTED',
-        exam: {
-          subject: {
-            contains: subject,
-            mode: 'insensitive'
-          }
-        }
-      },
-      _max: {
-        score: true
-      },
-      orderBy: {
-        _max: {
-          score: 'desc'
-        }
-      },
-      take: 5
-    });
-
-    const distinctAttempts = [];
-    for (const item of topScores) {
-      const bestAttempt = await prisma.testAttempt.findFirst({
-        where: {
-          studentId: item.studentId,
-          score: item._max.score || 0,
-          status: 'SUBMITTED',
-          exam: {
-            subject: {
-              contains: subject,
-              mode: 'insensitive'
-            }
-          }
-        },
-        include: {
-          student: {
-            include: {
-              user: {
-                select: {
-                  fullName: true,
-                  avatarUrl: true
-                }
-              }
-            }
-          },
-          exam: {
-            select: {
-              title: true,
-              subject: true
-            }
-          }
-        }
-      });
-      
-      if (bestAttempt) {
-        distinctAttempts.push({
-          userId: bestAttempt.studentId,
-          name: bestAttempt.student.user.fullName,
-          avatar: bestAttempt.student.user.avatarUrl,
-          score: bestAttempt.score,
-          examTitle: bestAttempt.exam.title,
-          subject: bestAttempt.exam.subject
-        });
-      }
-    }
-
-    setCachedData(cacheKey, distinctAttempts);
-
+    const start = Date.now();
+    const result = await LeaderboardService.getHighestScoreLeaderboard(subject);
+    console.log(`[GamificationController] getHighestScoreLeaderboard completed in ${Date.now() - start}ms (subject: ${subject})`);
     return res.status(200).json({
       success: true,
-      data: distinctAttempts
+      data: result
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });

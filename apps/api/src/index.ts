@@ -50,6 +50,12 @@ import {
   getHighestScoreLeaderboard
 } from './controllers/gamification.js';
 import { getTeacherStats as getTeacherDashboardStats } from './controllers/teacher.js';
+import {
+  getScoreLeaderboard,
+  getStreakLeaderboard,
+  getCourseLeaderboard,
+  getLeaderboardTelemetry
+} from './controllers/leaderboard.js';
 
 import {
   trackClick,
@@ -391,6 +397,11 @@ app.get('/forum/gamification/profile', authenticateJWT, getUserGamificationProfi
 
 app.get('/v1/leaderboard', authenticateJWT, getLeaderboardRankings);
 app.get('/v1/users/:id/activity-heatmap', authenticateJWT, getActivityHeatmap);
+
+app.get('/leaderboard/scores', getScoreLeaderboard);
+app.get('/leaderboard/streaks', getStreakLeaderboard);
+app.get('/leaderboard/courses', getCourseLeaderboard);
+app.get('/leaderboard/telemetry', getLeaderboardTelemetry);
 
 app.post('/gamification/attendance', authenticateJWT, recordAttendance);
 app.get('/gamification/attendance', authenticateJWT, getAttendanceHistory);

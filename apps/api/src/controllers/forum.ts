@@ -3,6 +3,7 @@ import type { AuthRequest } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
 import { getIO } from '../lib/socket.js';
 import { awardForumEffortPoints } from './gamification.js';
+import { LeaderboardService } from '../services/leaderboard.service.js';
 
 // =========================================================================
 // HELPERS
@@ -764,26 +765,10 @@ export async function leaveStudyGroup(req: AuthRequest, res: Response) {
 
 export async function getLeaderboard(req: AuthRequest, res: Response) {
   try {
-    const ranks = await prisma.userGamification.findMany({
-      orderBy: { xp: 'desc' },
-      take: 20,
-      include: {
-        user: { select: { fullName: true, avatarUrl: true, role: true } }
-      }
-    });
-
-    const formatted = ranks.map((r, index) => ({
-      rank: index + 1,
-      userId: r.userId,
-      name: r.user.fullName,
-      avatar: r.user.avatarUrl || 'HS',
-      role: r.user.role,
-      level: r.level,
-      xp: r.xp,
-      streak: r.streakDays
-    }));
-
-    return res.status(200).json({ success: true, data: formatted });
+    const start = Date.now();
+    const result = await LeaderboardService.getForumLeaderboard();
+    console.log(`[ForumController] getLeaderboard completed in ${Date.now() - start}ms`);
+    return res.status(200).json({ success: true, data: result });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }

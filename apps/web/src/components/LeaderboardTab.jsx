@@ -378,7 +378,7 @@ export default function LeaderboardTab({ currentUser }) {
               transition: 'all 0.2s'
             }}
           >
-            🔥 Điểm Tích Lũy (XP)
+            📝 Điểm Thi Thử
           </button>
         </div>
       </div>
@@ -466,7 +466,12 @@ export default function LeaderboardTab({ currentUser }) {
                       Khối {student.grade || 'Chưa rõ'} • Tỉnh: {student.province || 'Chưa cập nhật'}
                     </p>
                     <p style={{ fontSize: '13.5px', fontWeight: '900', color: colors.text, margin: 0 }}>
-                      XP: <strong>{student.xp.toLocaleString()}</strong> • {getStreakDisplay(student)}
+                      {sortBy === 'xp' ? (
+                        <>Điểm thi thử: <strong>{student.testScore ?? 0}</strong></>
+                      ) : (
+                        <>XP: <strong>{student.xp.toLocaleString()}</strong></>
+                      )}
+                      {" • "}{getStreakDisplay(student)}
                     </p>
                   </div>
                 );
@@ -505,7 +510,7 @@ export default function LeaderboardTab({ currentUser }) {
                   <div>Khối lớp</div>
                   <div>Tỉnh thành</div>
                   <div>Chuỗi học</div>
-                  <div style={{ textAlign: 'right' }}>Tổng điểm XP</div>
+                  <div style={{ textAlign: 'right' }}>{sortBy === 'xp' ? 'Điểm thi thử' : 'Tổng điểm XP'}</div>
                 </div>
 
                 {/* Custom Grid Rows */}
@@ -605,7 +610,7 @@ export default function LeaderboardTab({ currentUser }) {
 
                       {/* XP Column */}
                       <div style={{ textAlign: 'right', fontWeight: '955', fontSize: '15px', color: '#1E293B' }}>
-                        {student.xp.toLocaleString()} XP
+                        {sortBy === 'xp' ? `${student.testScore ?? 0} điểm` : `${student.xp.toLocaleString()} XP`}
                       </div>
                     </div>
                   ))}
