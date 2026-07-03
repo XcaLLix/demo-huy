@@ -8,7 +8,7 @@ import { incrementBothStats } from '../lib/monthlyStats.js';
 
 
 export async function getExams(req: AuthRequest, res: Response) {
-  const { subject, year, source, difficulty, grade, status } = req.query;
+  const { subject, year, source, difficulty, grade, status, teacherId } = req.query;
   const userRole = req.user?.role;
 
   try {
@@ -20,6 +20,10 @@ export async function getExams(req: AuthRequest, res: Response) {
 
     if (grade && grade !== 'All') {
       where.grade = Number(grade);
+    }
+
+    if (teacherId) {
+      where.createdBy = Number(teacherId);
     }
 
     if (userRole === 'STUDENT' || !userRole) {
@@ -55,6 +59,15 @@ export async function getExamById(req: Request, res: Response) {
     });
 
     if (!exam) return res.status(404).json({ success: false, error: 'Không tìm thấy đề thi!' });
+
+    const reqAuth = req as AuthRequest;
+    const userRole = reqAuth.user?.role;
+    const userId = reqAuth.user?.id;
+    if (exam.status !== 'published') {
+      if (userRole === 'STUDENT' || !userRole || (userRole === 'TEACHER' && exam.createdBy !== userId)) {
+        return res.status(403).json({ success: false, error: 'Bạn không có quyền truy cập đề thi này!' });
+      }
+    }
 
     const questions = exam.examQuestions.map(eq => {
       const q = eq.question;
@@ -384,6 +397,18 @@ export async function getExamQuestionsPublic(req: Request, res: Response) {
   const { id } = req.params;
 
   try {
+    const exam = await prisma.exam.findUnique({ where: { id: Number(id) } });
+    if (!exam) return res.status(404).json({ success: false, error: 'Không tìm thấy đề thi!' });
+
+    const reqAuth = req as AuthRequest;
+    const userRole = reqAuth.user?.role;
+    const userId = reqAuth.user?.id;
+    if (exam.status !== 'published') {
+      if (userRole === 'STUDENT' || !userRole || (userRole === 'TEACHER' && exam.createdBy !== userId)) {
+        return res.status(403).json({ success: false, error: 'Bạn không có quyền truy cập câu hỏi của đề thi này!' });
+      }
+    }
+
     const examQuestions = await prisma.examQuestion.findMany({
       where: { examId: Number(id) },
       include: { question: true },
@@ -1470,6 +1495,20 @@ export async function importExam(req: AuthRequest, res: Response) {
   const adminId = req.user?.id;
   if (!adminId) return res.status(401).json({ success: false, error: 'Chưa xác thực!' });
 
+  const userRole = req.user?.role;
+  if (userRole === 'TEACHER') {
+    const teacher = await prisma.teacher.findUnique({
+      where: { userId: adminId }
+    });
+
+    if (!teacher || teacher.status !== 'APPROVED') {
+      return res.status(403).json({
+        success: false,
+        error: 'Hồ sơ Giáo viên của bạn chưa được duyệt! Bạn chỉ có thể tạo hoặc nhập đề thi sau khi được Admin phê duyệt.'
+      });
+    }
+  }
+
   try {
     const examData = req.body;
     const examId = await importExamFromObject(examData, adminId);
@@ -1567,8 +1606,13 @@ export async function updateExamStatus(req: AuthRequest, res: Response) {
   const { id } = req.params;
   const { status } = req.body;
   const userId = req.user?.id;
+  const userRole = req.user?.role;
 
   if (!userId) return res.status(401).json({ success: false, error: 'Chưa xác thực!' });
+
+  if (userRole === 'TEACHER' && status === 'published') {
+    return res.status(403).json({ success: false, error: 'Giáo viên không có quyền phê duyệt đề thi!' });
+  }
 
   try {
     const exam = await prisma.exam.findUnique({ where: { id: Number(id) } });

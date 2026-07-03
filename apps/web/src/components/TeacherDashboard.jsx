@@ -169,6 +169,7 @@ export default function TeacherDashboard({
   const [cThumbnailUploading, setCThumbnailUploading] = useState(false);
   const [cTrailerUploading, setCTrailerUploading] = useState(false);
   const [courseStatusFilter, setCourseStatusFilter] = useState('ALL'); // ALL | PENDING | APPROVED | REJECTED | HIDDEN
+  const [examStatusFilter, setExamStatusFilter] = useState('ALL'); // ALL | PENDING | PUBLISHED | REJECTED | HIDDEN
 
   // --- LESSONS CRUD STATES ---
   const [lessonEditMode, setLessonEditMode] = useState('idle'); // idle, create, edit
@@ -691,8 +692,8 @@ export default function TeacherDashboard({
         try {
           const json = JSON.parse(evt.target.result);
           const imported = await api.importExam(json);
-          toast(`Nhập đề thi "${imported.title}" thành công! Trạng thái: Chờ duyệt.`, 'success');
-          addLog(`Nhập đề thi mới: ${imported.title}`, 'sys');
+          toast(`Nhập đề thi "${json.title}" thành công! Trạng thái: Chờ duyệt.`, 'success');
+          addLog(`Nhập đề thi mới: ${json.title}`, 'sys');
           loadExamsList();
         } catch (err) {
           toast(`Lỗi import: ${err.message}`, 'error');
@@ -704,20 +705,9 @@ export default function TeacherDashboard({
     }
   };
 
-  const handleApproveExam = async (examId) => {
-    try {
-      await api.updateExamStatus(examId, 'published');
-      toast('Phê duyệt đề thi thành công! Đề thi đã được phát hành tới học sinh.', 'success');
-      addLog(`Phê duyệt đề thi ID #${examId}`, 'sys');
-      loadExamsList();
-    } catch (err) {
-      toast(`Lỗi phê duyệt: ${err.message}`, 'error');
-    }
-  };
-
   const loadExamsList = async () => {
     try {
-      const data = await api.getExams();
+      const data = await api.getExams({ teacherId: currentUser?.id });
       if (data && data.length > 0) {
         const mapped = data.map(e => ({
           id: e.id,
@@ -729,7 +719,9 @@ export default function TeacherDashboard({
           avgScore: e.attempts && e.attempts.length > 0 ? Number((e.attempts.reduce((acc, a) => acc + (a.score || 0), 0) / e.attempts.length).toFixed(1)) : 0,
           maxScore: e.attempts && e.attempts.length > 0 ? Number(Math.max(...e.attempts.map(a => a.score || 0)).toFixed(1)) : 0,
           status: e.status || 'published',
-          grade: e.grade
+          grade: e.grade,
+          rejectedReason: e.rejectedReason,
+          hiddenReason: e.hiddenReason
         }));
         setExams(mapped);
       } else {
@@ -2543,8 +2535,7 @@ export default function TeacherDashboard({
             <div style={{ display: 'flex', gap: '12px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
               {[
                 { id: 'list', name: '📋 Danh sách đề thi' },
-                { id: 'build', name: '🛠️ Soạn & Upload đề thi' },
-                { id: 'moderate', name: '⚖️ Kiểm duyệt đề thi (' + exams.filter(e => e.status === 'pending').length + ')' }
+                { id: 'build', name: '🛠️ Soạn & Upload đề thi' }
               ].map(sub => (
                 <button
                   key={sub.id}
@@ -2567,50 +2558,160 @@ export default function TeacherDashboard({
             {/* Subtab 1: List */}
             {examSubTab === 'list' && (
               <div className="tdb-card">
-                <h3 className="tdb-card-title" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '14px', marginBottom: '10px' }}>
-                  📋 Danh sách đề thi hệ thống
-                </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
-                  {exams.map((ex) => (
-                    <div key={ex.id} style={{ padding: '14px', border: '1px solid #e2e8f0', borderRadius: '16px', background: '#f8fafc', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-                          <h4 style={{ fontSize: '13.5px', fontWeight: '800', margin: 0, color: '#0f172a' }}>{ex.title}</h4>
-                          <span className="tdb-exam-pill" style={{ fontSize: '9px' }}>{ex.subject}</span>
-                        </div>
-                        <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
-                          <span style={{ fontSize: '10px', fontWeight: 'bold', borderRadius: '6px', padding: '2px 6px', background: ex.status === 'pending' ? '#fef3c7' : '#d1fae5', color: ex.status === 'pending' ? '#d97706' : '#059669' }}>
-                            {ex.status === 'pending' ? '⏱️ CHỜ DUYỆT' : '✓ ĐÃ PHÁT HÀNH'}
-                          </span>
-                          {ex.grade && (
-                            <span style={{ fontSize: '10px', fontWeight: 'bold', borderRadius: '6px', padding: '2px 6px', background: '#e0e7ff', color: '#4f46e5' }}>
-                              Lớp {ex.grade}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', background: '#fff', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '12px', fontSize: '10px', fontWeight: '600', textAlign: 'center' }}>
-                        <div>
-                          <div style={{ color: '#64748b' }}>Câu hỏi</div>
-                          <div style={{ fontSize: '12px', color: '#0f172a', fontWeight: 'bold' }}>{ex.questionCount}</div>
-                        </div>
-                        <div>
-                          <div style={{ color: '#64748b' }}>Lượt thi</div>
-                          <div style={{ fontSize: '12px', color: '#2563eb', fontWeight: 'bold' }}>{ex.attempts}</div>
-                        </div>
-                        <div>
-                          <div style={{ color: '#64748b' }}>T.Bình</div>
-                          <div style={{ fontSize: '12px', color: '#f59e0b', fontWeight: 'bold' }}>{ex.avgScore ? `${ex.avgScore}đ` : '---'}</div>
-                        </div>
-                        <div>
-                          <div style={{ color: '#64748b' }}>Cao nhất</div>
-                          <div style={{ fontSize: '12px', color: '#10b981', fontWeight: 'bold' }}>{ex.maxScore ? `${ex.maxScore}đ` : '---'}</div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #cbd5e1', paddingBottom: '14px', marginBottom: '14px' }}>
+                  <h3 className="tdb-card-title">
+                    📋 Đề thi của tôi ({exams.length})
+                  </h3>
                 </div>
+
+                {/* Status Filter Tabs */}
+                {(() => {
+                  const EXAM_STATUS_TABS = [
+                    { key: 'ALL', label: 'Tất cả', icon: '📋' },
+                    { key: 'PENDING', label: 'Chờ duyệt', icon: '⏳', color: '#92400e', bg: '#fef3c7' },
+                    { key: 'PUBLISHED', label: 'Đã duyệt', icon: '✅', color: '#065f46', bg: '#d1fae5' },
+                    { key: 'REJECTED', label: 'Bị từ chối', icon: '❌', color: '#991b1b', bg: '#fee2e2' },
+                    { key: 'HIDDEN', label: 'Đã ẩn', icon: '🔒', color: '#475569', bg: '#f1f5f9' },
+                  ];
+                  const countByStatus = (s) => {
+                    if (s === 'ALL') return exams.length;
+                    return exams.filter(e => e.status?.toLowerCase() === s.toLowerCase()).length;
+                  };
+
+                  return (
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '18px' }}>
+                      {EXAM_STATUS_TABS.map(tab => {
+                        const isActive = examStatusFilter === tab.key;
+                        const count = countByStatus(tab.key);
+                        return (
+                          <button
+                            key={tab.key}
+                            onClick={() => setExamStatusFilter(tab.key)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '6px 12px',
+                              borderRadius: '20px',
+                              border: isActive ? '2px solid #000' : '1px solid #cbd5e1',
+                              background: isActive ? (tab.bg || '#e0e7ff') : '#fff',
+                              color: isActive ? (tab.color || '#1e1b4b') : '#475569',
+                              fontSize: '12px',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            <span>{tab.icon}</span>
+                            <span>{tab.label}</span>
+                            <span style={{ 
+                              fontSize: '10px', 
+                              background: isActive ? 'rgba(0,0,0,0.1)' : '#f1f5f9', 
+                              padding: '1px 6px', 
+                              borderRadius: '10px',
+                              color: isActive ? 'inherit' : '#64748b'
+                            }}>
+                              {count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+
+                {exams.filter(ex => {
+                  if (examStatusFilter === 'ALL') return true;
+                  return ex.status?.toLowerCase() === examStatusFilter.toLowerCase();
+                }).length === 0 ? (
+                  <div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontSize: '13.5px', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                    📭 Không có đề thi nào ở trạng thái này.
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+                    {exams
+                      .filter(ex => {
+                        if (examStatusFilter === 'ALL') return true;
+                        return ex.status?.toLowerCase() === examStatusFilter.toLowerCase();
+                      })
+                      .map((ex) => {
+                        const isPending = ex.status?.toLowerCase() === 'pending';
+                        const isPublished = ex.status?.toLowerCase() === 'published';
+                        const isRejected = ex.status?.toLowerCase() === 'rejected';
+                        const isHidden = ex.status?.toLowerCase() === 'hidden';
+
+                        return (
+                          <div key={ex.id} style={{ 
+                            padding: '16px', 
+                            border: '2px solid #000', 
+                            borderRadius: '16px', 
+                            background: '#ffffff', 
+                            boxShadow: '4px 4px 0px #000',
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            justifyContent: 'space-between',
+                            gap: '12px'
+                          }}>
+                            <div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
+                                <h4 style={{ fontSize: '14.5px', fontWeight: '800', margin: 0, color: '#0f172a' }}>{ex.title}</h4>
+                                <span className="tdb-exam-pill" style={{ fontSize: '9px', whiteSpace: 'nowrap' }}>{ex.subject}</span>
+                              </div>
+                              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                                <span style={{ 
+                                  fontSize: '10px', 
+                                  fontWeight: 'bold', 
+                                  borderRadius: '6px', 
+                                  padding: '2px 8px', 
+                                  background: isPending ? '#fef3c7' : (isPublished ? '#d1fae5' : (isRejected ? '#fee2e2' : '#f1f5f9')), 
+                                  color: isPending ? '#b45309' : (isPublished ? '#047857' : (isRejected ? '#b91c1c' : '#475569')),
+                                  border: '1.5px solid #000'
+                                }}>
+                                  {isPending ? '⏱️ CHỜ DUYỆT' : (isPublished ? '✓ ĐÃ PHÁT HÀNH' : (isRejected ? '❌ BỊ TỪ CHỐI' : '🔒 ĐÃ ẨN'))}
+                                </span>
+                                {ex.grade && (
+                                  <span style={{ fontSize: '10px', fontWeight: 'bold', borderRadius: '6px', padding: '2px 8px', background: '#e0e7ff', color: '#4f46e5', border: '1.5px solid #000' }}>
+                                    Lớp {ex.grade}
+                                  </span>
+                                )}
+                              </div>
+
+                              {isRejected && ex.rejectedReason && (
+                                <div style={{ padding: '8px 12px', background: '#fee2e2', borderLeft: '3.5px solid #ef4444', borderRadius: '8px', fontSize: '11.5px', color: '#991b1b', marginBottom: '8px' }}>
+                                  <strong>Lý do từ chối:</strong> {ex.rejectedReason}
+                                </div>
+                              )}
+
+                              {isHidden && ex.hiddenReason && (
+                                <div style={{ padding: '8px 12px', background: '#f1f5f9', borderLeft: '3.5px solid #64748b', borderRadius: '8px', fontSize: '11.5px', color: '#475569', marginBottom: '8px' }}>
+                                  <strong>Lý do ẩn:</strong> {ex.hiddenReason}
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', background: '#f8fafc', padding: '8px', border: '1.5px solid #000', borderRadius: '12px', fontSize: '10px', fontWeight: '600', textAlign: 'center' }}>
+                              <div>
+                                <div style={{ color: '#64748b' }}>Câu hỏi</div>
+                                <div style={{ fontSize: '12px', color: '#0f172a', fontWeight: 'bold' }}>{ex.questionCount}</div>
+                              </div>
+                              <div>
+                                <div style={{ color: '#64748b' }}>Lượt thi</div>
+                                <div style={{ fontSize: '12px', color: '#2563eb', fontWeight: 'bold' }}>{ex.attempts}</div>
+                              </div>
+                              <div>
+                                <div style={{ color: '#64748b' }}>T.Bình</div>
+                                <div style={{ fontSize: '12px', color: '#f59e0b', fontWeight: 'bold' }}>{ex.avgScore ? `${ex.avgScore}đ` : '---'}</div>
+                              </div>
+                              <div>
+                                <div style={{ color: '#64748b' }}>Cao nhất</div>
+                                <div style={{ fontSize: '12px', color: '#10b981', fontWeight: 'bold' }}>{ex.maxScore ? `${ex.maxScore}đ` : '---'}</div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
               </div>
             )}
 
@@ -2711,63 +2812,7 @@ export default function TeacherDashboard({
               </div>
             )}
 
-            {/* Subtab 3: Moderate */}
-            {examSubTab === 'moderate' && (
-              <div className="tdb-card">
-                <h3 className="tdb-card-title" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '14px', marginBottom: '10px' }}>
-                  ⚖️ Đề thi đang chờ kiểm duyệt & xuất bản
-                </h3>
-                {exams.filter(e => e.status === 'pending').length > 0 ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px' }}>
-                    {exams.filter(e => e.status === 'pending').map((ex) => (
-                      <div key={ex.id} style={{ padding: '16px', border: '1px solid #cbd5e1', borderRadius: '16px', background: '#FFFDF5', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                        <div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                            <h4 style={{ fontSize: '14px', fontWeight: '800', margin: 0, color: '#0f172a' }}>{ex.title}</h4>
-                            <span className="tdb-exam-pill" style={{ fontSize: '9px' }}>{ex.subject}</span>
-                          </div>
-                          <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', fontSize: '11.5px', fontWeight: '600', color: '#64748b' }}>
-                            <span>Số câu hỏi: <strong>{ex.questionCount} câu</strong></span>
-                            <span>•</span>
-                            <span>Thời gian: <strong>{ex.duration} phút</strong></span>
-                            {ex.grade && (
-                              <>
-                                <span>•</span>
-                                <span style={{ color: '#4f46e5' }}>Lớp {ex.grade}</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                        
-                        <div style={{ display: 'flex', gap: '8px', borderTop: '1px dashed #cbd5e1', paddingTop: '12px', marginTop: '10px' }}>
-                          <button 
-                            onClick={() => handleApproveExam(ex.id)}
-                            className="tdb-upgrade-btn"
-                            style={{ flex: 1, background: '#d1fae5', color: '#065f46', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', boxShadow: 'none' }}
-                          >
-                            <HiCheck /> Duyệt đề thi
-                          </button>
-                          <button 
-                            onClick={() => {
-                              setExams(exams.filter(e => e.id !== ex.id));
-                              toast('Đã từ chối và xóa đề thi khỏi hàng đợi kiểm duyệt.', 'info');
-                            }}
-                            className="tdb-upgrade-btn"
-                            style={{ width: 'auto', padding: '8px 12px', background: '#fee2e2', color: '#b91c1c', boxShadow: 'none' }}
-                          >
-                            Từ chối
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontSize: '13.5px' }}>
-                    🎉 Không có đề thi nào đang chờ phê duyệt. Tất cả các đề đã được kiểm duyệt!
-                  </div>
-                )}
-              </div>
-            )}
+            {/* Subtab 3: Moderate (REMOVED) */}
           </div>
         )}
 
