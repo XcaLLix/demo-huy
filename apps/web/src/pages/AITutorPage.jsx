@@ -197,6 +197,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
   const fileInputRef = useRef(null);
   const svgRef = useRef(null);
   const chatEndRef = useRef(null);
+  const drawerBodyRef = useRef(null);
 
   const loadSharedMindmap = async (id) => {
     setIsLoading(true);
@@ -260,8 +261,10 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
 
   // Adjust scroll when new messages arrive in drawer
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [nodeChatMessages, selectedNode, isNodeChatTyping]);
+    if (selectedNode) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [nodeChatMessages, isNodeChatTyping]);
 
   // Sync selected node with edit fields
   useEffect(() => {
@@ -271,6 +274,9 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
       setEditNodeShape(selectedNode.shape || 'oval');
       setNewChildName('');
       setNewChildDesc('');
+      if (drawerBodyRef.current) {
+        drawerBodyRef.current.scrollTop = 0;
+      }
     }
   }, [selectedNode]);
 
@@ -605,16 +611,67 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
     }
   };
 
-  // Client-side HTML5 Canvas PNG Exporter
-  const handleExportPng = () => {
+  // Client-side html-to-image PNG Exporter
+  const handleExportPng = async () => {
     if (!svgRef.current) return;
+    setIsLoading(true);
+    setLoadingStep('Đang chuẩn bị công cụ xuất ảnh PNG...');
     try {
-      const svgElement = svgRef.current;
-      const serializer = new XMLSerializer();
-      let svgString = serializer.serializeToString(svgElement);
+      // Dynamically load html-to-image library from jsDelivr CDN
+      const htmlToImage = await new Promise((resolve, reject) => {
+        if (window.htmlToImage) {
+          resolve(window.htmlToImage);
+          return;
+        }
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/dist/html-to-image.min.js';
+        script.onload = () => resolve(window.htmlToImage);
+        script.onerror = (err) => reject(new Error('Không thể tải thư viện xuất ảnh PNG.'));
+        document.body.appendChild(script);
+      });
 
-      const styles = `
-        svg { background-color: #141410; font-family: 'Outfit', 'Inter', sans-serif; }
+      setLoadingStep('Đang chuyển đổi sơ đồ thành ảnh PNG...');
+      const svgElement = svgRef.current;
+      const contentGroup = svgElement.querySelector('g');
+      if (!contentGroup) {
+        throw new Error('Không tìm thấy nội dung sơ đồ để xuất.');
+      }
+
+      // Temporarily remove transform of <g> to measure local bounding box
+      const originalTransform = contentGroup.getAttribute('transform');
+      contentGroup.setAttribute('transform', 'translate(0,0) scale(1)');
+      const bbox = svgElement.getBBox ? svgElement.getBBox() : { x: 0, y: 0, width: 1200, height: 800 };
+      
+      // Restore original transform
+      contentGroup.setAttribute('transform', originalTransform);
+
+      // Clone SVG and set its dimensions to encapsulate the whole mindmap
+      const clonedSvg = svgElement.cloneNode(true);
+      const clonedContentGroup = clonedSvg.querySelector('g');
+      
+      const padding = 80;
+      const width = bbox.width + padding * 2;
+      const height = bbox.height + padding * 2;
+
+      clonedSvg.setAttribute('width', width);
+      clonedSvg.setAttribute('height', height);
+      clonedSvg.setAttribute('style', `background-color: #141410; width: ${width}px; height: ${height}px;`);
+
+      // Translate group in the clone so the whole mindmap is visible inside cloned bounds
+      const tx = padding - bbox.x;
+      const ty = padding - bbox.y;
+      clonedContentGroup.setAttribute('transform', `translate(${tx}, ${ty}) scale(1)`);
+
+      // Append clone to body off-screen to allow proper stylesheet styles inheritance
+      clonedSvg.style.position = 'absolute';
+      clonedSvg.style.top = '-9999px';
+      clonedSvg.style.left = '-9999px';
+      document.body.appendChild(clonedSvg);
+
+      // Inline mindmap styles into the clone
+      const styleEl = document.createElement('style');
+      styleEl.innerHTML = `
+        svg { background-color: #141410; font-family: 'Inter', system-ui, sans-serif; }
         .canvas-node-card { border-radius: 14px; text-align: center; display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
         .canvas-node-card-root { background: linear-gradient(135deg, #3B82F6, #1D4ED8) !important; color: #FFFFFF !important; }
         .canvas-node-card-level1 { background: linear-gradient(135deg, #8B5CF6, #6D28D9) !important; color: #FFFFFF !important; }
@@ -626,48 +683,35 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
         .node-status-badge { position: absolute; top: 4px; right: 6px; font-size: 9px; font-weight: 800; }
         text { fill: #F3F4F6; }
       `;
-      svgString = svgString.replace('</svg>', `<style>${styles}</style></svg>`);
+      clonedSvg.appendChild(styleEl);
 
-      const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
-      const URL = window.URL || window.webkitURL || window;
-      const blobURL = URL.createObjectURL(svgBlob);
-      
-      const image = new Image();
-      image.onload = () => {
-        const canvas = document.createElement("canvas");
-        const bbox = svgElement.getBBox ? svgElement.getBBox() : { x: 0, y: 0, width: 1200, height: 800 };
-        
-        const padding = 120;
-        canvas.width = Math.max(bbox.width + padding * 2, 1200);
-        canvas.height = Math.max(bbox.height + padding * 2, 800);
-        
-        const context = canvas.getContext("2d");
-        if (context) {
-          context.fillStyle = "#141410";
-          context.fillRect(0, 0, canvas.width, canvas.height);
-          
-          const dx = padding - bbox.x;
-          const dy = padding - bbox.y;
-          context.drawImage(image, dx, dy);
-          
-          const pngUrl = canvas.toDataURL("image/png");
-          const downloadLink = document.createElement("a");
-          downloadLink.href = pngUrl;
-          downloadLink.download = `${mindmapData?.name || 'mindmap'}.png`;
-          document.body.appendChild(downloadLink);
-          downloadLink.click();
-          document.body.removeChild(downloadLink);
-          toast('Đã xuất file PNG thành công!', 'success');
+      const dataUrl = await htmlToImage.toPng(clonedSvg, {
+        width: width,
+        height: height,
+        style: {
+          transform: 'none',
+          left: '0',
+          top: '0',
+          position: 'static'
         }
-      };
-      image.onerror = (e) => {
-        console.error("PNG export image load error", e);
-        toast('Lỗi khi vẽ file PNG. Một số thành phần SVG có thể không được hỗ trợ.', 'error');
-      };
-      image.src = blobURL;
+      });
+
+      document.body.removeChild(clonedSvg);
+
+      const downloadLink = document.createElement("a");
+      downloadLink.href = dataUrl;
+      downloadLink.download = `${mindmapData?.name || 'mindmap'}.png`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      
+      toast('Đã xuất file PNG thành công!', 'success');
     } catch (err) {
       console.error(err);
-      toast('Lỗi khi xuất PNG!', 'error');
+      toast('Lỗi khi xuất ảnh PNG! Thử phóng to/thu nhỏ sơ đồ trước khi xuất.', 'error');
+    } finally {
+      setIsLoading(false);
+      setLoadingStep('');
     }
   };
 
@@ -821,16 +865,14 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
       const pathData = `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`;
       
       const isTargetSelected = selectedNode?.id === link.target.id;
+      const isSourceSelected = selectedNode?.id === link.source.id;
+      const isActive = isTargetSelected || isSourceSelected;
 
       return (
         <path
           key={link.id}
           d={pathData}
-          fill="none"
-          stroke="#000000"
-          strokeWidth="3.5"
-          strokeDasharray={isTargetSelected ? "4 3" : "none"}
-          style={{ transition: 'stroke 0.2s, stroke-width 0.2s' }}
+          className={`canvas-connection-path ${isActive ? 'canvas-connection-path--active' : ''}`}
         />
       );
     });
@@ -964,17 +1006,18 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
             >
               <circle 
                 r="10" 
-                fill="#ffffff" 
-                stroke="#000000"
-                strokeWidth="2.5"
+                fill="var(--mm-card-dark)" 
+                stroke="var(--mm-gold)"
+                strokeWidth="1.5"
                 style={{ transition: 'all 0.2s' }}
+                className="canvas-node-toggle-circle"
               />
               <text
                 textAnchor="middle"
                 dominantBaseline="central"
-                fontSize="13"
+                fontSize="12"
                 fontWeight="900"
-                fill="#000000"
+                fill="#ffffff"
                 y="0.5"
                 style={{ userSelect: 'none' }}
               >
@@ -2448,7 +2491,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
             </div>
 
             {/* Content Body scrollable */}
-            <div className="aitutor-drawer-body">
+            <div ref={drawerBodyRef} className="aitutor-drawer-body">
               {/* Node Title & Description with CRUD Edits */}
               <div className="drawer-section">
                 <label className="flashcard-modal-label" style={{ marginBottom: '4px', display: 'block', fontSize: '10px', color: '#ffffff' }}>Tên nút sơ đồ</label>
