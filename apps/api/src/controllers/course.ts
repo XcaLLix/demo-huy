@@ -9,7 +9,7 @@ export async function getCourses(req: AuthRequest, res: Response) {
   try {
     const filters: any = {};
     if (teacherId) {
-      filters.teacherId = String(teacherId);
+      filters.teacherId = Number(teacherId);
     } else {
       filters.isApproved = true;
       filters.status = 'APPROVED';
@@ -120,7 +120,6 @@ export async function createCourse(req: AuthRequest, res: Response) {
       });
     }
 
-    const published = req.body.isPublished === 'true' || req.body.isPublished === true;
     const newCourse = await prisma.course.create({
       data: {
         title,
@@ -131,8 +130,10 @@ export async function createCourse(req: AuthRequest, res: Response) {
         thumbnailUrl,
         grade: grade ? Number(grade) : null,
         level: level || null,
-        isPublished: published,
-        isApproved: published, // Auto-approve if published
+        isPublished: false,
+        isApproved: false,
+        status: 'PENDING',
+        submittedAt: new Date(),
         teacherId
       }
     });
@@ -173,7 +174,6 @@ export async function updateCourse(req: AuthRequest, res: Response) {
   const { title, description, subject, price, discount, thumbnailUrl, grade, isPublished, level } = req.body;
 
   try {
-    const published = isPublished !== undefined ? (isPublished === 'true' || isPublished === true) : undefined;
     const updated = await prisma.course.update({
       where: { id: courseId },
       data: {
@@ -184,8 +184,8 @@ export async function updateCourse(req: AuthRequest, res: Response) {
         ...(discount !== undefined ? { discount: Number(discount) } : {}),
         ...(thumbnailUrl !== undefined ? { thumbnailUrl } : {}),
         ...(grade !== undefined ? { grade: grade ? Number(grade) : null } : {}),
-        ...(level !== undefined ? { level } : {}),
-        ...(published !== undefined ? { isPublished: published, isApproved: published } : {})
+        ...(level !== undefined ? { level } : {})
+        // Không thay đổi isApproved/status khi giáo viên update — chỉ admin mới được duyệt
       }
     });
 
