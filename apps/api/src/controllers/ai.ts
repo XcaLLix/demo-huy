@@ -1120,6 +1120,8 @@ async function callOpenRouter(prompt: string, maxTokens = 1500, temp = 0.5) {
 
   const candidateModels = [
     primaryModel,
+    'google/gemma-2-9b-it:free',
+    'meta-llama/llama-3-8b-instruct:free',
     'google/gemma-4-31b-it:free',
     'qwen/qwen3-coder:free',
     'meta-llama/llama-3.3-70b-instruct:free',
