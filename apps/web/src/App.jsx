@@ -1475,14 +1475,16 @@ export default function App() {
     }
   }, [currentUser, role, parsedRoute.route]);
 
-  // Redirect guest users away from leaderboard
+  // Redirect guest users away from leaderboard, and redirect logged-in users away from dashboard leaderboard
   useEffect(() => {
     if ((role === 'guest' || !currentUser) && parsedRoute.route === 'public-leaderboard') {
       showToast.current?.('Vui lòng đăng nhập để xem bảng xếp hạng học tập!', 'warning');
       navigateTo('/');
       setActiveTab('login');
+    } else if (parsedRoute.route === 'dashboard' && parsedRoute.tab === 'leaderboard') {
+      navigateTo('/leaderboard');
     }
-  }, [currentUser, role, parsedRoute.route]);
+  }, [currentUser, role, parsedRoute.route, parsedRoute.tab]);
 
   // Guard dashboard routes and redirect to home if not logged in
   useEffect(() => {
@@ -2751,25 +2753,6 @@ export default function App() {
               {/* Forum tab */}
               {parsedRoute.tab === 'forum' && (
                 <Forum currentUser={currentUser} />
-              )}
-
-              {/* Leaderboard tab */}
-              {parsedRoute.tab === 'leaderboard' && (
-                <div className="card animate-in" style={{ border: '1px solid #2C3241', boxShadow: 'var(--shadow-md)', padding: '28px', background: '#1C202B', borderRadius: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #2C3241', paddingBottom: '16px', marginBottom: '20px' }}>
-                    <div>
-                      <h3 style={{ fontSize: '20px', fontWeight: '950', color: '#FFF', margin: 0 }}>
-                        🏆 BẢNG XẾP HẠNG HỌC VIÊN XUẤT SẮC
-                      </h3>
-                      <p style={{ fontSize: '13px', color: '#9BA3B2', margin: '4px 0 0 0' }}>
-                        Bảng vàng vinh danh những chiến thần học tập có phong độ cao nhất trên hệ thống EduPath.
-                      </p>
-                    </div>
-                    <span style={{ fontSize: '32px' }}>🏆</span>
-                  </div>
-
-                  <LeaderboardTab currentUser={currentUser} />
-                </div>
               )}
 
               {/* Online Mock Exams tab */}
