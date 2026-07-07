@@ -874,6 +874,22 @@ export async function syncMindmapNodes(mindmapId: number, content: any) {
     );
   }
 
+  const keysToSync = new Set(nodesToSync.map(n => n.nodeKey));
+  const keysToDelete = existingNodes
+    .filter(n => !keysToSync.has(n.nodeKey))
+    .map(n => n.nodeKey);
+
+  if (keysToDelete.length > 0) {
+    operations.push(
+      prisma.mindmapNode.deleteMany({
+        where: {
+          mindmapId,
+          nodeKey: { in: keysToDelete }
+        }
+      })
+    );
+  }
+
   if (operations.length > 0) {
     await prisma.$transaction(operations);
   }
@@ -1202,7 +1218,7 @@ function findNodeAndParentContext(node: any, targetKey: string, currentPath = '0
 
 export async function generateNodeQuiz(req: AuthRequest, res: Response) {
   const userId = req.user?.id;
-  const { mindmapId, nodeKey } = req.body;
+  const { mindmapId, nodeKey, refresh } = req.body;
 
   if (!userId) {
     return res.status(401).json({ success: false, error: 'Chưa xác thực!' });
@@ -1244,13 +1260,19 @@ export async function generateNodeQuiz(req: AuthRequest, res: Response) {
       return res.status(404).json({ success: false, error: 'Không tìm thấy nút kiến thức.' });
     }
 
+    if (refresh) {
+      await prisma.quizQuestion.deleteMany({
+        where: { mindmapNodeId: node.id }
+      });
+    }
+
     const existingQuestions = await prisma.quizQuestion.findMany({
       where: { mindmapNodeId: node.id }
     });
 
-    let questions = existingQuestions;
+    let questions = refresh ? [] : existingQuestions;
 
-    if (existingQuestions.length === 0) {
+    if (questions.length === 0) {
       const parsedInfo = findNodeAndParentContext(mindmap.content, String(nodeKey));
       const parentContextText = parsedInfo ? parsedInfo.parentContext : 'Không có';
       const nodeName = node.name;

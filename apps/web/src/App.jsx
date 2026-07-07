@@ -3921,7 +3921,7 @@ export default function App() {
 
 
       {/* ── Toast Notifications ── */}
-      <div className="app-toasts-container">
+      <div className={`app-toasts-container ${['ai-tutor', 'flashcards', 'mock-exam-taking', 'mock-exam-result'].includes(parsedRoute?.route) ? 'dark-theme' : ''}`}>
         {toasts.map(t => (
           <div key={t.id} className={`app-toast app-toast-${t.type}`}>
             <span className="app-toast-icon">

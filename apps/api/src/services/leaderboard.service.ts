@@ -589,6 +589,83 @@ export class LeaderboardService {
       const skip = (page - 1) * limit;
 
       // ────────────────────────────────────────────────────────
+      // OPTIMIZATION: Try to use pre-calculated snapshots if query matches
+      // ────────────────────────────────────────────────────────
+      if (
+        !search &&
+        page === 1 &&
+        limit <= 100 &&
+        sortBy === 'xp' &&
+        grade && [10, 11, 12].includes(grade) &&
+        !subject &&
+        !province
+      ) {
+        const dimensionKey = `grade_${grade}_xp`;
+        try {
+          const snapshots = await prisma.leaderboardSnapshot.findMany({
+            where: { dimensionKey },
+            orderBy: { rank: 'asc' },
+            take: limit,
+            include: {
+              user: {
+                select: {
+                  fullName: true,
+                  avatarUrl: true,
+                  role: true,
+                  student: {
+                    select: {
+                      grade: true,
+                      province: true
+                    }
+                  },
+                  gamification: {
+                    select: {
+                      level: true
+                    }
+                  }
+                }
+              }
+            }
+          });
+
+          if (snapshots.length > 0) {
+            console.log(`[LeaderboardService] Serving rankings from pre-calculated snapshot for: ${dimensionKey}`);
+            const formatted = snapshots.map(s => {
+              const student = s.user.student;
+              const gamify = s.user.gamification;
+              return {
+                userId: s.userId,
+                name: s.user.fullName,
+                avatar: s.user.avatarUrl || '',
+                role: s.user.role,
+                level: gamify?.level || 1,
+                xp: s.xp,
+                testScore: s.score,
+                streak: s.streakDays,
+                subjectStreak: 0,
+                grade: student?.grade || null,
+                province: student?.province || 'Chưa cập nhật'
+              };
+            });
+
+            return {
+              rankings: formatted.map((item, idx) => ({
+                rank: idx + 1,
+                ...item
+              })),
+              pagination: {
+                page,
+                totalPages: Math.ceil(snapshots.length / limit),
+                totalCount: snapshots.length
+              }
+            };
+          }
+        } catch (snapErr: any) {
+          console.error(`[LeaderboardService] Failed to fetch snapshots for ${dimensionKey}:`, snapErr.message);
+        }
+      }
+
+      // ────────────────────────────────────────────────────────
       // CASE A: Sorting by 'xp' (Special composite metric)
       // ────────────────────────────────────────────────────────
       if (sortBy === 'xp') {
@@ -748,8 +825,22 @@ export class LeaderboardService {
         });
       } else {
         // If subject is selected, streaks must be resolved per subject, requiring full list mapping
+        // OPTIMIZATION: Filter database rows by subject relation first to reduce volume
+        const cleanSubject = subject.toLowerCase().trim();
+        const optimizedWhereClause = {
+          ...whereClause,
+          user: {
+            ...whereClause.user,
+            subjectStreaks: {
+              some: {
+                subject: cleanSubject
+              }
+            }
+          }
+        };
+
         ranks = await prisma.userGamification.findMany({
-          where: whereClause,
+          where: optimizedWhereClause,
           orderBy: { xp: 'desc' },
           include: {
             user: {
