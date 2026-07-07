@@ -112,6 +112,8 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const [editNodeShape, setEditNodeShape] = useState('oval');
   const isDraggingSidebarRef = useRef(false);
+  const isDirtyRef = useRef(false);
+  const [autosaveStatus, setAutosaveStatus] = useState('');
   const [blankMindmapTitle, setBlankMindmapTitle] = useState('Sơ đồ tư duy mới');
   const examFileInputRef = useRef(null);
   const [isDraggingExamFile, setIsDraggingExamFile] = useState(false);
@@ -279,6 +281,54 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
       }
     }
   }, [selectedNode]);
+
+  // Autosave Effect
+  useEffect(() => {
+    if (!mindmapData || !isDirtyRef.current) return;
+
+    setAutosaveStatus('saving');
+    const timer = setTimeout(async () => {
+      try {
+        if (!currentUser) {
+          // LocalStorage save
+          const localId = activeMindmapDbId || `local-${Date.now()}`;
+          const newMindmap = {
+            id: localId,
+            title: mindmapData.name.trim() || 'Sơ đồ tư duy không tên',
+            content: mindmapData,
+            createdAt: new Date().toISOString()
+          };
+          const stored = localStorage.getItem('edupath_saved_mindmaps');
+          let list = stored ? JSON.parse(stored) : [];
+          const existingIdx = list.findIndex(m => m.id === localId);
+          if (existingIdx > -1) {
+            list[existingIdx] = newMindmap;
+          } else {
+            list = [newMindmap, ...list];
+          }
+          localStorage.setItem('edupath_saved_mindmaps', JSON.stringify(list));
+          setActiveMindmapDbId(localId);
+          loadLocalHistory();
+        } else {
+          // DB save
+          const response = await api.saveMindmap(mindmapData.name, mindmapData, activeMindmapDbId);
+          const savedId = response?.id || response?.data?.id;
+          if (savedId) {
+            setActiveMindmapDbId(savedId);
+          }
+          fetchHistory();
+        }
+        isDirtyRef.current = false;
+        setAutosaveStatus('saved');
+        setTimeout(() => setAutosaveStatus(''), 3000);
+      } catch (err) {
+        console.error('Autosave error:', err);
+        setAutosaveStatus('');
+      }
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [mindmapData, currentUser, activeMindmapDbId]);
 
   // Panning & Zooming SVG passive event hook
   useEffect(() => {
@@ -1128,7 +1178,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
     }
   }, [activeMindmapDbId]);
 
-  const handleStartNodeQuiz = async () => {
+  const handleStartNodeQuiz = async (refresh = false) => {
     if (!mindmapData) return;
     if (!selectedNode) {
       toast("Vui lòng chọn một nút trên sơ đồ tư duy để làm quiz.", "warning");
@@ -1140,8 +1190,9 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
       toast("Đang tự động lưu sơ đồ tư duy trước khi làm quiz...", "info");
       try {
         const response = await api.saveMindmap(mindmapData.name, mindmapData, null);
-        if (response && response.data) {
-          targetMindmapId = response.data.id;
+        const savedId = response?.id || response?.data?.id;
+        if (savedId) {
+          targetMindmapId = savedId;
           setActiveMindmapDbId(targetMindmapId);
           const data = await api.getMindmaps();
           setSavedMindmaps(data || []);
@@ -1166,7 +1217,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
     setQuizStartTime(Date.now());
 
     try {
-      const res = await api.generateNodeQuiz(targetMindmapId, selectedNode.id);
+      const res = await api.generateNodeQuiz(targetMindmapId, selectedNode.id, refresh);
       if (res) {
         setQuizQuestions(res);
       } else {
@@ -1512,6 +1563,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
 
     const updatedData = updateNodeInTree(mindmapData);
     setMindmapData(updatedData);
+    isDirtyRef.current = true;
     setSelectedNode(findNodeById(updatedData, nodeId));
     toast('Đã cập nhật thông tin nút sơ đồ!', 'success');
   };
@@ -1535,6 +1587,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
 
     const updatedData = updateNodeStatusInTree(mindmapData);
     setMindmapData(updatedData);
+    isDirtyRef.current = true;
     setSelectedNode(findNodeById(updatedData, nodeId));
     toast('Đã cập nhật trạng thái học tập của nút!', 'success');
   };
@@ -1572,6 +1625,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
     const updatedData = addChildToTree(mindmapData);
     const structured = assignIds(updatedData);
     setMindmapData(structured);
+    isDirtyRef.current = true;
     
     // Automatically expand parent node to see the new child
     setExpandedNodes(prev => {
@@ -1615,6 +1669,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
     const updatedData = deleteNodeFromTree(mindmapData);
     const structured = assignIds(updatedData);
     setMindmapData(structured);
+    isDirtyRef.current = true;
     setSelectedNode(null); // Close drawer since selected node is deleted
     toast('Đã xóa nút sơ đồ thành công!', 'success');
   };
@@ -2353,6 +2408,26 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
 
 
 
+                  {autosaveStatus && (
+                    <span 
+                      style={{ 
+                        fontSize: '11.5px', 
+                        color: autosaveStatus === 'saving' ? '#fbbf24' : '#34d399', 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        gap: '4px', 
+                        background: autosaveStatus === 'saving' ? 'rgba(251, 191, 36, 0.1)' : 'rgba(52, 211, 153, 0.1)', 
+                        padding: '6px 12px', 
+                        borderRadius: '20px',
+                        border: autosaveStatus === 'saving' ? '1px solid rgba(251, 191, 36, 0.2)' : '1px solid rgba(52, 211, 153, 0.2)',
+                        fontWeight: '600',
+                        marginRight: '4px'
+                      }}
+                    >
+                      {autosaveStatus === 'saving' ? '⏳ Đang tự động lưu...' : '✅ Đã lưu tự động'}
+                    </span>
+                  )}
+
                   <button 
                     className="canvas-action-pill" 
                     onClick={handleSaveMindmap} 
@@ -2962,7 +3037,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
                         </button>
                         <button 
                           className="mm-quiz-action-btn-primary" 
-                          onClick={handleStartNodeQuiz}
+                          onClick={() => handleStartNodeQuiz(true)}
                         >
                           <HiRefresh /> Luyện tập lại
                         </button>

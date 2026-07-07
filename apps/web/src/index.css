@@ -8518,18 +8518,18 @@ body {
   margin-top: 1px;
 }
 .dark-theme .app-toast-success {
-  background: rgba(0,184,148,0.18);
-  border-color: rgba(0,184,148,0.4);
+  background: #14281f;
+  border-color: rgba(0, 184, 148, 0.5);
   color: #55efc4;
 }
 .dark-theme .app-toast-error {
-  background: rgba(231,76,60,0.18);
-  border-color: rgba(231,76,60,0.4);
+  background: #2a1414;
+  border-color: rgba(231, 76, 60, 0.5);
   color: #ff7675;
 }
 .dark-theme .app-toast-warning {
-  background: rgba(243,156,18,0.18);
-  border-color: rgba(243,156,18,0.4);
+  background: #2a2014;
+  border-color: rgba(243, 156, 18, 0.5);
   color: #fdcb6e;
 }
 @keyframes toastIn {

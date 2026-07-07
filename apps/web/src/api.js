@@ -420,10 +420,10 @@ export const api = {
     return request(url);
   },
 
-  generateNodeQuiz: (mindmapId, nodeKey) =>
+  generateNodeQuiz: (mindmapId, nodeKey, refresh = false) =>
     request('/ai/mindmap/quiz', {
       method: 'POST',
-      body: { mindmapId, nodeKey }
+      body: { mindmapId, nodeKey, refresh }
     }),
 
   submitNodeQuiz: (mindmapId, nodeKey, answers, completionTime) =>

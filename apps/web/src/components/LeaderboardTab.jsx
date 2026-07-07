@@ -2,11 +2,69 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import { toast } from '../utils/toast';
 
+const skeletonKeyframes = `
+  @keyframes mm-pulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 0.3; }
+    100% { opacity: 0.6; }
+  }
+`;
+
+const renderTop3Skeleton = () => (
+  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+    {[1, 2, 3].map(i => (
+      <div key={i} style={{
+        background: '#FFFFFF',
+        borderRadius: '16px',
+        padding: '24px',
+        border: '1px solid #E2E8F0',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        animation: 'mm-pulse 1.5s infinite ease-in-out',
+        minHeight: '230px',
+        justifyContent: 'center',
+        gap: '12px'
+      }}>
+        <div style={{ width: '40px', height: '20px', background: '#E2E8F0', borderRadius: '4px' }} />
+        <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#E2E8F0' }} />
+        <div style={{ width: '120px', height: '24px', background: '#E2E8F0', borderRadius: '6px' }} />
+        <div style={{ width: '80px', height: '16px', background: '#E2E8F0', borderRadius: '4px' }} />
+        <div style={{ width: '100px', height: '32px', background: '#E2E8F0', borderRadius: '8px', marginTop: '8px' }} />
+      </div>
+    ))}
+  </div>
+);
+
+const renderTableSkeleton = () => (
+  <div style={{ background: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '16px', animation: 'mm-pulse 1.5s infinite ease-in-out' }}>
+    <div style={{ display: 'flex', borderBottom: '1px solid #E2E8F0', paddingBottom: '12px', marginBottom: '12px' }}>
+      <div style={{ flex: '0 0 60px', height: '16px', background: '#E2E8F0', borderRadius: '4px' }} />
+      <div style={{ flex: '1 1 200px', height: '16px', background: '#E2E8F0', borderRadius: '4px', marginLeft: '12px' }} />
+      <div style={{ flex: '0 0 100px', height: '16px', background: '#E2E8F0', borderRadius: '4px', marginLeft: '12px' }} />
+      <div style={{ flex: '0 0 80px', height: '16px', background: '#E2E8F0', borderRadius: '4px', marginLeft: '12px' }} />
+    </div>
+    {Array.from({ length: 5 }).map((_, i) => (
+      <div key={i} style={{ display: 'flex', padding: '12px 0', borderBottom: i === 4 ? 'none' : '1px solid #F1F5F9', alignItems: 'center' }}>
+        <div style={{ flex: '0 0 60px', height: '24px', background: '#F1F5F9', borderRadius: '4px' }} />
+        <div style={{ flex: '1 1 200px', display: 'flex', alignItems: 'center', marginLeft: '12px' }}>
+          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#F1F5F9' }} />
+          <div style={{ width: '100px', height: '16px', background: '#F1F5F9', borderRadius: '4px', marginLeft: '8px' }} />
+        </div>
+        <div style={{ flex: '0 0 100px', height: '16px', background: '#F1F5F9', borderRadius: '4px', marginLeft: '12px' }} />
+        <div style={{ flex: '0 0 80px', height: '16px', background: '#F1F5F9', borderRadius: '4px', marginLeft: '12px' }} />
+      </div>
+    ))}
+  </div>
+);
+
 export default function LeaderboardTab({ currentUser }) {
   const [grade, setGrade] = useState('');
   const [subject, setSubject] = useState('');
   const [province, setProvince] = useState('');
+  const [provinceVal, setProvinceVal] = useState('');
   const [search, setSearch] = useState('');
+  const [searchVal, setSearchVal] = useState('');
   const [rankings, setRankings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -29,6 +87,24 @@ export default function LeaderboardTab({ currentUser }) {
   useEffect(() => {
     fetchGamifyProfile();
   }, []);
+
+  // Debounce Search input (avoids heavy backend queries on every keystroke)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setSearch(searchVal);
+      setPage(1);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchVal]);
+
+  // Debounce Province input (avoids heavy backend queries on every keystroke)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setProvince(provinceVal);
+      setPage(1);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [provinceVal]);
 
   const handleCheckIn = async () => {
     if (checkingIn) return;
@@ -143,6 +219,7 @@ export default function LeaderboardTab({ currentUser }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <style>{skeletonKeyframes}</style>
       
       {/* Daily Check-In Premium Panel */}
       {userGamify && (
@@ -259,8 +336,8 @@ export default function LeaderboardTab({ currentUser }) {
             type="text"
             className="form-control"
             placeholder="🔍 Tìm học sinh bằng họ tên..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            value={searchVal}
+            onChange={(e) => setSearchVal(e.target.value)}
             style={{
               width: '100%',
               border: '1px solid #CBD5E1',
@@ -279,8 +356,8 @@ export default function LeaderboardTab({ currentUser }) {
             type="text"
             className="form-control"
             placeholder="📍 Tìm kiếm tỉnh thành..."
-            value={province}
-            onChange={(e) => { setProvince(e.target.value); setPage(1); }}
+            value={provinceVal}
+            onChange={(e) => setProvinceVal(e.target.value)}
             style={{
               width: '100%',
               border: '1px solid #CBD5E1',
@@ -384,8 +461,9 @@ export default function LeaderboardTab({ currentUser }) {
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '50px 0', fontSize: '15px', fontWeight: 'bold', color: '#475569' }}>
-          Đang tải bảng xếp hạng học tập... 🏆
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {renderTop3Skeleton()}
+          {renderTableSkeleton()}
         </div>
       ) : (
         <>
