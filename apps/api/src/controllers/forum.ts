@@ -6,6 +6,31 @@ import { awardForumEffortPoints } from './gamification.js';
 import { LeaderboardService } from '../services/leaderboard.service.js';
 
 // =========================================================================
+// FORUM CACHE SYSTEM (SWR)
+// =========================================================================
+
+class ForumCache {
+  private static cache = new Map<string, { data: any; timestamp: number }>();
+  private static readonly TTL = 8000; // 8 seconds SWR fresh duration
+
+  public static get(key: string): any | null {
+    const entry = this.cache.get(key);
+    if (entry && Date.now() - entry.timestamp < this.TTL) {
+      return entry.data;
+    }
+    return null;
+  }
+
+  public static set(key: string, data: any) {
+    this.cache.set(key, { data, timestamp: Date.now() });
+  }
+
+  public static clear() {
+    this.cache.clear();
+  }
+}
+
+// =========================================================================
 // HELPERS
 // =========================================================================
 
@@ -229,6 +254,12 @@ export async function deleteCategory(req: AuthRequest, res: Response) {
 export async function getPosts(req: AuthRequest, res: Response) {
   const { categoryId, tag, search, postType, studyGroupId, sort } = req.query;
 
+  const cacheKey = `posts:${categoryId || ''}_${tag || ''}_${search || ''}_${postType || ''}_${studyGroupId || ''}_${sort || ''}`;
+  const cachedData = ForumCache.get(cacheKey);
+  if (cachedData) {
+    return res.status(200).json({ success: true, data: cachedData });
+  }
+
   try {
     const filters: any = { isDraft: false };
 
@@ -272,8 +303,12 @@ export async function getPosts(req: AuthRequest, res: Response) {
         category: { select: { name: true, slug: true } },
         author: { select: { fullName: true, avatarUrl: true, email: true } },
         tags: true,
-        comments: { select: { id: true } },
-        reactions: true,
+        _count: {
+          select: { comments: true }
+        },
+        reactions: {
+          select: { userId: true, type: true }
+        },
         resource: true
       }
     });
@@ -283,12 +318,17 @@ export async function getPosts(req: AuthRequest, res: Response) {
       const upvotes = p.reactions.filter(r => r.type === 'UPVOTE').length;
       const downvotes = p.reactions.filter(r => r.type === 'DOWNVOTE').length;
       const likedBy = p.reactions.map(r => r.userId);
+      
+      const { reactions, ...rest } = p;
       return {
-        ...p,
+        ...rest,
         likes: upvotes - downvotes,
-        likedBy
+        likedBy,
+        comments: new Array(p._count.comments).fill(null) // Mock array satisfying post.comments?.length
       };
     });
+
+    ForumCache.set(cacheKey, mapped);
 
     return res.status(200).json({ success: true, data: mapped });
   } catch (err: any) {
@@ -387,6 +427,8 @@ export async function createPost(req: AuthRequest, res: Response) {
     // Award XP for contributing a post
     await awardXP(authorId, 5, 'POST_CREATED', `post_${newPost.id}`);
 
+    ForumCache.clear();
+
     return res.status(201).json({ success: true, data: newPost });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
@@ -407,6 +449,7 @@ export async function deletePost(req: AuthRequest, res: Response) {
     }
 
     await prisma.forumPost.delete({ where: { id: Number(id) } });
+    ForumCache.clear();
     return res.status(200).json({ success: true, data: 'Xóa bài viết thành công!' });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
@@ -423,6 +466,8 @@ export async function togglePinPost(req: AuthRequest, res: Response) {
       where: { id: Number(id) },
       data: { isPinned: !post.isPinned }
     });
+
+    ForumCache.clear();
 
     return res.status(200).json({ success: true, data: updated });
   } catch (err: any) {
@@ -482,6 +527,8 @@ export async function reactPost(req: AuthRequest, res: Response) {
     const upvotes = updatedPost!.reactions.filter(r => r.type === 'UPVOTE').length;
     const downvotes = updatedPost!.reactions.filter(r => r.type === 'DOWNVOTE').length;
 
+    ForumCache.clear();
+
     return res.status(200).json({ success: true, data: { likes: upvotes - downvotes } });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
@@ -500,7 +547,9 @@ export async function getComments(req: AuthRequest, res: Response) {
       orderBy: { createdAt: 'asc' },
       include: {
         author: { select: { fullName: true, avatarUrl: true, email: true } },
-        reactions: true
+        reactions: {
+          select: { userId: true, type: true }
+        }
       }
     });
 

@@ -257,7 +257,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
 
     // Fetch saved list if logged in
     if (currentUser) {
-      fetchHistory();
+      fetchHistory(true);
     }
   }, [currentUser]);
 
@@ -348,7 +348,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
   }, [svgRef.current]);
 
   // Fetch saved history
-  const fetchHistory = async () => {
+  const fetchHistory = async (autoLoadIfEmpty = false) => {
     if (!currentUser) {
       loadLocalHistory();
       return;
@@ -356,7 +356,14 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
     setIsHistoryLoading(true);
     try {
       const data = await api.getMindmaps();
-      setSavedMindmaps(data || []);
+      const mindmaps = data || [];
+      setSavedMindmaps(mindmaps);
+
+      // Auto-load the most recent mindmap if requested and nothing is loaded yet
+      if (autoLoadIfEmpty && mindmaps.length > 0 && !activeMindmapDbId && !mindmapData) {
+        handleLoadMindmap(mindmaps[0]);
+        setActiveTab('history');
+      }
     } catch (err) {
       console.error("Failed to load history:", err);
     } finally {
