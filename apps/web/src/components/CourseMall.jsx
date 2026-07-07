@@ -95,50 +95,7 @@ export default function CourseMall({ courses, currentUser, onSelectCourse, onLea
   return (
     <div className="course-mall-container animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       
-      {/* View Tabs */}
-      <div style={{ display: 'flex', gap: '14px', borderBottom: '3px solid #000000', paddingBottom: '12px' }}>
-        <button
-          className="admin-sub-tab-btn"
-          style={{
-            background: activeViewTab === 'my-courses' ? '#000000' : 'transparent',
-            color: activeViewTab === 'my-courses' ? '#ffffff' : '#000000',
-            border: '3px solid #000000',
-            padding: '10px 22px',
-            fontWeight: '800',
-            fontSize: '13px',
-            cursor: 'pointer',
-            borderRadius: '8px',
-            boxShadow: activeViewTab === 'my-courses' ? 'none' : '3px 3px 0px #000000',
-            transform: activeViewTab === 'my-courses' ? 'translate(2px, 2px)' : 'none',
-            transition: 'all 0.15s'
-          }}
-          onClick={() => setActiveViewTab('my-courses')}
-        >
-          🎓 KHÓA HỌC CỦA TÔI
-        </button>
-        <button
-          className="admin-sub-tab-btn"
-          style={{
-            background: activeViewTab === 'store' ? '#000000' : 'transparent',
-            color: activeViewTab === 'store' ? '#ffffff' : '#000000',
-            border: '3px solid #000000',
-            padding: '10px 22px',
-            fontWeight: '800',
-            fontSize: '13px',
-            cursor: 'pointer',
-            borderRadius: '8px',
-            boxShadow: activeViewTab === 'store' ? 'none' : '3px 3px 0px #000000',
-            transform: activeViewTab === 'store' ? 'translate(2px, 2px)' : 'none',
-            transition: 'all 0.15s'
-          }}
-          onClick={() => setActiveViewTab('store')}
-        >
-          🛒 KHO KHÓA HỌC PREMIUM
-        </button>
-      </div>
-
-      {activeViewTab === 'my-courses' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Continue Learning Rail */}
           <ContinueLearningRail 
             currentUser={currentUser}
@@ -287,23 +244,15 @@ export default function CourseMall({ courses, currentUser, onSelectCourse, onLea
               })}
             </div>
           ) : (
-            <div style={{ textAlign: 'center', padding: '48px 24px', background: '#FCFBFA', border: '2px dashed #000000', borderRadius: '12px' }}>
+            <div style={{ textAlign: 'center', padding: '48px 24px', background: '#ffffff', border: '1px dashed #e2e8f0', borderRadius: '16px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.03)' }}>
               <span style={{ fontSize: '36px' }}>📚</span>
-              <h4 style={{ fontWeight: '800', marginTop: '16px', fontSize: '15px' }}>Bạn chưa sở hữu khóa học nào</h4>
-              <p style={{ fontSize: '12.5px', color: '#666', marginTop: '6px', marginBottom: '20px' }}>
-                Hãy đăng ký khóa học Premium để mở khóa lộ trình học và bắt đầu bài học của mình nhé.
+              <h4 style={{ fontWeight: '700', marginTop: '16px', fontSize: '15px', color: '#0f172a' }}>Bạn chưa sở hữu khóa học nào</h4>
+              <p style={{ fontSize: '12.5px', color: '#64748b', marginTop: '6px' }}>
+                Hãy liên hệ với Giáo viên hoặc Quản trị viên của hệ thống để được kích hoạt khóa học nhé!
               </p>
-              <button 
-                className="admin-back-btn" 
-                style={{ background: '#000000', color: '#fff', border: '2px solid #000000', boxShadow: '3px 3px 0px #000000', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer' }}
-                onClick={() => setActiveViewTab('store')}
-              >
-                Khám phá kho khóa học &rarr;
-              </button>
             </div>
           )}
         </div>
-      )}
 
       {activeViewTab === 'store' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
