@@ -1611,28 +1611,27 @@
 }
 .node-status--learned {
   border-left: 6px solid #10B981 !important;
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.04)) !important;
-  border: 1.5px solid #10B981 !important;
-  color: #10B981 !important;
+  border-right: 2px solid #10B981 !important;
+  border-top: 2px solid #10B981 !important;
+  border-bottom: 2px solid #10B981 !important;
 }
 .node-status--learning {
   border-left: 6px solid #F59E0B !important;
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(245, 158, 11, 0.04)) !important;
-  border: 1.5px solid #F59E0B !important;
-  color: #F59E0B !important;
+  border-right: 2px solid #F59E0B !important;
+  border-top: 2px solid #F59E0B !important;
+  border-bottom: 2px solid #F59E0B !important;
 }
 .node-status--review {
   border-left: 6px solid #EF4444 !important;
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(239, 68, 68, 0.04)) !important;
-  border: 1.5px solid #EF4444 !important;
-  color: #EF4444 !important;
+  border-right: 2px solid #EF4444 !important;
+  border-top: 2px solid #EF4444 !important;
+  border-bottom: 2px solid #EF4444 !important;
 }
 .node-status--important {
   border-left: 6px solid #D946EF !important;
-  background: linear-gradient(135deg, rgba(217, 70, 239, 0.15), rgba(217, 70, 239, 0.04)) !important;
-  border: 1.5px solid #D946EF !important;
-  color: #E879F9 !important;
-  box-shadow: 0 0 10px rgba(217, 70, 239, 0.25) !important;
+  border-right: 2px solid #D946EF !important;
+  border-top: 2px solid #D946EF !important;
+  border-bottom: 2px solid #D946EF !important;
 }
 
 /* Right drawer annotation tag button group */
