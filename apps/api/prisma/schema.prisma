@@ -89,6 +89,9 @@ model Student {
   school       String?
   targetScore      Float?
   targetUniversity String?
+
+  @@index([grade])
+  @@index([province])
 }
 
 model Teacher {
@@ -251,6 +254,9 @@ model TestAttempt {
   student             Student             @relation(fields: [studentId], references: [userId], onDelete: Cascade)
   attemptAnswers      TestAttemptAnswer[]
   examEvents          ExamEvent[]
+
+  @@index([studentId, status])
+  @@index([examId])
 }
 
 model ExamEvent {
@@ -656,8 +662,11 @@ model UserGamification {
   streakDays        Int             @default(0)
   lastActiveDate    DateTime?
   milestonesReached Json?
-  
+
   updatedAt         DateTime        @updatedAt
+
+  @@index([xp])
+  @@index([streakDays])
 }
 
 model ForumReport {
