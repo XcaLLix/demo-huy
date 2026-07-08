@@ -255,10 +255,8 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
       }
     }
 
-    // Fetch saved list if logged in
-    if (currentUser) {
-      fetchHistory(true);
-    }
+    // Fetch saved list on mount or when auth state changes
+    fetchHistory(true);
   }, [currentUser]);
 
   // Adjust scroll when new messages arrive in drawer
@@ -1954,19 +1952,13 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
               className={`aitutor-tab-btn ${activeTab === 'create' ? 'aitutor-tab-btn--active' : ''}`}
               onClick={() => setActiveTab('create')}
             >
-              <HiSparkles /> Tạo sơ đồ AI
-            </button>
-            <button 
-              className={`aitutor-tab-btn ${activeTab === 'manual' ? 'aitutor-tab-btn--active' : ''}`}
-              onClick={() => setActiveTab('manual')}
-            >
-              <HiPlus /> Tự thiết kế
+              <HiSparkles /> Tạo sơ đồ mới
             </button>
             <button 
               className={`aitutor-tab-btn ${activeTab === 'history' ? 'aitutor-tab-btn--active' : ''}`}
               onClick={() => {
                 setActiveTab('history');
-                if (currentUser) fetchHistory();
+                fetchHistory();
               }}
             >
               <HiFolder /> Thư viện của tôi
