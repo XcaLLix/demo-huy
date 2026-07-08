@@ -1399,28 +1399,40 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
 
   function getNodeProgressStyle(node, isRoot, isLevel1) {
     const nodeId = node.id;
+    const idParts = String(node.id).split('-');
+
+    // Core pastel colors specified by the user
+    const colors = [
+      '#BFDBFE', // Pastel Blue
+      '#A7F3D0', // Pastel Mint Green
+      '#FED7AA', // Pastel Orange/Peach
+      '#DDD6FE'  // Pastel Violet/Purple
+    ];
+
     let background = '#ffffff';
     let statusColor = null;
 
-    // Set background color based on level hierarchy (always colorful pastel)
-    if (isRoot) {
-      background = '#FEF08A'; // Soft pastel yellow
-    } else if (isLevel1) {
-      const colors = [
-        '#DBEAFE', // Pastel Blue
-        '#D1FAE5', // Pastel Mint Green
-        '#FFEDD5', // Pastel Orange
-        '#F3E8FF', // Pastel Lavender
-        '#FCE7F3', // Pastel Pink
-        '#CCFBF1', // Pastel Teal
-        '#FFE4E6'  // Pastel Rose
-      ];
-      const idParts = String(node.id).split('-');
-      const lastPart = idParts[idParts.length - 1];
-      const colorIdx = (parseInt(lastPart) || 0) % colors.length;
-      background = colors[colorIdx];
+    if (idParts.length === 1) {
+      // Root Node: Clean white card with distinct contrast border
+      background = '#ffffff';
     } else {
-      background = '#F8FAFC'; // Leaf nodes: soft clean white/slate
+      // Resolve the branch index based on the Level 1 parent node index (idParts[1])
+      const branchIdx = (parseInt(idParts[1]) || 0) % colors.length;
+      const baseColor = colors[branchIdx];
+
+      if (idParts.length === 2) {
+        // Level 1 Nodes: Full vivid user pastel color for branch distinction
+        background = baseColor;
+      } else {
+        // Level 2 / Leaf Nodes: Very soft, lighter variant of the branch color
+        const lightColors = [
+          '#EFF6FF', // Light Blue
+          '#ECFDF5', // Light Mint Green
+          '#FFF7ED', // Light Peach
+          '#F5F3FF'  // Light Lavender
+        ];
+        background = lightColors[branchIdx];
+      }
     }
 
     // Determine status color based on priority or mastery progress
