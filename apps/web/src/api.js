@@ -92,7 +92,7 @@ async function request(path, options = {}) {
     err.data = data.data || null;
     throw err;
   }
-  return data.data;
+  return data.data !== undefined ? data.data : data;
 }
 
 export const api = {
@@ -574,7 +574,39 @@ export const api = {
   getAttendanceHistory: (startDate, endDate) => request(`/gamification/attendance?startDate=${startDate}&endDate=${endDate}`),
   
   getAdminSystemSettings: () => request('/admin/system-settings', { method: 'GET' }),
-  updateAdminSystemSettings: (settings) => request('/admin/system-settings', { method: 'PUT', body: { settings } })
+  updateAdminSystemSettings: (settings) => request('/admin/system-settings', { method: 'PUT', body: { settings } }),
+
+  // Notification API Methods
+  getNotifications: (params = {}) => {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') {
+        query.append(k, String(v));
+      }
+    });
+    return request('/notifications?' + query.toString());
+  },
+  getUnreadNotificationsCount: () => request('/notifications/unread-count'),
+  markNotificationAsRead: (id) => request(`/notifications/${id}/read`, { method: 'PUT' }),
+  markAllNotificationsAsRead: () => request('/notifications/read-all', { method: 'PUT' }),
+  deleteNotification: (id) => request(`/notifications/${id}`, { method: 'DELETE' }),
+  deleteAllReadNotifications: () => request('/notifications/all-read', { method: 'DELETE' }),
+
+  // Admin Notification management
+  adminSendNotification: (data) => request('/notifications/admin/send', { method: 'POST', body: data }),
+  adminGetSentNotifications: (params = {}) => {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') {
+        query.append(k, String(v));
+      }
+    });
+    return request('/notifications/admin/history?' + query.toString());
+  },
+  adminGetTemplates: () => request('/notifications/admin/templates'),
+  adminCreateTemplate: (data) => request('/notifications/admin/templates', { method: 'POST', body: data }),
+  adminUpdateTemplate: (id, data) => request(`/notifications/admin/templates/${id}`, { method: 'PUT', body: data }),
+  adminDeleteTemplate: (id) => request(`/notifications/admin/templates/${id}`, { method: 'DELETE' })
 };
 
 

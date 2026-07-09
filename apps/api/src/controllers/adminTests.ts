@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { logSystemEvent } from '../utils/logger.js';
+import { NotificationService } from '../services/notification.service.js';
 
 interface AuthRequest extends Request {
   user?: {
@@ -310,13 +311,11 @@ export const approveTest = async (req: AuthRequest, res: Response) => {
     });
 
     // Create notification for creator
-    await prisma.notification.create({
-      data: {
-        userId: exam.createdBy,
-        title: 'Đề thi đã được duyệt 🌟',
-        message: `Đề thi thử "${exam.title}" của bạn đã được phê duyệt và phát hành thành công.`
-      }
-    });
+    try {
+      await NotificationService.sendTemplate('EXAM_APPROVED', exam.createdBy, { examTitle: exam.title });
+    } catch (notifErr) {
+      console.error('[Notification Error] Failed to send EXAM_APPROVED notification:', notifErr);
+    }
 
     // Log admin event
     await logSystemEvent(req as any, {
@@ -376,13 +375,11 @@ export const rejectTest = async (req: AuthRequest, res: Response) => {
     });
 
     // Create notification for creator
-    await prisma.notification.create({
-      data: {
-        userId: exam.createdBy,
-        title: 'Đề thi bị từ chối phê duyệt ❌',
-        message: `Đề thi thử "${exam.title}" của bạn bị từ chối phê duyệt. Lý do: ${reason.trim()}`
-      }
-    });
+    try {
+      await NotificationService.sendTemplate('EXAM_REJECTED', exam.createdBy, { examTitle: exam.title, reason: reason.trim() });
+    } catch (notifErr) {
+      console.error('[Notification Error] Failed to send EXAM_REJECTED notification:', notifErr);
+    }
 
     // Log admin event
     await logSystemEvent(req as any, {

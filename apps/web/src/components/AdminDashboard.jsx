@@ -208,6 +208,217 @@ export default function AdminDashboard({
     }
   };
 
+  // --- NOTIFICATION CENTER STATES ---
+  const [notifSubTab, setNotifSubTab] = useState('send'); // 'send', 'history', 'templates'
+  const [notifHistory, setNotifHistory] = useState([]);
+  const [notifHistoryTotal, setNotifHistoryTotal] = useState(0);
+  const [notifHistoryPage, setNotifHistoryPage] = useState(1);
+  const [notifHistoryLoading, setNotifHistoryLoading] = useState(false);
+
+  const [notifTemplates, setNotifTemplates] = useState([]);
+  const [notifTemplatesLoading, setNotifTemplatesLoading] = useState(false);
+
+  // Send Notification Form states
+  const [notifSendTarget, setNotifSendTarget] = useState('all'); // 'all', 'role', 'user'
+  const [notifSendRole, setNotifSendRole] = useState('STUDENT');
+  const [notifSendUserId, setNotifSendUserId] = useState('');
+  const [notifSendMode, setNotifSendMode] = useState('raw'); // 'raw', 'template'
+  const [notifSendTemplateCode, setNotifSendTemplateCode] = useState('');
+  const [notifSendTitle, setNotifSendTitle] = useState('');
+  const [notifSendMessage, setNotifSendMessage] = useState('');
+  const [notifSendType, setNotifSendType] = useState('INFO');
+  const [notifSendCategory, setNotifSendCategory] = useState('SYSTEM');
+  const [notifSendLink, setNotifSendLink] = useState('');
+  const [notifSendVariables, setNotifSendVariables] = useState(''); // JSON string or comma separated k=v
+  const [notifSending, setNotifSending] = useState(false);
+
+  // Template CRUD Modal states
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState(null); // null means creating
+  const [templateFormCode, setTemplateFormCode] = useState('');
+  const [templateFormTitle, setTemplateFormTitle] = useState('');
+  const [templateFormMessage, setTemplateFormMessage] = useState('');
+  const [templateFormType, setTemplateFormType] = useState('INFO');
+  const [templateFormCategory, setTemplateFormCategory] = useState('SYSTEM');
+  const [templateFormIcon, setTemplateFormIcon] = useState('');
+  const [templateFormLink, setTemplateFormLink] = useState('');
+  const [templateFormActive, setTemplateFormActive] = useState(true);
+  const [templateSubmitting, setTemplateSubmitting] = useState(false);
+
+  // Fetch Sent Notification History
+  const fetchNotifHistory = async (page = 1) => {
+    setNotifHistoryLoading(true);
+    try {
+      const res = await api.adminGetSentNotifications({ page, limit: 15 });
+      if (res?.success && res.data) {
+        setNotifHistory(res.data.history);
+        setNotifHistoryTotal(res.data.pagination.total);
+        setNotifHistoryPage(res.data.pagination.page);
+      }
+    } catch (err) {
+      console.error(err);
+      toast('Lỗi tải lịch sử thông báo!', 'error');
+    } finally {
+      setNotifHistoryLoading(false);
+    }
+  };
+
+  // Fetch Notification Templates
+  const fetchNotifTemplates = async () => {
+    setNotifTemplatesLoading(true);
+    try {
+      const res = await api.adminGetTemplates();
+      if (res?.success && res.data) {
+        setNotifTemplates(res.data);
+      }
+    } catch (err) {
+      console.error(err);
+      toast('Lỗi tải danh sách mẫu thông báo!', 'error');
+    } finally {
+      setNotifTemplatesLoading(false);
+    }
+  };
+
+  // Fetch data on tab changes
+  useEffect(() => {
+    if (activeTab === 'announcements') {
+      if (notifSubTab === 'history') {
+        fetchNotifHistory(1);
+      } else if (notifSubTab === 'templates') {
+        fetchNotifTemplates();
+      }
+    }
+  }, [activeTab, notifSubTab]);
+
+  // Handle Send Notification Submit
+  const handleAdminSendNotification = async (e) => {
+    e.preventDefault();
+    if (notifSending) return;
+
+    let parsedVars = {};
+    if (notifSendMode === 'template' && notifSendVariables.trim()) {
+      try {
+        parsedVars = JSON.parse(notifSendVariables);
+      } catch (err) {
+        notifSendVariables.split(',').forEach(line => {
+          const parts = line.split('=');
+          if (parts.length >= 2) {
+            parsedVars[parts[0].trim()] = parts.slice(1).join('=').trim();
+          }
+        });
+      }
+    }
+
+    const payload = {
+      target: notifSendTarget,
+      userId: notifSendTarget === 'user' ? Number(notifSendUserId) : undefined,
+      role: notifSendTarget === 'role' ? notifSendRole : undefined,
+      title: notifSendMode === 'raw' ? notifSendTitle : undefined,
+      message: notifSendMode === 'raw' ? notifSendMessage : undefined,
+      type: notifSendMode === 'raw' ? notifSendType : undefined,
+      category: notifSendMode === 'raw' ? notifSendCategory : undefined,
+      templateCode: notifSendMode === 'template' ? notifSendTemplateCode : undefined,
+      variables: notifSendMode === 'template' ? parsedVars : undefined,
+      link: notifSendLink.trim() || undefined
+    };
+
+    setNotifSending(true);
+    try {
+      const res = await api.adminSendNotification(payload);
+      if (res?.success) {
+        toast('Đã gửi thông báo thành công!', 'success');
+        setNotifSendUserId('');
+        setNotifSendTitle('');
+        setNotifSendMessage('');
+        setNotifSendLink('');
+        setNotifSendVariables('');
+        if (notifSubTab === 'history') {
+          fetchNotifHistory(1);
+        }
+      }
+    } catch (err) {
+      toast(err.message || 'Lỗi gửi thông báo!', 'error');
+    } finally {
+      setNotifSending(false);
+    }
+  };
+
+  // Handle Save Template (Create/Edit)
+  const handleSaveTemplate = async (e) => {
+    e.preventDefault();
+    if (templateSubmitting) return;
+
+    const payload = {
+      code: editingTemplate ? undefined : templateFormCode.toUpperCase().trim(),
+      title: templateFormTitle.trim(),
+      message: templateFormMessage.trim(),
+      type: templateFormType,
+      category: templateFormCategory,
+      icon: templateFormIcon.trim() || null,
+      defaultLink: templateFormLink.trim() || null,
+      isActive: templateFormActive
+    };
+
+    setTemplateSubmitting(true);
+    try {
+      let res;
+      if (editingTemplate) {
+        res = await api.adminUpdateTemplate(editingTemplate.id, payload);
+      } else {
+        res = await api.adminCreateTemplate(payload);
+      }
+
+      if (res?.success) {
+        toast(editingTemplate ? 'Cập nhật mẫu thành công!' : 'Tạo mới mẫu thành công!', 'success');
+        setShowTemplateModal(false);
+        fetchNotifTemplates();
+      }
+    } catch (err) {
+      toast(err.message || 'Lỗi lưu mẫu thông báo!', 'error');
+    } finally {
+      setTemplateSubmitting(false);
+    }
+  };
+
+  // Handle Delete Template
+  const handleDeleteTemplate = async (id) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa mẫu thông báo này?')) return;
+    try {
+      const res = await api.adminDeleteTemplate(id);
+      if (res?.success) {
+        toast('Đã xóa mẫu thông báo thành công!', 'success');
+        fetchNotifTemplates();
+      }
+    } catch (err) {
+      toast(err.message || 'Lỗi xóa mẫu thông báo!', 'error');
+    }
+  };
+
+  // Open Template Modal for creation/editing
+  const openTemplateModal = (tpl = null) => {
+    setEditingTemplate(tpl);
+    if (tpl) {
+      setTemplateFormCode(tpl.code);
+      setTemplateFormTitle(tpl.title);
+      setTemplateFormMessage(tpl.message);
+      setTemplateFormType(tpl.type);
+      setTemplateFormCategory(tpl.category);
+      setTemplateFormIcon(tpl.icon || '');
+      setTemplateFormLink(tpl.defaultLink || '');
+      setTemplateFormActive(tpl.isActive);
+    } else {
+      setTemplateFormCode('');
+      setTemplateFormTitle('');
+      setTemplateFormMessage('');
+      setTemplateFormType('INFO');
+      setTemplateFormCategory('SYSTEM');
+      setTemplateFormIcon('');
+      setTemplateFormLink('');
+      setTemplateFormActive(true);
+    }
+    setShowTemplateModal(true);
+  };
+
   // --- SYSTEM LOGS STATE ---
   const [systemLogsList, setSystemLogsList] = useState([]);
   const [systemLogsStats, setSystemLogsStats] = useState({
@@ -2380,6 +2591,7 @@ export default function AdminDashboard({
               addLog={addLog}
               cartCourse={cartCourse}
               onCheckoutCourse={onCheckoutCourse}
+              courses={[]}
             />
           </div>
           <header className="admin-header">
@@ -2625,27 +2837,609 @@ export default function AdminDashboard({
               TAB: GỬI THÔNG BÁO HỆ THỐNG (SYSTEM ANNOUNCEMENTS)
               ========================================== */}
           {activeTab === 'announcements' && (
-            <div className="admin-card" style={{ maxWidth: '600px' }}>
-              <h3 className="chart-card-title">Gửi thông báo hệ thống</h3>
-              <p style={{ fontSize: '13px', color: '#7A7A7A', marginBottom: '20px', fontWeight: '700' }}>
-                Phát tin nhắn thông báo khẩn cấp tới toàn bộ học sinh và giáo viên trên hệ thống.
-              </p>
-              <form onSubmit={handleSendAnnouncement} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div className="admin-form-group">
-                  <label style={{ fontSize: '12px', fontWeight: '850', display: 'block', marginBottom: '8px' }}>Nội dung thông báo (Toàn bộ người dùng):</label>
-                  <textarea
-                    className="admin-form-textarea"
-                    rows="5"
-                    placeholder="Nhập thông báo gửi đến toàn bộ học sinh và giáo viên trên hệ thống..."
-                    value={annText}
-                    onChange={e => setAnnText(e.target.value)}
-                    required
-                  />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Sub-tabs bar */}
+              <div style={{ display: 'flex', gap: '10px', borderBottom: '2.5px solid #000000', paddingBottom: '12px' }}>
+                {[
+                  { id: 'send', label: '⚡ GỬI THÔNG BÁO', color: '#6c5ce7' },
+                  { id: 'history', label: '📖 LỊCH SỬ THÔNG BÁO', color: '#0984e3' },
+                  { id: 'templates', label: '📋 QUẢN LÝ TEMPLATES', color: '#00b894' }
+                ].map(sub => (
+                  <button
+                    key={sub.id}
+                    onClick={() => setNotifSubTab(sub.id)}
+                    style={{
+                      padding: '8px 16px', borderRadius: '8px',
+                      border: '2px solid #000000',
+                      background: notifSubTab === sub.id ? sub.color : '#FFFFFF',
+                      color: notifSubTab === sub.id ? '#FFFFFF' : '#1E293B',
+                      fontWeight: '900', fontSize: '12.5px', cursor: 'pointer',
+                      boxShadow: notifSubTab === sub.id ? '2px 2px 0px #000000' : 'none',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    {sub.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Sub-tab 1: Gửi thông báo */}
+              {notifSubTab === 'send' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px', alignItems: 'start' }}>
+                  {/* Form card */}
+                  <div className="admin-card">
+                    <h3 className="chart-card-title">Thiết lập thông báo mới</h3>
+                    <p style={{ fontSize: '13px', color: '#6B7280', marginBottom: '20px', fontWeight: '500' }}>
+                      Phát đi các thông điệp tùy chỉnh hoặc sử dụng mẫu cấu hình sẵn tới toàn bộ người dùng, vai trò hoặc tài khoản cụ thể.
+                    </p>
+
+                    <form onSubmit={handleAdminSendNotification} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {/* Đối tượng nhận */}
+                      <div className="admin-form-group">
+                        <label style={{ fontSize: '12px', fontWeight: '900', display: 'block', marginBottom: '6px' }}>Đối tượng nhận thông báo:</label>
+                        <select
+                          className="admin-form-select"
+                          value={notifSendTarget}
+                          onChange={e => setNotifSendTarget(e.target.value)}
+                        >
+                          <option value="all">Toàn bộ người dùng trên hệ thống</option>
+                          <option value="role">Theo vai trò tài khoản (Role)</option>
+                          <option value="user">Tài khoản cụ thể (User ID)</option>
+                        </select>
+                      </div>
+
+                      {/* Phụ thuộc vào đối tượng */}
+                      {notifSendTarget === 'role' && (
+                        <div className="admin-form-group">
+                          <label style={{ fontSize: '12px', fontWeight: '900', display: 'block', marginBottom: '6px' }}>Chọn vai trò nhận:</label>
+                          <select
+                            className="admin-form-select"
+                            value={notifSendRole}
+                            onChange={e => setNotifSendRole(e.target.value)}
+                          >
+                            <option value="STUDENT">Học sinh (STUDENT)</option>
+                            <option value="TEACHER">Giáo viên (TEACHER)</option>
+                            <option value="ADMIN">Quản trị viên (ADMIN)</option>
+                          </select>
+                        </div>
+                      )}
+
+                      {notifSendTarget === 'user' && (
+                        <div className="admin-form-group">
+                          <label style={{ fontSize: '12px', fontWeight: '900', display: 'block', marginBottom: '6px' }}>Nhập ID người dùng (User ID):</label>
+                          <input
+                            type="number"
+                            className="admin-form-input"
+                            placeholder="Ví dụ: 101"
+                            value={notifSendUserId}
+                            onChange={e => setNotifSendUserId(e.target.value)}
+                            required
+                          />
+                        </div>
+                      )}
+
+                      {/* Chế độ gửi */}
+                      <div className="admin-form-group">
+                        <label style={{ fontSize: '12px', fontWeight: '900', display: 'block', marginBottom: '6px' }}>Phương thức soạn thông báo:</label>
+                        <div style={{ display: 'flex', gap: '16px' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer', fontWeight: 'bold' }}>
+                            <input
+                              type="radio"
+                              name="sendMode"
+                              checked={notifSendMode === 'raw'}
+                              onChange={() => setNotifSendMode('raw')}
+                            /> Soạn tùy ý (Raw)
+                          </label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer', fontWeight: 'bold' }}>
+                            <input
+                              type="radio"
+                              name="sendMode"
+                              checked={notifSendMode === 'template'}
+                              onChange={() => setNotifSendMode('template')}
+                            /> Theo mẫu (Template)
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Nội dung khi chọn RAW */}
+                      {notifSendMode === 'raw' && (
+                        <>
+                          <div className="admin-form-group">
+                            <label style={{ fontSize: '12px', fontWeight: '900', display: 'block', marginBottom: '6px' }}>Tiêu đề thông báo:</label>
+                            <input
+                              type="text"
+                              className="admin-form-input"
+                              placeholder="Nhập tiêu đề..."
+                              value={notifSendTitle}
+                              onChange={e => setNotifSendTitle(e.target.value)}
+                              required
+                            />
+                          </div>
+
+                          <div className="admin-form-group">
+                            <label style={{ fontSize: '12px', fontWeight: '900', display: 'block', marginBottom: '6px' }}>Nội dung thông báo:</label>
+                            <textarea
+                              className="admin-form-textarea"
+                              rows="4"
+                              placeholder="Nhập nội dung thông điệp chi tiết..."
+                              value={notifSendMessage}
+                              onChange={e => setNotifSendMessage(e.target.value)}
+                              required
+                            />
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                            <div className="admin-form-group">
+                              <label style={{ fontSize: '12px', fontWeight: '900', display: 'block', marginBottom: '6px' }}>Loại (Type):</label>
+                              <select
+                                className="admin-form-select"
+                                value={notifSendType}
+                                onChange={e => setNotifSendType(e.target.value)}
+                              >
+                                <option value="INFO">INFO (Thông tin màu xanh)</option>
+                                <option value="SUCCESS">SUCCESS (Thành công màu xanh lá)</option>
+                                <option value="WARNING">WARNING (Cảnh báo màu vàng)</option>
+                                <option value="ERROR">ERROR (Quan trọng màu đỏ)</option>
+                              </select>
+                            </div>
+
+                            <div className="admin-form-group">
+                              <label style={{ fontSize: '12px', fontWeight: '900', display: 'block', marginBottom: '6px' }}>Danh mục (Category):</label>
+                              <select
+                                className="admin-form-select"
+                                value={notifSendCategory}
+                                onChange={e => setNotifSendCategory(e.target.value)}
+                              >
+                                <option value="SYSTEM">SYSTEM (Hệ thống)</option>
+                                <option value="ACCOUNT">ACCOUNT (Tài khoản)</option>
+                                <option value="COURSE">COURSE (Khóa học)</option>
+                                <option value="EXAM">EXAM (Thi cử)</option>
+                                <option value="PAYMENT">PAYMENT (Thanh toán)</option>
+                                <option value="AI">AI (Trí tuệ nhân tạo)</option>
+                                <option value="REPORT">REPORT (Báo cáo vi phạm)</option>
+                                <option value="TEACHER">TEACHER (Giảng dạy)</option>
+                                <option value="ADMIN">ADMIN (Quản trị)</option>
+                              </select>
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Nội dung khi chọn TEMPLATE */}
+                      {notifSendMode === 'template' && (
+                        <>
+                          <div className="admin-form-group">
+                            <label style={{ fontSize: '12px', fontWeight: '900', display: 'block', marginBottom: '6px' }}>Chọn mẫu thông báo:</label>
+                            <select
+                              className="admin-form-select"
+                              value={notifSendTemplateCode}
+                              onChange={e => {
+                                setNotifSendTemplateCode(e.target.value);
+                                setNotifSendVariables('');
+                              }}
+                              required
+                            >
+                              <option value="">-- Chọn mẫu thông báo --</option>
+                              {notifTemplates.map(t => (
+                                <option key={t.id} value={t.code}>{t.code} - {t.title}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {notifSendTemplateCode && (
+                            <div style={{ background: '#FAF9FF', padding: '12px', borderRadius: '8px', border: '1px solid #E2E8F0', marginBottom: '8px' }}>
+                              <strong style={{ fontSize: '11px', color: '#6c5ce7', display: 'block', marginBottom: '4px' }}>NỘI DUNG MẪU GỐC:</strong>
+                              <p style={{ margin: 0, fontSize: '11.5px', color: '#4B5563', lineHeight: '1.4' }}>
+                                {notifTemplates.find(t => t.code === notifSendTemplateCode)?.message}
+                              </p>
+                            </div>
+                          )}
+
+                          <div className="admin-form-group">
+                            <label style={{ fontSize: '12px', fontWeight: '900', display: 'block', marginBottom: '6px' }}>Các biến số thay thế (Variables):</label>
+                            <input
+                              type="text"
+                              className="admin-form-input"
+                              placeholder="Ví dụ: fullName=Minh Anh, reason=Spam"
+                              value={notifSendVariables}
+                              onChange={e => setNotifSendVariables(e.target.value)}
+                            />
+                            <small style={{ fontSize: '10.5px', color: '#9CA3AF', marginTop: '4px', display: 'block' }}>
+                              Ngăn cách các biến bằng dấu phẩy. Cấu trúc: <code>tenBien=giaTri</code>
+                            </small>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Link đính kèm */}
+                      <div className="admin-form-group">
+                        <label style={{ fontSize: '12px', fontWeight: '900', display: 'block', marginBottom: '6px' }}>Đường dẫn điều hướng (Link - Tùy chọn):</label>
+                        <input
+                          type="text"
+                          className="admin-form-input"
+                          placeholder="Ví dụ: /dashboard/home hoặc https://..."
+                          value={notifSendLink}
+                          onChange={e => setNotifSendLink(e.target.value)}
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={notifSending}
+                        className="admin-back-btn"
+                        style={{
+                          alignSelf: 'flex-start', background: '#6c5ce7', color: '#FFFFFF',
+                          border: '2px solid #000000', boxShadow: '3px 3px 0px #000000', fontWeight: '900', cursor: 'pointer'
+                        }}
+                      >
+                        {notifSending ? 'Đang gửi...' : 'Phát thông báo ngay ⚡'}
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Guide card */}
+                  <div className="admin-card" style={{ background: '#FAF9FF' }}>
+                    <h3 className="chart-card-title">💡 Hướng dẫn hệ thống</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '13px', lineHeight: '1.6', color: '#4B5563' }}>
+                      <p>
+                        Hệ thống <strong>Notification Center</strong> được xây dựng tập trung để phục vụ tất cả các module nghiệp vụ trong ứng dụng EduPath.
+                      </p>
+                      <div>
+                        <strong style={{ display: 'block', color: '#1E293B', marginBottom: '4px' }}>Các biến phổ biến trong Template:</strong>
+                        <ul style={{ paddingLeft: '18px', margin: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <li><code>{'{fullName}'}</code>: Tên đầy đủ người nhận.</li>
+                          <li><code>{'{email}'}</code>: Địa chỉ email tài khoản.</li>
+                          <li><code>{'{courseName}'}</code>: Tên khóa học liên quan.</li>
+                          <li><code>{'{teacherName}'}</code>: Tên của thầy/cô giáo viên.</li>
+                          <li><code>{'{reason}'}</code>: Lý do phê duyệt, từ chối, khóa tài khoản.</li>
+                        </ul>
+                      </div>
+                      <div style={{ marginTop: '10px', padding: '10px', background: '#E0F2FE', borderRadius: '8px', borderLeft: '4px solid #0284C7' }}>
+                        <span style={{ fontWeight: 'bold', color: '#0369A1' }}>Thông báo tức thời (Real-time):</span>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '12px' }}>
+                          Người dùng đang trực tuyến trên hệ thống sẽ nhận được thông báo ngay lập tức dạng popup kèm âm thanh nhờ vào kênh truyền tin tức thời Socket.IO.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <button type="submit" className="admin-back-btn" style={{ alignSelf: 'flex-start', background: '#6c5ce7', color: '#FFFFFF' }}>
-                  Phát thông báo ngay ⚡
-                </button>
-              </form>
+              )}
+
+              {/* Sub-tab 2: Lịch sử thông báo đã gửi */}
+              {notifSubTab === 'history' && (
+                <div className="admin-card">
+                  <h3 className="chart-card-title">Nhật ký lịch sử thông báo đã phát đi</h3>
+                  <p style={{ fontSize: '13px', color: '#6B7280', marginBottom: '20px' }}>
+                    Danh sách các thông báo đã gửi cho các tài khoản trên hệ thống EduPath.
+                  </p>
+
+                  {notifHistoryLoading ? (
+                    <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}><div className="admin-spinner" /></div>
+                  ) : notifHistory.length > 0 ? (
+                    <>
+                      <div className="admin-table-container">
+                        <table className="admin-table">
+                          <thead>
+                            <tr>
+                              <th>ID</th>
+                              <th>Người nhận</th>
+                              <th>Tiêu đề</th>
+                              <th>Nội dung thông điệp</th>
+                              <th>Danh mục</th>
+                              <th>Cấp độ</th>
+                              <th>Ngày gửi</th>
+                              <th>Trạng thái</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {notifHistory.map(h => (
+                              <tr key={h.id}>
+                                <td><code>#{h.id}</code></td>
+                                <td>
+                                  {h.recipient ? (
+                                    <div>
+                                      <div style={{ fontWeight: 'bold' }}>{h.recipient.name}</div>
+                                      <div style={{ fontSize: '10.5px', color: '#6B7280' }}>{h.recipient.email}</div>
+                                      <span style={{ fontSize: '9px', background: '#E2E8F0', padding: '2px 4px', borderRadius: '4px', fontWeight: 'bold' }}>{h.recipient.role}</span>
+                                    </div>
+                                  ) : (
+                                    <span style={{ color: '#9CA3AF' }}>Bị xóa</span>
+                                  )}
+                                </td>
+                                <td style={{ fontWeight: 'bold' }}>{h.title}</td>
+                                <td style={{ maxWidth: '300px', whiteSpace: 'normal', fontSize: '12px', lineHeight: '1.4' }}>{h.message}</td>
+                                <td><span style={{ background: '#FAF9FF', padding: '2px 6px', borderRadius: '6px', border: '1px solid #E2E8F0', fontSize: '11px', fontWeight: 'bold' }}>{h.category}</span></td>
+                                <td>
+                                  <span style={{
+                                    background: h.type === 'SUCCESS' ? '#D1FAE5' : (h.type === 'WARNING' ? '#FEF3C7' : (h.type === 'ERROR' ? '#FEE2E2' : '#E0F2FE')),
+                                    color: h.type === 'SUCCESS' ? '#065F46' : (h.type === 'WARNING' ? '#92400E' : (h.type === 'ERROR' ? '#991B1B' : '#0369A1')),
+                                    fontSize: '10.5px', fontWeight: 'bold', padding: '3px 8px', borderRadius: '6px'
+                                  }}>
+                                    {h.type}
+                                  </span>
+                                </td>
+                                <td style={{ fontSize: '11.5px', color: '#6B7280' }}>{new Date(h.createdAt).toLocaleString()}</td>
+                                <td>
+                                  <span style={{
+                                    background: h.isRead ? '#E6FFFA' : '#FFF5F5',
+                                    color: h.isRead ? '#319795' : '#E53E3E',
+                                    fontSize: '10px', fontWeight: '900', padding: '2px 6px', borderRadius: '4px'
+                                  }}>
+                                    {h.isRead ? 'ĐÃ ĐỌC' : 'CHƯA ĐỌC'}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Pagination */}
+                      {Math.ceil(notifHistoryTotal / 15) > 1 && (
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginTop: '20px' }}>
+                          <button
+                            disabled={notifHistoryPage === 1}
+                            onClick={() => fetchNotifHistory(notifHistoryPage - 1)}
+                            className="admin-back-btn"
+                            style={{ padding: '6px 12px', fontSize: '12px', background: '#FFFFFF' }}
+                          >
+                            Trước
+                          </button>
+                          <span style={{ fontSize: '12.5px', fontWeight: 'bold' }}>Trang {notifHistoryPage} / {Math.ceil(notifHistoryTotal / 15)}</span>
+                          <button
+                            disabled={notifHistoryPage >= Math.ceil(notifHistoryTotal / 15)}
+                            onClick={() => fetchNotifHistory(notifHistoryPage + 1)}
+                            className="admin-back-btn"
+                            style={{ padding: '6px 12px', fontSize: '12px', background: '#FFFFFF' }}
+                          >
+                            Sau
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p style={{ textAlign: 'center', padding: '32px 0', color: '#6B7280', fontWeight: 'bold' }}>Chưa có thông báo nào được phát đi.</p>
+                  )}
+                </div>
+              )}
+
+              {/* Sub-tab 3: Quản lý Templates */}
+              {notifSubTab === 'templates' && (
+                <div className="admin-card">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+                    <div>
+                      <h3 className="chart-card-title">Danh sách mẫu thông báo tự động</h3>
+                      <p style={{ fontSize: '13px', color: '#6B7280', margin: 0 }}>
+                        Các template được dùng để tự động tạo tiêu đề, thông điệp và điều hướng ở backend.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => openTemplateModal()}
+                      className="admin-back-btn"
+                      style={{
+                        background: '#6c5ce7', color: '#FFFFFF', border: '2px solid #000000',
+                        boxShadow: '2.5px 2.5px 0px #000000', fontWeight: '900', fontSize: '12.5px',
+                        padding: '8px 16px', borderRadius: '8px', cursor: 'pointer'
+                      }}
+                    >
+                      + Tạo mẫu mới
+                    </button>
+                  </div>
+
+                  {notifTemplatesLoading ? (
+                    <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}><div className="admin-spinner" /></div>
+                  ) : notifTemplates.length > 0 ? (
+                    <div className="admin-table-container">
+                      <table className="admin-table">
+                        <thead>
+                          <tr>
+                            <th>Mã (Code)</th>
+                            <th>Tiêu đề mặc định</th>
+                            <th>Nội dung khuôn mẫu</th>
+                            <th>Cấp độ/Danh mục</th>
+                            <th>Icon/Link</th>
+                            <th>Trạng thái</th>
+                            <th>Hành động</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {notifTemplates.map(t => (
+                            <tr key={t.id}>
+                              <td><code>{t.code}</code></td>
+                              <td style={{ fontWeight: 'bold' }}>{t.title}</td>
+                              <td style={{ maxWidth: '300px', whiteSpace: 'normal', fontSize: '12px', lineHeight: '1.4' }}>{t.message}</td>
+                              <td>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <span style={{ fontSize: '9px', background: '#F3F4F6', border: '1px solid #E5E7EB', padding: '2px 4px', borderRadius: '4px', alignSelf: 'flex-start', fontWeight: 'bold' }}>{t.category}</span>
+                                  <span style={{ fontSize: '9px', background: '#E0F2FE', color: '#0369A1', padding: '2px 4px', borderRadius: '4px', alignSelf: 'flex-start', fontWeight: 'bold' }}>{t.type}</span>
+                                </div>
+                              </td>
+                              <td style={{ fontSize: '11.5px' }}>
+                                <div>Icon: <span style={{ fontSize: '15px' }}>{t.icon || '📢'}</span></div>
+                                <div style={{ fontSize: '10px', color: '#6B7280', marginTop: '2px' }}>Link: <code>{t.defaultLink || 'Không'}</code></div>
+                              </td>
+                              <td>
+                                <span style={{
+                                  background: t.isActive ? '#D1FAE5' : '#F3F4F6',
+                                  color: t.isActive ? '#065F46' : '#374151',
+                                  fontSize: '10.5px', fontWeight: 'bold', padding: '3px 8px', borderRadius: '6px'
+                                }}>
+                                  {t.isActive ? 'ĐANG BẬT' : 'ĐÃ TẮT'}
+                                </span>
+                              </td>
+                              <td>
+                                <div style={{ display: 'flex', gap: '6px' }}>
+                                  <button
+                                    onClick={() => openTemplateModal(t)}
+                                    style={{
+                                      padding: '5px 10px', background: '#E0F2FE', color: '#0369A1',
+                                      border: '1.5px solid #000000', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer'
+                                    }}
+                                  >
+                                    Sửa
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteTemplate(t.id)}
+                                    style={{
+                                      padding: '5px 10px', background: '#FEE2E2', color: '#EF4444',
+                                      border: '1.5px solid #000000', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer'
+                                    }}
+                                  >
+                                    Xóa
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p style={{ textAlign: 'center', padding: '32px 0', color: '#6B7280', fontWeight: 'bold' }}>Chưa có khuôn mẫu thông báo nào.</p>
+                  )}
+                </div>
+              )}
+
+              {/* Template CRUD Modal */}
+              {showTemplateModal && (
+                <div style={{
+                  position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                  background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center',
+                  alignItems: 'center', zIndex: 9999
+                }}>
+                  <div className="admin-card" style={{ width: '500px', padding: '24px', position: 'relative', border: '3px solid #000000', boxShadow: '6px 6px 0px #000000' }}>
+                    <h3 className="chart-card-title">{editingTemplate ? 'Sửa mẫu thông báo' : 'Tạo mẫu thông báo mới'}</h3>
+                    <button
+                      onClick={() => setShowTemplateModal(false)}
+                      style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', fontWeight: 'bold' }}
+                    >
+                      ✕
+                    </button>
+
+                    <form onSubmit={handleSaveTemplate} style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '16px' }}>
+                      {!editingTemplate && (
+                        <div className="admin-form-group">
+                          <label style={{ fontSize: '11px', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>Mã mẫu (Code - Viết hoa, duy nhất):</label>
+                          <input
+                            type="text"
+                            className="admin-form-input"
+                            placeholder="Ví dụ: SYSTEM_MAINTENANCE"
+                            value={templateFormCode}
+                            onChange={e => setTemplateFormCode(e.target.value)}
+                            required
+                          />
+                        </div>
+                      )}
+
+                      <div className="admin-form-group">
+                        <label style={{ fontSize: '11px', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>Tiêu đề mặc định:</label>
+                        <input
+                          type="text"
+                          className="admin-form-input"
+                          placeholder="Tiêu đề mẫu..."
+                          value={templateFormTitle}
+                          onChange={e => setTemplateFormTitle(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="admin-form-group">
+                        <label style={{ fontSize: '11px', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>Nội dung khuôn mẫu:</label>
+                        <textarea
+                          className="admin-form-textarea"
+                          rows="4"
+                          placeholder="Ví dụ: Chào mừng {fullName} đã tham gia học tập..."
+                          value={templateFormMessage}
+                          onChange={e => setTemplateFormMessage(e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                        <div className="admin-form-group">
+                          <label style={{ fontSize: '11px', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>Loại (Type):</label>
+                          <select
+                            className="admin-form-select"
+                            value={templateFormType}
+                            onChange={e => setTemplateFormType(e.target.value)}
+                          >
+                            <option value="INFO">INFO</option>
+                            <option value="SUCCESS">SUCCESS</option>
+                            <option value="WARNING">WARNING</option>
+                            <option value="ERROR">ERROR</option>
+                          </select>
+                        </div>
+
+                        <div className="admin-form-group">
+                          <label style={{ fontSize: '11px', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>Danh mục (Category):</label>
+                          <select
+                            className="admin-form-select"
+                            value={templateFormCategory}
+                            onChange={e => setTemplateFormCategory(e.target.value)}
+                          >
+                            <option value="SYSTEM">SYSTEM</option>
+                            <option value="ACCOUNT">ACCOUNT</option>
+                            <option value="COURSE">COURSE</option>
+                            <option value="EXAM">EXAM</option>
+                            <option value="PAYMENT">PAYMENT</option>
+                            <option value="AI">AI</option>
+                            <option value="REPORT">REPORT</option>
+                            <option value="TEACHER">TEACHER</option>
+                            <option value="ADMIN">ADMIN</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                        <div className="admin-form-group">
+                          <label style={{ fontSize: '11px', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>Biểu tượng (Emoji - Tùy chọn):</label>
+                          <input
+                            type="text"
+                            className="admin-form-input"
+                            placeholder="Ví dụ: ⚙️"
+                            value={templateFormIcon}
+                            onChange={e => setTemplateFormIcon(e.target.value)}
+                          />
+                        </div>
+
+                        <div className="admin-form-group">
+                          <label style={{ fontSize: '11px', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>Link mặc định (Tùy chọn):</label>
+                          <input
+                            type="text"
+                            className="admin-form-input"
+                            placeholder="Ví dụ: /dashboard/home"
+                            value={templateFormLink}
+                            onChange={e => setTemplateFormLink(e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="admin-form-group" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="checkbox"
+                          id="tpl-active"
+                          checked={templateFormActive}
+                          onChange={e => setTemplateFormActive(e.target.checked)}
+                        />
+                        <label htmlFor="tpl-active" style={{ fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>Kích hoạt hoạt động (Active)</label>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={templateSubmitting}
+                        className="admin-back-btn"
+                        style={{
+                          background: '#6c5ce7', color: '#FFFFFF', border: '2.5px solid #000000',
+                          boxShadow: '3px 3px 0px #000000', fontWeight: '950', marginTop: '10px'
+                        }}
+                      >
+                        {templateSubmitting ? 'Đang lưu...' : 'Lưu mẫu cấu hình ➔'}
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

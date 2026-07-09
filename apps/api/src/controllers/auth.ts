@@ -10,6 +10,7 @@ import { sendOTPEmail, sendResetPasswordEmail, sendResetPasswordOTPEmail, sendRo
 import { isDisposableEmail, isValidEmailFormat } from '../lib/disposable-domains.js';
 import { checkOtpSendRateLimit, recordOtpSend, checkResendCooldown, recordResendCooldown } from '../lib/rate-limiter.js';
 import { logSystemEvent } from '../utils/logger.js';
+import { NotificationService } from '../services/notification.service.js';
 
 if (!process.env.JWT_SECRET) {
   throw new Error('FATAL: JWT_SECRET environment variable is missing!');
@@ -642,6 +643,14 @@ export async function verifyOtpRegister(req: Request, res: Response) {
 
     if (!user) return res.status(500).json({ success: false, error: 'Không tạo được tài khoản.' });
 
+    // Gửi thông báo chào mừng & xác minh email thành công
+    try {
+      await NotificationService.sendTemplate('WELCOME', user.id, { fullName: user.fullName });
+      await NotificationService.sendTemplate('EMAIL_VERIFIED', user.id, { email: user.email });
+    } catch (notifErr) {
+      console.error('[Notification Error] Failed to send registration notifications (OTP):', notifErr);
+    }
+
     // Cập nhật thống kê hàng tháng
     try {
       const now = new Date();
@@ -880,6 +889,14 @@ export async function googleCompleteOnboarding(req: Request, res: Response) {
     });
 
     if (!user) return res.status(500).json({ success: false, error: 'Không tạo được tài khoản.' });
+
+    // Gửi thông báo chào mừng & xác minh email thành công
+    try {
+      await NotificationService.sendTemplate('WELCOME', user.id, { fullName: user.fullName });
+      await NotificationService.sendTemplate('EMAIL_VERIFIED', user.id, { email: user.email });
+    } catch (notifErr) {
+      console.error('[Notification Error] Failed to send registration notifications (Google):', notifErr);
+    }
 
     // Cập nhật thống kê hàng tháng (Google OAuth register)
     try {
