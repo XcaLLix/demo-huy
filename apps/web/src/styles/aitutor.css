@@ -625,44 +625,48 @@
 .canvas-node-card {
   box-sizing: border-box;
   font-family: 'Inter', system-ui, sans-serif;
-  border: 1.5px solid rgba(0, 0, 0, 0.15) !important;
+  border: 2px solid rgba(255, 255, 255, 0.08) !important;
   color: #1e293b !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.05) !important;
-  border-radius: 14px !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
+  border-radius: 16px !important;
   transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s, border-color 0.25s !important;
 }
 
 .canvas-node-card:hover {
-  transform: translateY(-4px) scale(1.03) !important;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2), 0 0 12px rgba(255, 255, 255, 0.15) !important;
-  filter: brightness(1.05);
+  transform: translateY(-2px) scale(1.03) !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22) !important;
+  filter: brightness(1.03);
 }
 
 .canvas-node-card--selected {
-  transform: translateY(-2px) scale(1.01) !important;
-  box-shadow: 0 0 20px rgba(255, 210, 52, 0.45), 0 4px 15px rgba(0, 0, 0, 0.2) !important;
-  border: 2px solid var(--mm-gold) !important;
+  transform: translateY(-2px) scale(1.02) !important;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.28) !important;
+  outline: 3px solid var(--mm-gold) !important;
+  outline-offset: 2px !important;
 }
 
 .canvas-node-card--selected:hover {
-  transform: translateY(-5px) scale(1.04) !important;
-  box-shadow: 0 0 25px rgba(255, 210, 52, 0.6), 0 8px 25px rgba(0, 0, 0, 0.3) !important;
+  transform: translateY(-3px) scale(1.04) !important;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.32) !important;
 }
 
 /* Right slide-in drawer details */
 .aitutor-drawer {
   position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
+  top: 20px;
+  right: 20px;
+  bottom: 20px;
   width: 360px;
-  background: var(--mm-card-dark);
-  border-left: 1px solid var(--mm-border-dark);
-  box-shadow: var(--shadow-lg);
+  background: rgba(43, 89, 61, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: -10px 0 35px rgba(0, 0, 0, 0.2);
   display: flex;
   flex-direction: column;
   z-index: 100;
   overflow: hidden;
+  border-radius: 20px;
 }
 
 .aitutor-drawer-header {
@@ -670,8 +674,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid var(--mm-border-dark);
-  background: rgba(0,0,0,0.15);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.15);
 }
 
 .drawer-depth-tag {
@@ -1590,6 +1594,7 @@
 /* Custom hierarchy overrides removed for uniform Neo-brutalism borders & shadows */
 .canvas-node-card-root {
   font-weight: 800 !important;
+  border: 3px double var(--mm-gold) !important;
 }
 .canvas-node-card-level1 {
   font-weight: 700 !important;
