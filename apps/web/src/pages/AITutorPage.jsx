@@ -109,6 +109,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
   const [editNodeDesc, setEditNodeDesc] = useState('');
   const [newChildName, setNewChildName] = useState('');
   const [newChildDesc, setNewChildDesc] = useState('');
+  const [isEditingNode, setIsEditingNode] = useState(false);
   // Sidebar resizing and node shapes states
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const [editNodeShape, setEditNodeShape] = useState('oval');
@@ -601,6 +602,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
 
   const handleNodeSelect = (node) => {
     setSelectedNode(node);
+    setIsEditingNode(false);
   };
 
   // Flat Node Index Memoization for fast searches
