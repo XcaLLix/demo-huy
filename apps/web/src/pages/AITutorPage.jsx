@@ -2295,7 +2295,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
                   {/* Background grid representation */}
                   <defs>
                     <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
-                      <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#000000" strokeWidth="0.5" opacity="0.06" />
+                      <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#ffffff" strokeWidth="0.5" opacity="0.12" />
                     </pattern>
                   </defs>
                   <rect width="100%" height="100%" fill="url(#grid)" data-canvas-bg="true" />

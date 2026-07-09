@@ -4,12 +4,12 @@
    ========================================================================== */
 
 :root {
-  --mm-bg-dark: #A7F3D0; /* Pastel Mint Green Canvas Background */
+  --mm-bg-dark: #5A7C54; /* Organic Olive Green Canvas Background */
   --mm-card-dark: #ffffff;
   --mm-border-dark: rgba(30, 41, 59, 0.12);
-  --mm-gold: #b45309;
-  --mm-text-primary: #1e293b;
-  --mm-text-secondary: #475569;
+  --mm-gold: #FFD234;
+  --mm-text-primary: #ffffff;
+  --mm-text-secondary: rgba(255, 255, 255, 0.75);
   --mm-border-focus: #ef4444;
 }
 
@@ -1888,29 +1888,29 @@ g:hover > text {
 }
 
 /* ==========================================================================
-   Light Pastel Theme Overrides (4 Main Colors: #BFDBFE, #A7F3D0, #FED7AA, #DDD6FE)
+   Darker Pastel Theme Overrides (4 Main Colors: Blue, Green, Peach, Purple)
    ========================================================================== */
 
-/* 1. Left Sidebar Background: #BFDBFE (Pastel Blue) */
+/* 1. Left Sidebar Background: #294B7C (Darker Blue to highlight white text) */
 .aitutor-sidebar {
-  background: #BFDBFE !important;
-  border: 1px solid rgba(30, 41, 59, 0.15) !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05) !important;
+  background: #294B7C !important;
+  border: 1px solid rgba(0, 0, 0, 0.2) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
 }
 
 .aitutor-sidebar .aitutor-sidebar-tabs {
-  background: rgba(255, 255, 255, 0.25) !important;
-  border-bottom: 1px solid rgba(30, 41, 59, 0.1) !important;
+  background: rgba(0, 0, 0, 0.2) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.25) !important;
 }
 
 .aitutor-sidebar .aitutor-tab-btn {
-  color: #475569 !important;
+  color: rgba(255, 255, 255, 0.7) !important;
 }
 
 .aitutor-sidebar .aitutor-tab-btn--active {
-  background: #ffffff !important;
-  color: #1e3a8a !important;
-  box-shadow: 0 4px 12px rgba(30, 41, 59, 0.08) !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
 }
 
 .aitutor-sidebar .aitutor-textarea-label,
@@ -1918,7 +1918,7 @@ g:hover > text {
 .aitutor-sidebar .aitutor-history-item-title,
 .aitutor-sidebar h3,
 .aitutor-sidebar h4 {
-  color: #1e293b !important;
+  color: #ffffff !important;
 }
 
 .aitutor-sidebar .aitutor-dropzone-desc,
@@ -1927,145 +1927,143 @@ g:hover > text {
 .aitutor-sidebar .aitutor-history-loading,
 .aitutor-sidebar .aitutor-dropzone-icon,
 .aitutor-sidebar .aitutor-history-item-delete {
-  color: #475569 !important;
+  color: rgba(255, 255, 255, 0.75) !important;
 }
 
 .aitutor-sidebar .aitutor-dropzone {
-  border: 2px dashed rgba(30, 41, 59, 0.2) !important;
-  background: rgba(255, 255, 255, 0.35) !important;
+  border: 2px dashed rgba(255, 255, 255, 0.25) !important;
+  background: rgba(0, 0, 0, 0.15) !important;
 }
 
 .aitutor-sidebar .aitutor-dropzone:hover {
-  background: rgba(255, 255, 255, 0.6) !important;
-  border-color: #1e3a8a !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: #ffffff !important;
 }
 
 .aitutor-sidebar .aitutor-textarea {
-  background: rgba(255, 255, 255, 0.5) !important;
-  border: 1px solid rgba(30, 41, 59, 0.15) !important;
-  color: #1e293b !important;
+  background: rgba(0, 0, 0, 0.2) !important;
+  border: 1px solid rgba(0, 0, 0, 0.2) !important;
+  color: #ffffff !important;
 }
 
 .aitutor-sidebar .aitutor-textarea:focus {
-  background: #ffffff !important;
-  border-color: #1e3a8a !important;
+  background: rgba(0, 0, 0, 0.3) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
 }
 
 .aitutor-sidebar .aitutor-textarea::placeholder {
-  color: #6b7280 !important;
+  color: rgba(255, 255, 255, 0.4) !important;
 }
 
 .aitutor-sidebar .aitutor-history-item {
-  background: rgba(255, 255, 255, 0.4) !important;
-  border: 1px solid rgba(30, 41, 59, 0.08) !important;
+  background: rgba(0, 0, 0, 0.15) !important;
+  border: 1px solid rgba(0, 0, 0, 0.15) !important;
 }
 
 .aitutor-sidebar .aitutor-history-item:hover {
-  background: rgba(255, 255, 255, 0.65) !important;
-  border-color: #1e3a8a !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
 }
 
 .aitutor-sidebar .aitutor-history-item--active {
-  background: #ffffff !important;
-  border: 2px solid #1e3a8a !important;
-  box-shadow: 0 4px 12px rgba(30, 41, 59, 0.08) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 2px solid rgba(255, 255, 255, 0.3) !important;
 }
 
 .aitutor-sidebar .aitutor-uploaded-tag {
-  background: rgba(255, 255, 255, 0.5) !important;
-  border: 1px solid rgba(30, 41, 59, 0.15) !important;
-  color: #1e3a8a !important;
+  background: rgba(0, 0, 0, 0.25) !important;
+  border: 1px solid rgba(0, 0, 0, 0.25) !important;
+  color: #fbbf24 !important;
 }
 
-/* 2. Top Header Background: #FED7AA (Pastel Peach/Orange) */
+/* 2. Top Header Background: #E28743 (Richer/Darker Orange to highlight white text) */
 .aitutor-chat-header,
 .aitutor-guest-header {
-  background: #FED7AA !important;
-  border: 1px solid rgba(30, 41, 59, 0.15) !important;
-  border-bottom: 1px solid rgba(30, 41, 59, 0.15) !important;
-  color: #1e293b !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03) !important;
+  background: #E28743 !important;
+  border: 1px solid rgba(0, 0, 0, 0.15) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.15) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08) !important;
 }
 
 .aitutor-chat-header .aitutor-active-title,
 .aitutor-guest-header h2,
 .aitutor-guest-header p,
 .aitutor-guest-header .aitutor-channel-avatar {
-  color: #1e293b !important;
+  color: #ffffff !important;
 }
 
 .aitutor-chat-header .aitutor-active-status {
-  color: #475569 !important;
+  color: rgba(255, 255, 255, 0.85) !important;
 }
 
-/* 3. Right Details Drawer Background: #DDD6FE (Pastel Purple/Lavender) */
+/* 3. Right Details Drawer Background: #5A4A85 (Darker Purple to highlight white text) */
 .aitutor-drawer {
-  background: rgba(221, 214, 254, 0.92) !important;
-  border: 1px solid rgba(30, 41, 59, 0.15) !important;
-  box-shadow: -10px 0 35px rgba(0, 0, 0, 0.08) !important;
-  color: #1e293b !important;
+  background: rgba(90, 74, 133, 0.92) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow: -10px 0 35px rgba(0, 0, 0, 0.25) !important;
+  color: #ffffff !important;
 }
 
 .aitutor-drawer .aitutor-drawer-header {
-  border-bottom: 1px solid rgba(30, 41, 59, 0.1) !important;
-  background: rgba(255, 255, 255, 0.2) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: rgba(0, 0, 0, 0.15) !important;
 }
 
 .aitutor-drawer .drawer-depth-tag {
-  background: rgba(255, 255, 255, 0.5) !important;
-  color: #4f46e5 !important;
-  border: 1px solid rgba(79, 70, 229, 0.15) !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
 }
 
 .aitutor-drawer .drawer-close-btn {
-  color: #4b5563 !important;
+  color: rgba(255, 255, 255, 0.7) !important;
 }
 
 .aitutor-drawer .drawer-close-btn:hover {
-  color: #1e293b !important;
+  color: #ffffff !important;
 }
 
 .aitutor-drawer .drawer-node-desc {
-  color: #334155 !important;
+  color: rgba(255, 255, 255, 0.9) !important;
 }
 
 .aitutor-drawer .status-tag-pill {
-  border: 1px solid rgba(30, 41, 59, 0.15) !important;
-  background: rgba(255, 255, 255, 0.4) !important;
-  color: #475569 !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  background: rgba(0, 0, 0, 0.15) !important;
+  color: rgba(255, 255, 255, 0.7) !important;
 }
 
 .aitutor-drawer .status-tag-pill--active {
-  background: #ffffff !important;
-  color: #4f46e5 !important;
-  border-color: #4f46e5 !important;
-  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.1) !important;
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+  border-color: #ffffff !important;
 }
 
 .aitutor-drawer .aitutor-subnode-input {
-  background: rgba(255, 255, 255, 0.6) !important;
-  border: 1px solid rgba(30, 41, 59, 0.15) !important;
-  color: #1e293b !important;
+  background: rgba(0, 0, 0, 0.2) !important;
+  border: 1px solid rgba(0, 0, 0, 0.2) !important;
+  color: #ffffff !important;
 }
 
 .aitutor-drawer .aitutor-subnode-input:focus {
-  background: #ffffff !important;
-  border-color: #4f46e5 !important;
+  background: rgba(0, 0, 0, 0.3) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
 }
 
 .aitutor-drawer .drawer-view-mode,
 .aitutor-drawer .drawer-edit-mode {
-  background: rgba(255, 255, 255, 0.4) !important;
+  background: rgba(0, 0, 0, 0.15) !important;
   border-radius: 12px;
   padding: 12px;
-  border: 1px solid rgba(30, 41, 59, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
 /* 4. Canvas Nodes & Links Styling */
 .canvas-node-card {
-  border: 1.5px solid rgba(30, 41, 59, 0.15) !important;
+  border: 1.5px solid rgba(0, 0, 0, 0.12) !important;
   color: #1e293b !important;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05) !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12) !important;
 }
 
 .canvas-node-card-root {
@@ -2073,37 +2071,37 @@ g:hover > text {
 }
 
 .canvas-node-card:hover {
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2) !important;
 }
 
 .canvas-node-card--selected {
-  outline: 3px solid #1e3a8a !important;
+  outline: 3px solid #FFD234 !important;
   outline-offset: 2px !important;
 }
 
 .canvas-connection-path {
-  stroke: rgba(30, 41, 59, 0.3) !important;
+  stroke: rgba(255, 255, 255, 0.25) !important;
   stroke-width: 2.5px;
 }
 
 .canvas-connection-path--active {
-  stroke: #2563eb !important;
+  stroke: #FFD234 !important;
   stroke-width: 3.5px !important;
-  filter: drop-shadow(0px 0px 4px rgba(37, 99, 235, 0.3));
+  filter: drop-shadow(0px 0px 4px rgba(255, 210, 52, 0.4));
 }
 
 .aitutor-canvas-controls {
-  background: rgba(255, 255, 255, 0.8) !important;
-  border: 1px solid rgba(30, 41, 59, 0.1) !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important;
+  background: rgba(0, 0, 0, 0.4) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
 }
 
 .control-btn {
-  color: #475569 !important;
+  color: rgba(255, 255, 255, 0.8) !important;
 }
 
 .control-btn:hover {
-  background: rgba(0, 0, 0, 0.05) !important;
-  color: #1e293b !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
 }
 
