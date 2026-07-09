@@ -232,6 +232,57 @@ export default function AdminDashboard({
   const [notifSendVariables, setNotifSendVariables] = useState(''); // JSON string or comma separated k=v
   const [notifSending, setNotifSending] = useState(false);
 
+  // States for user search multi-select tags
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [searchedUsers, setSearchedUsers] = useState([]);
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [userSearchLoading, setUserSearchLoading] = useState(false);
+  const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
+
+  // Sync selectedUsers IDs to notifSendUserId as a comma separated string
+  useEffect(() => {
+    setNotifSendUserId(selectedUsers.map(u => u.id).join(','));
+  }, [selectedUsers]);
+
+  // Fetch initial available users when 'user' target is selected
+  useEffect(() => {
+    const fetchAvailableUsers = async () => {
+      try {
+        const res = await api.getAdminUsers({ limit: 100 });
+        if (res && res.users) {
+          setAvailableUsers(res.users);
+        }
+      } catch (err) {
+        console.error('Error fetching available users:', err);
+      }
+    };
+
+    if (notifSendTarget === 'user' && availableUsers.length === 0) {
+      fetchAvailableUsers();
+    }
+  }, [notifSendTarget, availableUsers.length]);
+
+  // Search users via API
+  const handleUserSearch = async (query) => {
+    setUserSearchQuery(query);
+    if (!query.trim()) {
+      setSearchedUsers([]);
+      return;
+    }
+    setUserSearchLoading(true);
+    try {
+      const res = await api.getAdminUsers({ search: query, limit: 10 });
+      if (res && res.users) {
+        setSearchedUsers(res.users);
+      }
+    } catch (err) {
+      console.error('Error searching users:', err);
+    } finally {
+      setUserSearchLoading(false);
+    }
+  };
+
   // Template CRUD Modal states
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null); // null means creating
@@ -250,10 +301,10 @@ export default function AdminDashboard({
     setNotifHistoryLoading(true);
     try {
       const res = await api.adminGetSentNotifications({ page, limit: 15 });
-      if (res?.success && res.data) {
-        setNotifHistory(res.data.history);
-        setNotifHistoryTotal(res.data.pagination.total);
-        setNotifHistoryPage(res.data.pagination.page);
+      if (res) {
+        setNotifHistory(res.history || []);
+        setNotifHistoryTotal(res.pagination?.total || 0);
+        setNotifHistoryPage(res.pagination?.page || 1);
       }
     } catch (err) {
       console.error(err);
@@ -268,8 +319,8 @@ export default function AdminDashboard({
     setNotifTemplatesLoading(true);
     try {
       const res = await api.adminGetTemplates();
-      if (res?.success && res.data) {
-        setNotifTemplates(res.data);
+      if (res) {
+        setNotifTemplates(res);
       }
     } catch (err) {
       console.error(err);
@@ -311,7 +362,7 @@ export default function AdminDashboard({
 
     const payload = {
       target: notifSendTarget,
-      userId: notifSendTarget === 'user' ? Number(notifSendUserId) : undefined,
+      userId: notifSendTarget === 'user' ? notifSendUserId : undefined,
       role: notifSendTarget === 'role' ? notifSendRole : undefined,
       title: notifSendMode === 'raw' ? notifSendTitle : undefined,
       message: notifSendMode === 'raw' ? notifSendMessage : undefined,
@@ -327,6 +378,7 @@ export default function AdminDashboard({
       const res = await api.adminSendNotification(payload);
       if (res?.success) {
         toast('Đã gửi thông báo thành công!', 'success');
+        setSelectedUsers([]);
         setNotifSendUserId('');
         setNotifSendTitle('');
         setNotifSendMessage('');
@@ -2865,37 +2917,70 @@ export default function AdminDashboard({
 
               {/* Sub-tab 1: Gửi thông báo */}
               {notifSubTab === 'send' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px', alignItems: 'start' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '28px', alignItems: 'start' }}>
                   {/* Form card */}
-                  <div className="admin-card">
-                    <h3 className="chart-card-title">Thiết lập thông báo mới</h3>
-                    <p style={{ fontSize: '13px', color: '#6B7280', marginBottom: '20px', fontWeight: '500' }}>
+                  <div
+                    className="admin-card"
+                    style={{
+                      background: '#ffffff',
+                      borderRadius: '16px',
+                      border: '1.5px solid #E2E8F0',
+                      boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)',
+                      padding: '24px'
+                    }}
+                  >
+                    <h3 style={{ margin: '0 0 6px 0', fontSize: '18px', fontWeight: '850', color: '#0F172A' }}>Thiết lập thông báo mới</h3>
+                    <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '24px', lineHeight: '1.5' }}>
                       Phát đi các thông điệp tùy chỉnh hoặc sử dụng mẫu cấu hình sẵn tới toàn bộ người dùng, vai trò hoặc tài khoản cụ thể.
                     </p>
 
-                    <form onSubmit={handleAdminSendNotification} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <form onSubmit={handleAdminSendNotification} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                       {/* Đối tượng nhận */}
                       <div className="admin-form-group">
-                        <label style={{ fontSize: '12px', fontWeight: '900', display: 'block', marginBottom: '6px' }}>Đối tượng nhận thông báo:</label>
+                        <label style={{ fontSize: '11px', fontWeight: '800', color: '#475569', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Đối tượng nhận thông báo:</label>
                         <select
                           className="admin-form-select"
                           value={notifSendTarget}
                           onChange={e => setNotifSendTarget(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '10px 14px',
+                            borderRadius: '10px',
+                            border: '1.5px solid #E2E8F0',
+                            background: '#ffffff',
+                            fontSize: '13.5px',
+                            fontWeight: '600',
+                            color: '#1E293B',
+                            outline: 'none',
+                            cursor: 'pointer'
+                          }}
                         >
                           <option value="all">Toàn bộ người dùng trên hệ thống</option>
                           <option value="role">Theo vai trò tài khoản (Role)</option>
-                          <option value="user">Tài khoản cụ thể (User ID)</option>
+                          <option value="user">Tài khoản cụ thể (Chọn theo Tên/Email)</option>
                         </select>
                       </div>
 
-                      {/* Phụ thuộc vào đối tượng */}
+                      {/* Phụ thuộc vào đối tượng: Role */}
                       {notifSendTarget === 'role' && (
-                        <div className="admin-form-group">
-                          <label style={{ fontSize: '12px', fontWeight: '900', display: 'block', marginBottom: '6px' }}>Chọn vai trò nhận:</label>
+                        <div className="admin-form-group" style={{ animation: 'fadeIn 0.2s ease-out' }}>
+                          <label style={{ fontSize: '11px', fontWeight: '800', color: '#475569', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Chọn vai trò nhận:</label>
                           <select
                             className="admin-form-select"
                             value={notifSendRole}
                             onChange={e => setNotifSendRole(e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '10px 14px',
+                              borderRadius: '10px',
+                              border: '1.5px solid #E2E8F0',
+                              background: '#ffffff',
+                              fontSize: '13.5px',
+                              fontWeight: '600',
+                              color: '#1E293B',
+                              outline: 'none',
+                              cursor: 'pointer'
+                            }}
                           >
                             <option value="STUDENT">Học sinh (STUDENT)</option>
                             <option value="TEACHER">Giáo viên (TEACHER)</option>
@@ -2904,38 +2989,226 @@ export default function AdminDashboard({
                         </div>
                       )}
 
+                      {/* Phụ thuộc vào đối tượng: Chọn người nhận theo tên (Pills layout) */}
                       {notifSendTarget === 'user' && (
-                        <div className="admin-form-group">
-                          <label style={{ fontSize: '12px', fontWeight: '900', display: 'block', marginBottom: '6px' }}>Nhập ID người dùng (User ID):</label>
-                          <input
-                            type="number"
-                            className="admin-form-input"
-                            placeholder="Ví dụ: 101"
-                            value={notifSendUserId}
-                            onChange={e => setNotifSendUserId(e.target.value)}
-                            required
-                          />
+                        <div className="admin-form-group" style={{ position: 'relative', animation: 'fadeIn 0.2s ease-out' }}>
+                          <label style={{ fontSize: '11px', fontWeight: '800', color: '#475569', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Chọn người nhận (Tìm kiếm theo Tên/Email):</label>
+                          
+                          {/* Selected Users list styled like Facebook recipient tags */}
+                          <div
+                            style={{
+                              display: 'flex',
+                              flexWrap: 'wrap',
+                              alignItems: 'center',
+                              gap: '8px',
+                              background: '#F8FAFC',
+                              border: '1.5px solid #E2E8F0',
+                              borderRadius: '10px',
+                              padding: '10px 12px',
+                              minHeight: '44px',
+                              marginBottom: '10px'
+                            }}
+                          >
+                            <span style={{ fontSize: '12.5px', fontWeight: '800', color: '#64748B', marginRight: '4px' }}>Đến:</span>
+                            {selectedUsers.length === 0 ? (
+                              <span style={{ fontSize: '12.5px', color: '#94A3B8', fontStyle: 'italic' }}>Chưa chọn người nhận. Nhập tên tìm kiếm ở dưới.</span>
+                            ) : (
+                              selectedUsers.map(user => (
+                                <div
+                                  key={user.id}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    background: '#EFF6FF',
+                                    color: '#1E40AF',
+                                    border: '1px solid #BFDBFE',
+                                    padding: '4px 10px',
+                                    borderRadius: '8px',
+                                    fontSize: '12.5px',
+                                    fontWeight: '700',
+                                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)'
+                                  }}
+                                >
+                                  <span>{user.name}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedUsers(prev => prev.filter(u => u.id !== user.id))}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: '#3B82F6',
+                                      cursor: 'pointer',
+                                      fontSize: '14px',
+                                      padding: '0 2px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      fontWeight: '900',
+                                      lineHeight: 1
+                                    }}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))
+                            )}
+                          </div>
+
+                          {/* Dynamic Search Box */}
+                          <div style={{ position: 'relative' }}>
+                            <input
+                              type="text"
+                              className="admin-form-input"
+                              placeholder="Nhập tên hoặc email người dùng..."
+                              value={userSearchQuery}
+                              onChange={e => {
+                                handleUserSearch(e.target.value);
+                                setShowSearchSuggestions(true);
+                              }}
+                              onFocus={() => setShowSearchSuggestions(true)}
+                              style={{
+                                width: '100%',
+                                padding: '10px 14px',
+                                borderRadius: '10px',
+                                border: '1.5px solid #E2E8F0',
+                                fontSize: '13.5px',
+                                outline: 'none'
+                              }}
+                            />
+                            {userSearchLoading && (
+                              <div style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)' }}>
+                                <div className="admin-spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }} />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Suggestions Popup */}
+                          {showSearchSuggestions && (
+                            <>
+                              <div 
+                                style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }} 
+                                onClick={() => setShowSearchSuggestions(false)} 
+                              />
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  top: '100%',
+                                  left: 0,
+                                  right: 0,
+                                  background: '#ffffff',
+                                  borderRadius: '12px',
+                                  border: '1.5px solid #CBD5E1',
+                                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
+                                  marginTop: '6px',
+                                  zIndex: 1000,
+                                  maxHeight: '220px',
+                                  overflowY: 'auto',
+                                  padding: '6px 0'
+                                }}
+                              >
+                                {(() => {
+                                  const displaySuggestions = (userSearchQuery.trim() ? searchedUsers : availableUsers)
+                                    .filter(user => !selectedUsers.some(u => u.id === user.id));
+
+                                  if (displaySuggestions.length === 0) {
+                                    return (
+                                      <div style={{ padding: '12px', textAlign: 'center', color: '#64748B', fontSize: '13px' }}>
+                                        {userSearchQuery.trim() ? 'Không tìm thấy người dùng phù hợp.' : 'Tất cả người dùng đã được chọn.'}
+                                      </div>
+                                    );
+                                  }
+
+                                  return displaySuggestions.map(user => {
+                                    const isAlreadySelected = selectedUsers.some(u => u.id === user.id);
+                                    return (
+                                      <div
+                                        key={user.id}
+                                        style={{
+                                          display: 'flex',
+                                          justifyContent: 'space-between',
+                                          alignItems: 'center',
+                                          padding: '10px 14px',
+                                          cursor: isAlreadySelected ? 'not-allowed' : 'pointer',
+                                          background: isAlreadySelected ? '#F8FAFC' : '#ffffff',
+                                          transition: 'background 0.15s'
+                                        }}
+                                        onClick={() => {
+                                          if (!isAlreadySelected) {
+                                            setSelectedUsers(prev => [...prev, user]);
+                                          }
+                                          setUserSearchQuery('');
+                                          setSearchedUsers([]);
+                                          setShowSearchSuggestions(false);
+                                        }}
+                                        onMouseEnter={e => {
+                                          if (!isAlreadySelected) e.currentTarget.style.background = '#F1F5F9';
+                                        }}
+                                        onMouseLeave={e => {
+                                          if (!isAlreadySelected) e.currentTarget.style.background = isAlreadySelected ? '#F8FAFC' : '#ffffff';
+                                        }}
+                                      >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                          <div style={{
+                                            width: '32px',
+                                            height: '32px',
+                                            borderRadius: '50%',
+                                            background: '#E2E8F0',
+                                            color: '#475569',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontWeight: '700',
+                                            fontSize: '11px'
+                                          }}>
+                                            {user.name ? user.name.split(' ').map(n => n[0]).slice(-2).join('').toUpperCase() : '?'}
+                                          </div>
+                                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                            <span style={{ fontSize: '13px', fontWeight: '750', color: '#1E293B' }}>{user.name}</span>
+                                            <span style={{ fontSize: '11px', color: '#64748B' }}>{user.email}</span>
+                                          </div>
+                                        </div>
+
+                                        <span style={{
+                                          background: user.role === 'ADMIN' ? '#FEE2E2' : (user.role === 'TEACHER' ? '#FEF3C7' : '#E0F2FE'),
+                                          color: user.role === 'ADMIN' ? '#991B1B' : (user.role === 'TEACHER' ? '#92400E' : '#0369A1'),
+                                          fontSize: '9.5px',
+                                          fontWeight: '800',
+                                          padding: '2px 6px',
+                                          borderRadius: '4px',
+                                          textTransform: 'uppercase'
+                                        }}>
+                                          {user.role}
+                                        </span>
+                                      </div>
+                                    );
+                                  });
+                                })()}
+                              </div>
+                            </>
+                          )}
                         </div>
                       )}
 
                       {/* Chế độ gửi */}
                       <div className="admin-form-group">
-                        <label style={{ fontSize: '12px', fontWeight: '900', display: 'block', marginBottom: '6px' }}>Phương thức soạn thông báo:</label>
-                        <div style={{ display: 'flex', gap: '16px' }}>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer', fontWeight: 'bold' }}>
+                        <label style={{ fontSize: '11px', fontWeight: '800', color: '#475569', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Phương thức soạn thông báo:</label>
+                        <div style={{ display: 'flex', gap: '20px' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px', cursor: 'pointer', fontWeight: '700', color: '#1E293B' }}>
                             <input
                               type="radio"
                               name="sendMode"
                               checked={notifSendMode === 'raw'}
                               onChange={() => setNotifSendMode('raw')}
+                              style={{ width: '16px', height: '16px', accentColor: '#6c5ce7' }}
                             /> Soạn tùy ý (Raw)
                           </label>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer', fontWeight: 'bold' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px', cursor: 'pointer', fontWeight: '700', color: '#1E293B' }}>
                             <input
                               type="radio"
                               name="sendMode"
                               checked={notifSendMode === 'template'}
                               onChange={() => setNotifSendMode('template')}
+                              style={{ width: '16px', height: '16px', accentColor: '#6c5ce7' }}
                             /> Theo mẫu (Template)
                           </label>
                         </div>
@@ -2944,8 +3217,8 @@ export default function AdminDashboard({
                       {/* Nội dung khi chọn RAW */}
                       {notifSendMode === 'raw' && (
                         <>
-                          <div className="admin-form-group">
-                            <label style={{ fontSize: '12px', fontWeight: '900', display: 'block', marginBottom: '6px' }}>Tiêu đề thông báo:</label>
+                          <div className="admin-form-group" style={{ animation: 'fadeIn 0.2s ease-out' }}>
+                            <label style={{ fontSize: '11px', fontWeight: '800', color: '#475569', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tiêu đề thông báo:</label>
                             <input
                               type="text"
                               className="admin-form-input"
@@ -2953,11 +3226,19 @@ export default function AdminDashboard({
                               value={notifSendTitle}
                               onChange={e => setNotifSendTitle(e.target.value)}
                               required
+                              style={{
+                                width: '100%',
+                                padding: '10px 14px',
+                                borderRadius: '10px',
+                                border: '1.5px solid #E2E8F0',
+                                fontSize: '13.5px',
+                                outline: 'none'
+                              }}
                             />
                           </div>
 
-                          <div className="admin-form-group">
-                            <label style={{ fontSize: '12px', fontWeight: '900', display: 'block', marginBottom: '6px' }}>Nội dung thông báo:</label>
+                          <div className="admin-form-group" style={{ animation: 'fadeIn 0.2s ease-out' }}>
+                            <label style={{ fontSize: '11px', fontWeight: '800', color: '#475569', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Nội dung thông báo:</label>
                             <textarea
                               className="admin-form-textarea"
                               rows="4"
@@ -2965,16 +3246,37 @@ export default function AdminDashboard({
                               value={notifSendMessage}
                               onChange={e => setNotifSendMessage(e.target.value)}
                               required
+                              style={{
+                                width: '100%',
+                                padding: '10px 14px',
+                                borderRadius: '10px',
+                                border: '1.5px solid #E2E8F0',
+                                fontSize: '13.5px',
+                                outline: 'none',
+                                resize: 'vertical'
+                              }}
                             />
                           </div>
 
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', animation: 'fadeIn 0.2s ease-out' }}>
                             <div className="admin-form-group">
-                              <label style={{ fontSize: '12px', fontWeight: '900', display: 'block', marginBottom: '6px' }}>Loại (Type):</label>
+                              <label style={{ fontSize: '11px', fontWeight: '800', color: '#475569', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Loại (Type):</label>
                               <select
                                 className="admin-form-select"
                                 value={notifSendType}
                                 onChange={e => setNotifSendType(e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  padding: '10px 14px',
+                                  borderRadius: '10px',
+                                  border: '1.5px solid #E2E8F0',
+                                  background: '#ffffff',
+                                  fontSize: '13.5px',
+                                  fontWeight: '600',
+                                  color: '#1E293B',
+                                  outline: 'none',
+                                  cursor: 'pointer'
+                                }}
                               >
                                 <option value="INFO">INFO (Thông tin màu xanh)</option>
                                 <option value="SUCCESS">SUCCESS (Thành công màu xanh lá)</option>
@@ -2984,11 +3286,23 @@ export default function AdminDashboard({
                             </div>
 
                             <div className="admin-form-group">
-                              <label style={{ fontSize: '12px', fontWeight: '900', display: 'block', marginBottom: '6px' }}>Danh mục (Category):</label>
+                              <label style={{ fontSize: '11px', fontWeight: '800', color: '#475569', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Danh mục (Category):</label>
                               <select
                                 className="admin-form-select"
                                 value={notifSendCategory}
                                 onChange={e => setNotifSendCategory(e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  padding: '10px 14px',
+                                  borderRadius: '10px',
+                                  border: '1.5px solid #E2E8F0',
+                                  background: '#ffffff',
+                                  fontSize: '13.5px',
+                                  fontWeight: '600',
+                                  color: '#1E293B',
+                                  outline: 'none',
+                                  cursor: 'pointer'
+                                }}
                               >
                                 <option value="SYSTEM">SYSTEM (Hệ thống)</option>
                                 <option value="ACCOUNT">ACCOUNT (Tài khoản)</option>
@@ -3008,8 +3322,8 @@ export default function AdminDashboard({
                       {/* Nội dung khi chọn TEMPLATE */}
                       {notifSendMode === 'template' && (
                         <>
-                          <div className="admin-form-group">
-                            <label style={{ fontSize: '12px', fontWeight: '900', display: 'block', marginBottom: '6px' }}>Chọn mẫu thông báo:</label>
+                          <div className="admin-form-group" style={{ animation: 'fadeIn 0.2s ease-out' }}>
+                            <label style={{ fontSize: '11px', fontWeight: '800', color: '#475569', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Chọn mẫu thông báo:</label>
                             <select
                               className="admin-form-select"
                               value={notifSendTemplateCode}
@@ -3018,6 +3332,18 @@ export default function AdminDashboard({
                                 setNotifSendVariables('');
                               }}
                               required
+                              style={{
+                                width: '100%',
+                                padding: '10px 14px',
+                                borderRadius: '10px',
+                                border: '1.5px solid #E2E8F0',
+                                background: '#ffffff',
+                                fontSize: '13.5px',
+                                fontWeight: '600',
+                                color: '#1E293B',
+                                outline: 'none',
+                                cursor: 'pointer'
+                              }}
                             >
                               <option value="">-- Chọn mẫu thông báo --</option>
                               {notifTemplates.map(t => (
@@ -3027,24 +3353,32 @@ export default function AdminDashboard({
                           </div>
 
                           {notifSendTemplateCode && (
-                            <div style={{ background: '#FAF9FF', padding: '12px', borderRadius: '8px', border: '1px solid #E2E8F0', marginBottom: '8px' }}>
-                              <strong style={{ fontSize: '11px', color: '#6c5ce7', display: 'block', marginBottom: '4px' }}>NỘI DUNG MẪU GỐC:</strong>
-                              <p style={{ margin: 0, fontSize: '11.5px', color: '#4B5563', lineHeight: '1.4' }}>
+                            <div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '12px', border: '1.5px dashed #CBD5E1', marginBottom: '8px', animation: 'fadeIn 0.2s ease-out' }}>
+                              <strong style={{ fontSize: '11px', color: '#6c5ce7', display: 'block', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>NỘI DUNG MẪU GỐC:</strong>
+                              <p style={{ margin: 0, fontSize: '12.5px', color: '#334155', lineHeight: '1.5' }}>
                                 {notifTemplates.find(t => t.code === notifSendTemplateCode)?.message}
                               </p>
                             </div>
                           )}
 
-                          <div className="admin-form-group">
-                            <label style={{ fontSize: '12px', fontWeight: '900', display: 'block', marginBottom: '6px' }}>Các biến số thay thế (Variables):</label>
+                          <div className="admin-form-group" style={{ animation: 'fadeIn 0.2s ease-out' }}>
+                            <label style={{ fontSize: '11px', fontWeight: '800', color: '#475569', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Các biến số thay thế (Variables):</label>
                             <input
                               type="text"
                               className="admin-form-input"
                               placeholder="Ví dụ: fullName=Minh Anh, reason=Spam"
                               value={notifSendVariables}
                               onChange={e => setNotifSendVariables(e.target.value)}
+                              style={{
+                                width: '100%',
+                                padding: '10px 14px',
+                                borderRadius: '10px',
+                                border: '1.5px solid #E2E8F0',
+                                fontSize: '13.5px',
+                                outline: 'none'
+                              }}
                             />
-                            <small style={{ fontSize: '10.5px', color: '#9CA3AF', marginTop: '4px', display: 'block' }}>
+                            <small style={{ fontSize: '11px', color: '#64748B', marginTop: '6px', display: 'block', lineHeight: '1.4' }}>
                               Ngăn cách các biến bằng dấu phẩy. Cấu trúc: <code>tenBien=giaTri</code>
                             </small>
                           </div>
@@ -3053,24 +3387,42 @@ export default function AdminDashboard({
 
                       {/* Link đính kèm */}
                       <div className="admin-form-group">
-                        <label style={{ fontSize: '12px', fontWeight: '900', display: 'block', marginBottom: '6px' }}>Đường dẫn điều hướng (Link - Tùy chọn):</label>
+                        <label style={{ fontSize: '11px', fontWeight: '800', color: '#475569', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Đường dẫn điều hướng (Link - Tùy chọn):</label>
                         <input
                           type="text"
                           className="admin-form-input"
                           placeholder="Ví dụ: /dashboard/home hoặc https://..."
                           value={notifSendLink}
                           onChange={e => setNotifSendLink(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '10px 14px',
+                            borderRadius: '10px',
+                            border: '1.5px solid #E2E8F0',
+                            fontSize: '13.5px',
+                            outline: 'none'
+                          }}
                         />
                       </div>
 
                       <button
                         type="submit"
                         disabled={notifSending}
-                        className="admin-back-btn"
                         style={{
-                          alignSelf: 'flex-start', background: '#6c5ce7', color: '#FFFFFF',
-                          border: '2px solid #000000', boxShadow: '3px 3px 0px #000000', fontWeight: '900', cursor: 'pointer'
+                          alignSelf: 'flex-start',
+                          background: '#6c5ce7',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          borderRadius: '10px',
+                          fontWeight: '800',
+                          padding: '12px 24px',
+                          fontSize: '13.5px',
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 6px rgba(108, 92, 231, 0.25)',
+                          transition: 'all 0.15s'
                         }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#5b4bc4'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = '#6c5ce7'; }}
                       >
                         {notifSending ? 'Đang gửi...' : 'Phát thông báo ngay ⚡'}
                       </button>
@@ -3078,15 +3430,25 @@ export default function AdminDashboard({
                   </div>
 
                   {/* Guide card */}
-                  <div className="admin-card" style={{ background: '#FAF9FF' }}>
-                    <h3 className="chart-card-title">💡 Hướng dẫn hệ thống</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '13px', lineHeight: '1.6', color: '#4B5563' }}>
+                  <div
+                    className="admin-card"
+                    style={{
+                      background: 'linear-gradient(135deg, #F8F9FA 0%, #F1F3F5 100%)',
+                      borderRadius: '16px',
+                      border: '1.5px solid #E2E8F0',
+                      boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)',
+                      padding: '24px'
+                    }}
+                  >
+                    <h3 style={{ margin: '0 0 6px 0', fontSize: '18px', fontWeight: '850', color: '#0F172A' }}>💡 Hướng dẫn hệ thống</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '13px', lineHeight: '1.6', color: '#475569' }}>
                       <p>
                         Hệ thống <strong>Notification Center</strong> được xây dựng tập trung để phục vụ tất cả các module nghiệp vụ trong ứng dụng EduPath.
                       </p>
-                      <div>
-                        <strong style={{ display: 'block', color: '#1E293B', marginBottom: '4px' }}>Các biến phổ biến trong Template:</strong>
-                        <ul style={{ paddingLeft: '18px', margin: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      
+                      <div style={{ background: '#ffffff', padding: '16px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+                        <strong style={{ display: 'block', color: '#1E293B', marginBottom: '8px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Các biến phổ biến trong Template:</strong>
+                        <ul style={{ paddingLeft: '18px', margin: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
                           <li><code>{'{fullName}'}</code>: Tên đầy đủ người nhận.</li>
                           <li><code>{'{email}'}</code>: Địa chỉ email tài khoản.</li>
                           <li><code>{'{courseName}'}</code>: Tên khóa học liên quan.</li>
@@ -3094,9 +3456,10 @@ export default function AdminDashboard({
                           <li><code>{'{reason}'}</code>: Lý do phê duyệt, từ chối, khóa tài khoản.</li>
                         </ul>
                       </div>
-                      <div style={{ marginTop: '10px', padding: '10px', background: '#E0F2FE', borderRadius: '8px', borderLeft: '4px solid #0284C7' }}>
-                        <span style={{ fontWeight: 'bold', color: '#0369A1' }}>Thông báo tức thời (Real-time):</span>
-                        <p style={{ margin: '4px 0 0 0', fontSize: '12px' }}>
+                      
+                      <div style={{ padding: '16px', background: '#EFF6FF', borderRadius: '12px', borderLeft: '4px solid #3B82F6' }}>
+                        <span style={{ fontWeight: '800', color: '#1E40AF', fontSize: '13px', display: 'block', marginBottom: '4px' }}>Thông báo tức thời (Real-time):</span>
+                        <p style={{ margin: 0, fontSize: '12.5px', color: '#1E3A8A' }}>
                           Người dùng đang trực tuyến trên hệ thống sẽ nhận được thông báo ngay lập tức dạng popup kèm âm thanh nhờ vào kênh truyền tin tức thời Socket.IO.
                         </p>
                       </div>
@@ -3117,61 +3480,142 @@ export default function AdminDashboard({
                     <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}><div className="admin-spinner" /></div>
                   ) : notifHistory.length > 0 ? (
                     <>
-                      <div className="admin-table-container">
-                        <table className="admin-table">
-                          <thead>
-                            <tr>
-                              <th>ID</th>
-                              <th>Người nhận</th>
-                              <th>Tiêu đề</th>
-                              <th>Nội dung thông điệp</th>
-                              <th>Danh mục</th>
-                              <th>Cấp độ</th>
-                              <th>Ngày gửi</th>
-                              <th>Trạng thái</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {notifHistory.map(h => (
-                              <tr key={h.id}>
-                                <td><code>#{h.id}</code></td>
-                                <td>
-                                  {h.recipient ? (
-                                    <div>
-                                      <div style={{ fontWeight: 'bold' }}>{h.recipient.name}</div>
-                                      <div style={{ fontSize: '10.5px', color: '#6B7280' }}>{h.recipient.email}</div>
-                                      <span style={{ fontSize: '9px', background: '#E2E8F0', padding: '2px 4px', borderRadius: '4px', fontWeight: 'bold' }}>{h.recipient.role}</span>
-                                    </div>
-                                  ) : (
-                                    <span style={{ color: '#9CA3AF' }}>Bị xóa</span>
-                                  )}
-                                </td>
-                                <td style={{ fontWeight: 'bold' }}>{h.title}</td>
-                                <td style={{ maxWidth: '300px', whiteSpace: 'normal', fontSize: '12px', lineHeight: '1.4' }}>{h.message}</td>
-                                <td><span style={{ background: '#FAF9FF', padding: '2px 6px', borderRadius: '6px', border: '1px solid #E2E8F0', fontSize: '11px', fontWeight: 'bold' }}>{h.category}</span></td>
-                                <td>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+                        {notifHistory.map(h => {
+                          const typeColors = {
+                            SUCCESS: { bg: '#ECFDF5', text: '#059669', border: '#A7F3D0' },
+                            WARNING: { bg: '#FFFBEB', text: '#D97706', border: '#FDE68A' },
+                            ERROR: { bg: '#FEF2F2', text: '#DC2626', border: '#FCA5A5' },
+                            INFO: { bg: '#EFF6FF', text: '#2563EB', border: '#BFDBFE' }
+                          };
+                          const typeStyle = typeColors[h.type] || typeColors.INFO;
+
+                          // Recipient initials for visual avatar
+                          const getInitials = (name) => {
+                            if (!name) return '?';
+                            return name.split(' ').map(n => n[0]).slice(-2).join('').toUpperCase();
+                          };
+
+                          return (
+                            <div
+                              key={h.id}
+                              style={{
+                                background: '#ffffff',
+                                borderRadius: '16px',
+                                border: '1.5px solid #E2E8F0',
+                                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)',
+                                padding: '20px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '14px',
+                                transition: 'all 0.2s ease',
+                                position: 'relative'
+                              }}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.transform = 'translateY(-3px)';
+                                e.currentTarget.style.boxShadow = '0 10px 20px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.03)';
+                                e.currentTarget.style.borderColor = '#CBD5E1';
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.transform = 'none';
+                                e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)';
+                                e.currentTarget.style.borderColor = '#E2E8F0';
+                              }}
+                            >
+                              {/* Card Header: Recipient Details */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                  <div style={{
+                                    width: '38px',
+                                    height: '38px',
+                                    borderRadius: '50%',
+                                    background: '#E0F2FE',
+                                    color: '#0369A1',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontWeight: '900',
+                                    fontSize: '12px'
+                                  }}>
+                                    {h.recipient ? getInitials(h.recipient.name) : '?'}
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontSize: '13px', fontWeight: '850', color: '#0F172A' }}>
+                                      {h.recipient ? h.recipient.name : 'Người dùng bị xóa'}
+                                    </span>
+                                    <span style={{ fontSize: '10.5px', color: '#64748B' }}>
+                                      {h.recipient ? h.recipient.email : 'N/A'}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <span style={{
+                                  background: '#F1F5F9',
+                                  color: '#475569',
+                                  fontSize: '9px',
+                                  fontWeight: '800',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  textTransform: 'uppercase'
+                                }}>
+                                  {h.recipient ? h.recipient.role : 'N/A'}
+                                </span>
+                              </div>
+
+                              {/* Divider */}
+                              <div style={{ height: '1px', background: '#F1F5F9' }} />
+
+                              {/* Card Body: Title and Message */}
+                              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '10.5px', color: '#6366F1', fontWeight: 'bold' }}>
+                                    🏷️ {h.category}
+                                  </span>
+                                  <span style={{ fontSize: '10.5px', color: '#94A3B8' }}>
+                                    {new Date(h.createdAt).toLocaleDateString()} {new Date(h.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                </div>
+                                <h4 style={{ margin: '4px 0 0 0', fontSize: '13.5px', fontWeight: '850', color: '#0F172A', lineHeight: '1.4' }}>
+                                  {h.title}
+                                </h4>
+                                <p style={{ margin: 0, fontSize: '12.5px', color: '#475569', lineHeight: '1.5', whiteSpace: 'normal' }}>
+                                  {h.message}
+                                </p>
+                              </div>
+
+                              {/* Card Footer: Info Badge, Status and ID */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #F1F5F9', paddingTop: '12px', marginTop: '4px' }}>
+                                <div style={{ display: 'flex', gap: '6px' }}>
                                   <span style={{
-                                    background: h.type === 'SUCCESS' ? '#D1FAE5' : (h.type === 'WARNING' ? '#FEF3C7' : (h.type === 'ERROR' ? '#FEE2E2' : '#E0F2FE')),
-                                    color: h.type === 'SUCCESS' ? '#065F46' : (h.type === 'WARNING' ? '#92400E' : (h.type === 'ERROR' ? '#991B1B' : '#0369A1')),
-                                    fontSize: '10.5px', fontWeight: 'bold', padding: '3px 8px', borderRadius: '6px'
+                                    background: typeStyle.bg,
+                                    color: typeStyle.text,
+                                    border: `1px solid ${typeStyle.border}`,
+                                    fontSize: '10.5px',
+                                    fontWeight: '800',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px'
                                   }}>
                                     {h.type}
                                   </span>
-                                </td>
-                                <td style={{ fontSize: '11.5px', color: '#6B7280' }}>{new Date(h.createdAt).toLocaleString()}</td>
-                                <td>
                                   <span style={{
                                     background: h.isRead ? '#E6FFFA' : '#FFF5F5',
                                     color: h.isRead ? '#319795' : '#E53E3E',
-                                    fontSize: '10px', fontWeight: '900', padding: '2px 6px', borderRadius: '4px'
+                                    fontSize: '10.5px',
+                                    fontWeight: '800',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px'
                                   }}>
                                     {h.isRead ? 'ĐÃ ĐỌC' : 'CHƯA ĐỌC'}
                                   </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                                </div>
+                                
+                                <code style={{ fontSize: '10.5px', color: '#94A3B8', fontWeight: 'bold' }}>
+                                  #{h.id}
+                                </code>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
 
                       {/* Pagination */}
@@ -3230,70 +3674,158 @@ export default function AdminDashboard({
                   {notifTemplatesLoading ? (
                     <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}><div className="admin-spinner" /></div>
                   ) : notifTemplates.length > 0 ? (
-                    <div className="admin-table-container">
-                      <table className="admin-table">
-                        <thead>
-                          <tr>
-                            <th>Mã (Code)</th>
-                            <th>Tiêu đề mặc định</th>
-                            <th>Nội dung khuôn mẫu</th>
-                            <th>Cấp độ/Danh mục</th>
-                            <th>Icon/Link</th>
-                            <th>Trạng thái</th>
-                            <th>Hành động</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {notifTemplates.map(t => (
-                            <tr key={t.id}>
-                              <td><code>{t.code}</code></td>
-                              <td style={{ fontWeight: 'bold' }}>{t.title}</td>
-                              <td style={{ maxWidth: '300px', whiteSpace: 'normal', fontSize: '12px', lineHeight: '1.4' }}>{t.message}</td>
-                              <td>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                  <span style={{ fontSize: '9px', background: '#F3F4F6', border: '1px solid #E5E7EB', padding: '2px 4px', borderRadius: '4px', alignSelf: 'flex-start', fontWeight: 'bold' }}>{t.category}</span>
-                                  <span style={{ fontSize: '9px', background: '#E0F2FE', color: '#0369A1', padding: '2px 4px', borderRadius: '4px', alignSelf: 'flex-start', fontWeight: 'bold' }}>{t.type}</span>
-                                </div>
-                              </td>
-                              <td style={{ fontSize: '11.5px' }}>
-                                <div>Icon: <span style={{ fontSize: '15px' }}>{t.icon || '📢'}</span></div>
-                                <div style={{ fontSize: '10px', color: '#6B7280', marginTop: '2px' }}>Link: <code>{t.defaultLink || 'Không'}</code></div>
-                              </td>
-                              <td>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+                      {notifTemplates.map(t => {
+                        const typeColors = {
+                          SUCCESS: { bg: '#ECFDF5', text: '#059669', border: '#A7F3D0' },
+                          WARNING: { bg: '#FFFBEB', text: '#D97706', border: '#FDE68A' },
+                          ERROR: { bg: '#FEF2F2', text: '#DC2626', border: '#FCA5A5' },
+                          INFO: { bg: '#EFF6FF', text: '#2563EB', border: '#BFDBFE' }
+                        };
+                        const typeStyle = typeColors[t.type] || typeColors.INFO;
+
+                        // Highlight {variables} in the message
+                        const formattedMessage = t.message.split(/(\{.*?\})/).map((part, i) => {
+                          if (part.startsWith('{') && part.endsWith('}')) {
+                            return <code key={i} style={{ background: '#EEF2F6', color: '#6366F1', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontFamily: 'monospace', fontWeight: 'bold' }}>{part}</code>;
+                          }
+                          return part;
+                        });
+
+                        return (
+                          <div
+                            key={t.id}
+                            style={{
+                              background: '#ffffff',
+                              borderRadius: '16px',
+                              border: '1.5px solid #E2E8F0',
+                              boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)',
+                              padding: '20px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '14px',
+                              transition: 'all 0.2s ease',
+                              position: 'relative'
+                            }}
+                            onMouseEnter={e => {
+                              e.currentTarget.style.transform = 'translateY(-3px)';
+                              e.currentTarget.style.boxShadow = '0 10px 20px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.03)';
+                              e.currentTarget.style.borderColor = '#CBD5E1';
+                            }}
+                            onMouseLeave={e => {
+                              e.currentTarget.style.transform = 'none';
+                              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)';
+                              e.currentTarget.style.borderColor = '#E2E8F0';
+                            }}
+                          >
+                            {/* Card Header: Icon, Code and Status */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <span style={{
-                                  background: t.isActive ? '#D1FAE5' : '#F3F4F6',
-                                  color: t.isActive ? '#065F46' : '#374151',
-                                  fontSize: '10.5px', fontWeight: 'bold', padding: '3px 8px', borderRadius: '6px'
+                                  fontSize: '20px',
+                                  width: '40px',
+                                  height: '40px',
+                                  background: '#F1F5F9',
+                                  borderRadius: '10px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
                                 }}>
-                                  {t.isActive ? 'ĐANG BẬT' : 'ĐÃ TẮT'}
+                                  {t.icon || '📢'}
                                 </span>
-                              </td>
-                              <td>
-                                <div style={{ display: 'flex', gap: '6px' }}>
-                                  <button
-                                    onClick={() => openTemplateModal(t)}
-                                    style={{
-                                      padding: '5px 10px', background: '#E0F2FE', color: '#0369A1',
-                                      border: '1.5px solid #000000', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer'
-                                    }}
-                                  >
-                                    Sửa
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteTemplate(t.id)}
-                                    style={{
-                                      padding: '5px 10px', background: '#FEE2E2', color: '#EF4444',
-                                      border: '1.5px solid #000000', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer'
-                                    }}
-                                  >
-                                    Xóa
-                                  </button>
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                  <code style={{ fontSize: '12px', fontWeight: '800', color: '#1E293B' }}>{t.code}</code>
+                                  <span style={{ fontSize: '10.5px', color: '#64748B', fontWeight: '650' }}>Category: {t.category}</span>
                                 </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                              </div>
+
+                              <span style={{
+                                background: t.isActive ? '#ECFDF5' : '#F1F5F9',
+                                color: t.isActive ? '#047857' : '#475569',
+                                fontSize: '11px',
+                                fontWeight: '800',
+                                padding: '4px 10px',
+                                borderRadius: '20px',
+                                border: t.isActive ? '1px solid #A7F3D0' : '1px solid #E2E8F0'
+                              }}>
+                                {t.isActive ? 'ĐANG BẬT' : 'ĐÃ TẮT'}
+                              </span>
+                            </div>
+
+                            {/* Card Body: Title and Message */}
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '850', color: '#0F172A', lineHeight: '1.4' }}>
+                                {t.title}
+                              </h4>
+                              <p style={{ margin: 0, fontSize: '12.5px', color: '#475569', lineHeight: '1.5', whiteSpace: 'normal' }}>
+                                {formattedMessage}
+                              </p>
+                            </div>
+
+                            {/* Info Tag: Link if exists */}
+                            {t.defaultLink && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#F8FAFC', padding: '6px 10px', borderRadius: '8px', fontSize: '11px', border: '1px solid #F1F5F9' }}>
+                                <span style={{ color: '#64748B', fontWeight: 'bold' }}>🔗 Link mặc định:</span>
+                                <code style={{ color: '#0F172A', wordBreak: 'break-all' }}>{t.defaultLink}</code>
+                              </div>
+                            )}
+
+                            {/* Card Footer: Type badge and Actions */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', borderTop: '1px solid #F1F5F9', paddingTop: '12px' }}>
+                              <span style={{
+                                background: typeStyle.bg,
+                                color: typeStyle.text,
+                                border: `1px solid ${typeStyle.border}`,
+                                fontSize: '11px',
+                                fontWeight: '800',
+                                padding: '3px 8px',
+                                borderRadius: '6px'
+                              }}>
+                                {t.type}
+                              </span>
+
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <button
+                                  onClick={() => openTemplateModal(t)}
+                                  style={{
+                                    padding: '6px 12px',
+                                    background: '#F1F5F9',
+                                    color: '#475569',
+                                    border: '1px solid #E2E8F0',
+                                    borderRadius: '8px',
+                                    fontSize: '12px',
+                                    fontWeight: '750',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s'
+                                  }}
+                                  onMouseEnter={e => { e.currentTarget.style.background = '#E2E8F0'; }}
+                                  onMouseLeave={e => { e.currentTarget.style.background = '#F1F5F9'; }}
+                                >
+                                  Sửa
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteTemplate(t.id)}
+                                  style={{
+                                    padding: '6px 12px',
+                                    background: '#FEF2F2',
+                                    color: '#EF4444',
+                                    border: '1px solid #FCA5A5',
+                                    borderRadius: '8px',
+                                    fontSize: '12px',
+                                    fontWeight: '750',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s'
+                                  }}
+                                  onMouseEnter={e => { e.currentTarget.style.background = '#FEE2E2'; }}
+                                  onMouseLeave={e => { e.currentTarget.style.background = '#FEF2F2'; }}
+                                >
+                                  Xóa
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
                     <p style={{ textAlign: 'center', padding: '32px 0', color: '#6B7280', fontWeight: 'bold' }}>Chưa có khuôn mẫu thông báo nào.</p>

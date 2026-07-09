@@ -172,7 +172,10 @@ export async function adminSendNotification(req: AuthRequest, res: Response) {
     if (templateCode) {
       // 1. Send via Template
       if (target === 'user' && userId) {
-        await NotificationService.sendTemplate(templateCode, Number(userId), variables || {}, link, metadata);
+        const ids = String(userId).split(',').map(id => Number(id.trim())).filter(id => !isNaN(id) && id > 0);
+        for (const uId of ids) {
+          await NotificationService.sendTemplate(templateCode, uId, variables || {}, link, metadata);
+        }
       } else if (target === 'role' && role) {
         const template = await NotificationTemplateService.getTemplate(templateCode);
         if (!template) return res.status(404).json({ success: false, error: 'Không tìm thấy template mẫu!' });
@@ -213,7 +216,10 @@ export async function adminSendNotification(req: AuthRequest, res: Response) {
       };
 
       if (target === 'user' && userId) {
-        await NotificationService.send({ userId: Number(userId), ...params });
+        const ids = String(userId).split(',').map(id => Number(id.trim())).filter(id => !isNaN(id) && id > 0);
+        for (const uId of ids) {
+          await NotificationService.send({ userId: uId, ...params });
+        }
       } else if (target === 'role' && role) {
         await NotificationService.sendToRole(role, params);
       } else {
