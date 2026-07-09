@@ -1399,41 +1399,8 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
 
   function getNodeProgressStyle(node, isRoot, isLevel1) {
     const nodeId = node.id;
-    const idParts = String(node.id).split('-');
-
-    // Core pastel colors specified by the user
-    const colors = [
-      '#BFDBFE', // Pastel Blue
-      '#A7F3D0', // Pastel Mint Green
-      '#FED7AA', // Pastel Orange/Peach
-      '#DDD6FE'  // Pastel Violet/Purple
-    ];
-
     let background = '#ffffff';
     let statusColor = null;
-
-    if (idParts.length === 1) {
-      // Root Node: Clean white card with distinct contrast border
-      background = '#ffffff';
-    } else {
-      // Resolve the branch index based on the Level 1 parent node index (idParts[1])
-      const branchIdx = (parseInt(idParts[1]) || 0) % colors.length;
-      const baseColor = colors[branchIdx];
-
-      if (idParts.length === 2) {
-        // Level 1 Nodes: Full vivid user pastel color for branch distinction
-        background = baseColor;
-      } else {
-        // Level 2 / Leaf Nodes: Very soft, lighter variant of the branch color
-        const lightColors = [
-          '#EFF6FF', // Light Blue
-          '#ECFDF5', // Light Mint Green
-          '#FFF7ED', // Light Peach
-          '#F5F3FF'  // Light Lavender
-        ];
-        background = lightColors[branchIdx];
-      }
-    }
 
     // Determine status color based on priority or mastery progress
     if (node.priority) {
@@ -2328,7 +2295,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
                   {/* Background grid representation */}
                   <defs>
                     <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
-                      <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#ffffff" strokeWidth="0.5" opacity="0.08" />
+                      <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#000000" strokeWidth="0.5" opacity="0.06" />
                     </pattern>
                   </defs>
                   <rect width="100%" height="100%" fill="url(#grid)" data-canvas-bg="true" />
