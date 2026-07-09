@@ -78,6 +78,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
   const [searchResults, setSearchResults] = useState([]);
   const [searchIndex, setSearchIndex] = useState(-1);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
   
   // Input states
   const [inputText, setInputText] = useState('');
@@ -2241,6 +2242,31 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
                 </>
               )}
               
+              {/* Help button "?" */}
+              <button 
+                className="canvas-action-pill help-btn"
+                onClick={() => setShowHelpModal(true)}
+                title="Hướng dẫn"
+                style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '16px',
+                  fontWeight: '900',
+                  background: 'rgba(255, 255, 255, 0.15)',
+                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  padding: 0,
+                  transition: 'all 0.2s',
+                  marginLeft: '4px'
+                }}
+              >
+                ?
+              </button>
             </div>
           </div>
 
@@ -3020,6 +3046,50 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
 
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Usage Instruction Help Modal */}
+      {showHelpModal && (
+        <div className="aitutor-modal-overlay" onClick={() => setShowHelpModal(false)}>
+          <div className="aitutor-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="aitutor-modal-header">
+              <h3>💡 Hướng dẫn sử dụng Sơ đồ Tư duy AI</h3>
+              <button className="aitutor-modal-close" onClick={() => setShowHelpModal(false)}>×</button>
+            </div>
+            <div className="aitutor-modal-body">
+              <div className="help-section">
+                <h4>🚀 Khởi tạo Sơ đồ</h4>
+                <ul>
+                  <li>✍️ **Tạo bằng AI**: Nhập chủ đề hoặc đề tài vào ô trống ở cột trái và nhấn **Tạo sơ đồ**.</li>
+                  <li>📄 **Tạo từ Tài liệu**: Tải lên tập tin PDF hoặc hình ảnh đề bài để AI tự động phân tích và lập sơ đồ.</li>
+                  <li>🆕 **Tạo thủ công**: Nhấn **Tạo sơ đồ trống mới** để tự tay thiết kế sơ đồ của riêng bạn.</li>
+                </ul>
+              </div>
+
+              <div className="help-section">
+                <h4>🖱️ Thao tác trên Bản đồ</h4>
+                <ul>
+                  <li>👈 **Chọn nút**: Click chuột trái vào nút bất kỳ để xem chi tiết hoặc chỉnh sửa ở cột phải.</li>
+                  <li>➕ **Thêm nhanh**: Di chuột vào nút và click nút **(+)** để tạo ngay nút con mới.</li>
+                  <li>🔄 **Di chuyển Canvas**: Nhấp giữ chuột vào khoảng trống và kéo để di chuyển vùng làm việc.</li>
+                  <li>🔍 **Phóng to/Thu nhỏ**: Sử dụng con lăn chuột hoặc bộ điều khiển góc dưới để zoom sơ đồ.</li>
+                </ul>
+              </div>
+
+              <div className="help-section">
+                <h4>💾 Lưu trữ & Chia sẻ</h4>
+                <ul>
+                  <li>📁 **Tự động lưu**: Tất cả thay đổi được tự động sao lưu vào **Thư viện của tôi**.</li>
+                  <li>📤 **Xuất file**: Bạn có thể xuất sơ đồ sang định dạng ảnh PNG, SVG hoặc JSON chất lượng cao.</li>
+                  <li>📋 **Chế độ Dàn ý**: Nhấp **📋 Dàn ý** ở trên thanh công cụ để xem dưới dạng danh sách bài học văn bản gọn gàng.</li>
+                </ul>
+              </div>
+            </div>
+            <div className="aitutor-modal-footer">
+              <button className="aitutor-modal-btn-confirm" onClick={() => setShowHelpModal(false)}>Đã hiểu!</button>
             </div>
           </div>
         </div>
