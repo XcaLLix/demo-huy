@@ -2101,12 +2101,48 @@ g:hover > text {
 }
 
 .control-btn {
-  color: rgba(255, 255, 255, 0.8) !important;
+  background: #ffffff !important;
+  color: #000000 !important;
+  border: 1.5px solid rgba(0, 0, 0, 0.12) !important;
 }
 
 .control-btn:hover {
-  background: rgba(255, 255, 255, 0.1) !important;
+  background: #f1f5f9 !important;
+  color: #000000 !important;
+}
+
+/* Dropdown Menu Export Buttons (Black text on White background) */
+.canvas-export-menu {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.15) !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12) !important;
+}
+
+.canvas-export-menu button {
+  color: #000000 !important;
+  background: transparent !important;
+}
+
+.canvas-export-menu button:hover {
+  background: rgba(0, 0, 0, 0.06) !important;
+  color: #1d3557 !important;
+}
+
+/* Search Nodes Input (Force White Text) */
+.aitutor-search-input {
   color: #ffffff !important;
+}
+
+.aitutor-search-input::placeholder {
+  color: rgba(255, 255, 255, 0.45) !important;
+}
+
+.aitutor-search-btn {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+
+.aitutor-search-btn:hover {
+  color: #fbbf24 !important;
 }
 
 /* 5. Center Canvas Placeholder and Guide Modal */
