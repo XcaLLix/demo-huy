@@ -1021,7 +1021,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
                     bottom: 0,
                     width: '7px',
                     backgroundColor: progressStyle.statusColor,
-                    borderRight: '2px solid #000000',
+                    borderRight: '1px solid rgba(0,0,0,0.06)',
                     zIndex: 2
                   }}
                 />
@@ -1404,49 +1404,46 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
     let background = '#ffffff';
     let statusColor = null;
 
+    // Set background color based on level hierarchy (always colorful pastel)
+    if (isRoot) {
+      background = '#FEF08A'; // Soft pastel yellow
+    } else if (isLevel1) {
+      const colors = [
+        '#DBEAFE', // Pastel Blue
+        '#D1FAE5', // Pastel Mint Green
+        '#FFEDD5', // Pastel Orange
+        '#F3E8FF', // Pastel Lavender
+        '#FCE7F3', // Pastel Pink
+        '#CCFBF1', // Pastel Teal
+        '#FFE4E6'  // Pastel Rose
+      ];
+      const idParts = String(node.id).split('-');
+      const lastPart = idParts[idParts.length - 1];
+      const colorIdx = (parseInt(lastPart) || 0) % colors.length;
+      background = colors[colorIdx];
+    } else {
+      background = '#F8FAFC'; // Leaf nodes: soft clean white/slate
+    }
+
+    // Determine status color based on priority or mastery progress
     if (node.priority) {
       const priority = node.priority.toLowerCase();
-      background = '#fee2e2'; // light pastel red/pink
-      if (priority === 'critical') statusColor = '#991B1B';
-      else if (priority === 'high') statusColor = '#DC2626';
-      else if (priority === 'medium') statusColor = '#D97606';
-      else if (priority === 'low') statusColor = '#CA8A04';
-      
-      return { background, statusColor };
-    }
-
-    const progress = nodeProgressMap[nodeId];
-    if (!progress || progress.mastery === undefined) {
-      if (isRoot) {
-        background = '#FFD234'; // yellow sun mascot color
-      } else if (isLevel1) {
-        const colors = ['#bfdbfe', '#a7f3d0', '#fed7aa', '#e9d5ff'];
-        const colorIdx = parseInt(node.id.split('-').slice(-1)[0]) % colors.length;
-        background = colors[colorIdx];
-      } else {
-        background = '#faf9f5'; // off-white/beige
-      }
-      return { background, statusColor };
-    }
-
-    const mastery = progress.mastery;
-    if (mastery < 0.5) {
-      statusColor = '#ef4444'; // Red
-      background = '#fee2e2';
-    } else if (mastery < 0.8) {
-      statusColor = '#f59e0b'; // Orange
-      background = '#fef3c7';
+      if (priority === 'critical') statusColor = '#EF4444';
+      else if (priority === 'high') statusColor = '#F97316';
+      else if (priority === 'medium') statusColor = '#F59E0B';
+      else if (priority === 'low') statusColor = '#10B981';
     } else {
-      statusColor = '#22c55e'; // Green
-      background = '#dcfce7';
-    }
-
-    if (isRoot) {
-      background = '#FFD234';
-    } else if (isLevel1 && !statusColor) {
-      const colors = ['#bfdbfe', '#a7f3d0', '#fed7aa', '#e9d5ff'];
-      const colorIdx = parseInt(node.id.split('-').slice(-1)[0]) % colors.length;
-      background = colors[colorIdx];
+      const progress = nodeProgressMap[nodeId];
+      if (progress && progress.mastery !== undefined) {
+        const mastery = progress.mastery;
+        if (mastery < 0.5) {
+          statusColor = '#EF4444'; // Red (Not understood)
+        } else if (mastery < 0.8) {
+          statusColor = '#F59E0B'; // Orange (Learning)
+        } else {
+          statusColor = '#10B981'; // Green (Mastered)
+        }
+      }
     }
 
     return { background, statusColor };
