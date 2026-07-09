@@ -348,8 +348,22 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
 
   // Fetch saved history
   const fetchHistory = async (autoLoadIfEmpty = false) => {
+    const activeId = localStorage.getItem('edupath_active_mindmap_id');
+
     if (!currentUser) {
-      loadLocalHistory();
+      try {
+        const stored = localStorage.getItem('edupath_saved_mindmaps');
+        const mindmaps = stored ? JSON.parse(stored) : [];
+        setSavedMindmaps(mindmaps);
+
+        if (autoLoadIfEmpty && mindmaps.length > 0 && !activeMindmapDbId && !mindmapData) {
+          const target = mindmaps.find(m => String(m.id) === String(activeId)) || mindmaps[0];
+          handleLoadMindmap(target);
+          setActiveTab('history');
+        }
+      } catch (e) {
+        console.error(e);
+      }
       return;
     }
     setIsHistoryLoading(true);
@@ -358,9 +372,10 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
       const mindmaps = data || [];
       setSavedMindmaps(mindmaps);
 
-      // Auto-load the most recent mindmap if requested and nothing is loaded yet
+      // Auto-load the last active mindmap if requested and nothing is loaded yet
       if (autoLoadIfEmpty && mindmaps.length > 0 && !activeMindmapDbId && !mindmapData) {
-        handleLoadMindmap(mindmaps[0]);
+        const target = mindmaps.find(m => String(m.id) === String(activeId)) || mindmaps[0];
+        handleLoadMindmap(target);
         setActiveTab('history');
       }
     } catch (err) {
@@ -1143,6 +1158,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
 
         localStorage.setItem('edupath_saved_mindmaps', JSON.stringify(list));
         setActiveMindmapDbId(localId);
+        localStorage.setItem('edupath_active_mindmap_id', localId);
         toast('Đã lưu sơ đồ tư duy vào bộ nhớ tạm trình duyệt!', 'success');
         
         loadLocalHistory();
@@ -1156,7 +1172,9 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
     try {
       const response = await api.saveMindmap(mindmapData.name, mindmapData, activeMindmapDbId);
       toast('Đã lưu sơ đồ tư duy vào Thư viện thành công!', 'success');
-      setActiveMindmapDbId(response.id);
+      const savedId = response?.id || response?.data?.id || response;
+      setActiveMindmapDbId(savedId);
+      localStorage.setItem('edupath_active_mindmap_id', savedId);
       fetchHistory();
     } catch (err) {
       console.error(err);
@@ -1506,6 +1524,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
     setMindmapData(structured);
     setActiveMindmapDbId(null);
     setSelectedNode(null);
+    localStorage.removeItem('edupath_active_mindmap_id');
 
     // Expand root node
     const newExpanded = new Set();
@@ -1663,6 +1682,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
       const structured = assignIds(parsed);
       setMindmapData(structured);
       setActiveMindmapDbId(savedItem.id);
+      localStorage.setItem('edupath_active_mindmap_id', savedItem.id);
       setSelectedNode(null);
 
       // Auto expand root + level 1
@@ -1699,6 +1719,8 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
           localStorage.setItem('edupath_saved_mindmaps', JSON.stringify(nextList));
           if (activeMindmapDbId === id) {
             setActiveMindmapDbId(null);
+            setMindmapData(null);
+            localStorage.removeItem('edupath_active_mindmap_id');
           }
           loadLocalHistory();
           toast('Đã xóa sơ đồ tư duy khỏi trình duyệt!', 'success');
@@ -1715,6 +1737,8 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
       toast('Đã xóa sơ đồ tư duy khỏi Thư viện!', 'success');
       if (activeMindmapDbId === id) {
         setActiveMindmapDbId(null);
+        setMindmapData(null);
+        localStorage.removeItem('edupath_active_mindmap_id');
       }
       fetchHistory();
     } catch (err) {
