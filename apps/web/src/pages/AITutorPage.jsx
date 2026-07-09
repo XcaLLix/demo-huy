@@ -1697,7 +1697,6 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
       setZoom(0.9);
       setPan({ x: 50, y: 150 });
       
-      toast(`Đã tải sơ đồ: ${savedItem.title}`, 'success');
     } catch (err) {
       console.error(err);
       toast('Không thể parse dữ liệu sơ đồ tư duy đã lưu!', 'error');
