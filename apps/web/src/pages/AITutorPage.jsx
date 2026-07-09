@@ -1958,26 +1958,6 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
                 <span>Tạo sơ đồ trống mới</span>
               </button>
 
-              {/* Mindmap Guide card */}
-              <div className="aitutor-guide-card" style={{
-                background: 'rgba(255, 226, 89, 0.03)',
-                border: '1px dashed rgba(255, 226, 89, 0.2)',
-                borderRadius: '12px',
-                padding: '12px',
-                marginBottom: '16px',
-                fontSize: '11px',
-                color: '#ffffff'
-              }}>
-                <h5 style={{ color: 'var(--fc-gold)', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11.5px', fontWeight: 'bold' }}>
-                  💡 HƯỚNG DẪN SỬ DỤNG HIỆU QUẢ
-                </h5>
-                <ul style={{ margin: 0, paddingLeft: '14px', lineHeight: '1.5', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  <li><strong>Tự động tạo:</strong> Dán văn bản hoặc tải file PDF/Ảnh học tập để AI phân tích vẽ sơ đồ.</li>
-                  <li><strong>Tương tác kéo thả:</strong> Nhấp giữ chuột vào khoảng trống canvas để kéo sơ đồ, cuộn chuột để phóng to/thu nhỏ.</li>
-                  <li><strong>Hỏi đáp chuyên sâu:</strong> Click chọn bất kỳ nút nào để mở bảng chat bên phải, chọn <em>Giải thích sâu</em> hoặc <em>Ví dụ</em> để ôn tập cùng EduBot AI.</li>
-                  <li><strong>Lưu & Chia sẻ:</strong> Bấm <strong>Lưu</strong> ở trên cùng để đưa vào Thư viện cá nhân. Sau khi lưu, bấm <strong>🔗 Chia sẻ</strong> để copy link gửi cho bạn bè!</li>
-                </ul>
-              </div>
 
               {/* Drag & drop upload area */}
               <div 

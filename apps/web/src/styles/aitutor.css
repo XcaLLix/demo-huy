@@ -13,6 +13,10 @@
   --mm-border-focus: #ef4444;
 }
 
+button, input, select, textarea {
+  font-family: 'Inter', system-ui, sans-serif !important;
+}
+
 .aitutor-page {
   background-color: var(--mm-bg-dark);
   height: 100vh;
