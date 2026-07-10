@@ -8797,4 +8797,14 @@ code, pre, a[href^="http"], .breakable {
   }
 }
 
+/* ===== NOTIFICATION CENTER PREMIUM STYLES ===== */
+.notification-card {
+  transition: all 0.2s ease !important;
+}
+.notification-card:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: var(--shadow-md) !important;
+  border-color: var(--primary-light) !important;
+}
+
 

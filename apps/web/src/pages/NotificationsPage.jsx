@@ -180,8 +180,8 @@ export default function NotificationsPage({ currentUser, navigateTo }) {
       {/* Header Section */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h1 style={{ fontSize: '28px', fontWeight: '900', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ display: 'inline-flex', padding: '8px', background: '#6c5ce7', borderRadius: '12px', color: '#FFFFFF', border: '2.5px solid #000000', boxShadow: '3px 3px 0px #000000' }}>
+          <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ display: 'inline-flex', padding: '8px', background: 'var(--primary-bg)', borderRadius: '12px', color: 'var(--primary)' }}>
               <HiBell style={{ fontSize: '24px' }} />
             </span>
             Trung tâm thông báo
@@ -195,23 +195,29 @@ export default function NotificationsPage({ currentUser, navigateTo }) {
         <div style={{ display: 'flex', gap: '12px' }}>
           <button
             onClick={handleMarkAllRead}
-            className="admin-back-btn"
+            className="btn-outline"
             style={{
-              background: '#FFFFFF', color: '#1E293B', border: '2.5px solid #000000',
-              boxShadow: '3px 3px 0px #000000', fontWeight: '900', fontSize: '13px',
-              padding: '10px 16px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer'
+              background: 'var(--bg-card)', color: 'var(--text-main)', border: '1px solid var(--border)',
+              boxShadow: 'var(--shadow-sm)', fontWeight: '600', fontSize: '13px',
+              padding: '10px 16px', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
+              transition: 'all 0.2s'
             }}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; }}
           >
             <HiCheck /> Đọc tất cả
           </button>
           <button
             onClick={handleDeleteAllRead}
-            className="admin-back-btn"
+            className="btn-danger"
             style={{
-              background: '#FF7675', color: '#FFFFFF', border: '2.5px solid #000000',
-              boxShadow: '3px 3px 0px #000000', fontWeight: '900', fontSize: '13px',
-              padding: '10px 16px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer'
+              background: '#FF7675', color: '#FFFFFF', border: 'none',
+              boxShadow: 'var(--shadow-sm)', fontWeight: '600', fontSize: '13px',
+              padding: '10px 16px', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
+              transition: 'all 0.2s'
             }}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; }}
           >
             <HiTrash /> Dọn thông báo đã đọc
           </button>
@@ -219,11 +225,11 @@ export default function NotificationsPage({ currentUser, navigateTo }) {
       </div>
 
       {/* Filter panel */}
-      <div className="admin-card" style={{ padding: '20px', marginBottom: '24px' }}>
+      <div className="card" style={{ padding: '20px', marginBottom: '24px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Categories Row */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '13px', fontWeight: '900', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <HiFilter /> Danh mục:
             </span>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -232,13 +238,25 @@ export default function NotificationsPage({ currentUser, navigateTo }) {
                   key={cat.id}
                   onClick={() => { setActiveCategory(cat.id); setPage(1); }}
                   style={{
-                    padding: '6px 12px', borderRadius: '8px',
-                    border: '2px solid #000000',
-                    background: activeCategory === cat.id ? '#6c5ce7' : '#FFFFFF',
-                    color: activeCategory === cat.id ? '#FFFFFF' : '#1E293B',
-                    fontWeight: '900', fontSize: '12px', cursor: 'pointer',
-                    boxShadow: activeCategory === cat.id ? '2px 2px 0px #000000' : 'none',
-                    transition: 'all 0.15s'
+                    padding: '6px 14px', borderRadius: '20px',
+                    border: activeCategory === cat.id ? '1px solid var(--primary)' : '1px solid var(--border)',
+                    background: activeCategory === cat.id ? 'var(--primary)' : 'var(--bg-card)',
+                    color: activeCategory === cat.id ? '#FFFFFF' : 'var(--text-secondary)',
+                    fontWeight: '500', fontSize: '12px', cursor: 'pointer',
+                    boxShadow: 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (activeCategory !== cat.id) {
+                      e.currentTarget.style.borderColor = 'var(--primary-light)';
+                      e.currentTarget.style.color = 'var(--primary)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (activeCategory !== cat.id) {
+                      e.currentTarget.style.borderColor = 'var(--border)';
+                      e.currentTarget.style.color = 'var(--text-secondary)';
+                    }
                   }}
                 >
                   {cat.label}
@@ -248,22 +266,34 @@ export default function NotificationsPage({ currentUser, navigateTo }) {
           </div>
 
           {/* Types and Search Row */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderTop: '1.5px solid #F3F4F6', paddingTop: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '13px', fontWeight: '900', color: 'var(--text-main)' }}>Cấp độ:</span>
+              <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-main)' }}>Cấp độ:</span>
               <div style={{ display: 'flex', gap: '8px' }}>
                 {types.map(t => (
                   <button
                     key={t.id}
                     onClick={() => { setActiveType(t.id); setPage(1); }}
                     style={{
-                      padding: '6px 12px', borderRadius: '8px',
-                      border: '2px solid #000000',
-                      background: activeType === t.id ? '#1E293B' : '#FFFFFF',
-                      color: activeType === t.id ? '#FFFFFF' : '#1E293B',
-                      fontWeight: '900', fontSize: '12px', cursor: 'pointer',
-                      boxShadow: activeType === t.id ? '2px 2px 0px #000000' : 'none',
-                      transition: 'all 0.15s'
+                      padding: '6px 14px', borderRadius: '20px',
+                      border: activeType === t.id ? '1px solid var(--text-main)' : '1px solid var(--border)',
+                      background: activeType === t.id ? 'var(--text-main)' : 'var(--bg-card)',
+                      color: activeType === t.id ? 'var(--bg-card)' : 'var(--text-secondary)',
+                      fontWeight: '500', fontSize: '12px', cursor: 'pointer',
+                      boxShadow: 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (activeType !== t.id) {
+                        e.currentTarget.style.borderColor = 'var(--text-main)';
+                        e.currentTarget.style.color = 'var(--text-main)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (activeType !== t.id) {
+                        e.currentTarget.style.borderColor = 'var(--border)';
+                        e.currentTarget.style.color = 'var(--text-secondary)';
+                      }
                     }}
                   >
                     {t.label}
@@ -274,23 +304,41 @@ export default function NotificationsPage({ currentUser, navigateTo }) {
 
             {/* Search Box */}
             <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '8px' }}>
-              <div className="admin-search-wrapper" style={{ margin: 0, width: '260px' }}>
-                <HiSearch className="admin-search-icon" />
+              <div className="admin-search-wrapper" style={{ margin: 0, width: '260px', position: 'relative' }}>
+                <HiSearch className="admin-search-icon" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748B' }} />
                 <input
                   type="text"
                   placeholder="Tìm kiếm nội dung..."
                   className="admin-search-input"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
+                  style={{
+                    paddingLeft: '36px',
+                    width: '100%',
+                    border: '1px solid var(--border)',
+                    paddingTop: '8px',
+                    paddingBottom: '8px',
+                    paddingRight: '14px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    background: '#F8FAFC',
+                    color: '#1E293B',
+                    fontWeight: '500',
+                    outline: 'none'
+                  }}
                 />
               </div>
               <button
                 type="submit"
                 style={{
-                  background: '#6c5ce7', color: '#FFFFFF', border: '2px solid #000000',
-                  boxShadow: '2px 2px 0px #000000', fontWeight: '900', fontSize: '12.5px',
-                  padding: '0 16px', borderRadius: '8px', cursor: 'pointer'
+                  background: 'var(--primary)', color: '#FFFFFF', border: 'none',
+                  fontWeight: '600', fontSize: '12.5px',
+                  padding: '0 18px', borderRadius: '8px', cursor: 'pointer',
+                  boxShadow: 'var(--shadow-sm)',
+                  transition: 'all 0.2s ease'
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; }}
               >
                 Tìm
               </button>
@@ -306,7 +354,7 @@ export default function NotificationsPage({ currentUser, navigateTo }) {
             <div className="admin-spinner" />
           </div>
         ) : error ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '240px', background: '#FEF2F2', border: '2.5px solid #EF4444', borderRadius: '16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '240px', background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '16px' }}>
             <span style={{ fontSize: '36px', marginBottom: '12px' }}>⚠️</span>
             <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#EF4444', margin: '0 0 6px 0' }}>Lỗi tải thông báo</h3>
             <p style={{ fontSize: '13px', color: '#6B7280', margin: '0 0 16px 0', textAlign: 'center', padding: '0 24px' }}>{error}</p>
@@ -324,11 +372,11 @@ export default function NotificationsPage({ currentUser, navigateTo }) {
                 key={n.id}
                 style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  background: n.isRead ? '#FFFFFF' : 'rgba(108, 92, 231, 0.04)',
-                  border: '2.5px solid #000000', borderRadius: '16px',
+                  background: n.isRead ? 'var(--bg-card)' : 'rgba(108, 92, 231, 0.03)',
+                  border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)',
                   padding: '18px 24px', transition: 'all 0.15s ease',
-                  boxShadow: n.isRead ? '2px 2px 0px #000000' : '4px 4px 0px #000000',
-                  borderLeft: `8px solid ${statusColor}`
+                  boxShadow: 'var(--shadow-sm)',
+                  borderLeft: `5px solid ${statusColor}`
                 }}
                 className="notification-card"
               >
@@ -339,12 +387,12 @@ export default function NotificationsPage({ currentUser, navigateTo }) {
                     if (n.link && navigateTo) navigateTo(n.link);
                   }}
                 >
-                  <span style={{ fontSize: '24px', padding: '8px', background: '#F3F4F6', borderRadius: '12px', border: '1.5px solid #000000' }}>
+                  <span style={{ fontSize: '20px', padding: '10px', background: `${statusColor}12`, borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {icon}
                   </span>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                      <h3 style={{ fontSize: '15px', fontWeight: '950', color: '#1E293B', margin: 0 }}>
+                      <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: 'var(--text-main)', margin: 0 }}>
                         {n.title}
                       </h3>
                       {!n.isRead && (
@@ -352,15 +400,15 @@ export default function NotificationsPage({ currentUser, navigateTo }) {
                           MỚI
                         </span>
                       )}
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#6B7280', fontWeight: '600' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11.5px', color: 'var(--text-muted)', fontWeight: '500' }}>
                         <HiClock /> {formatRelativeTime(n.createdAt)}
                       </span>
                     </div>
-                    <p style={{ fontSize: '13px', color: '#4B5563', marginTop: '6px', lineHeight: '1.5', margin: 0 }}>
+                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '6px', lineHeight: '1.5', margin: 0 }}>
                       {n.message}
                     </p>
                     {n.link && (
-                      <span style={{ fontSize: '11.5px', color: '#6c5ce7', fontWeight: 'bold', display: 'block', marginTop: '6px' }}>
+                      <span style={{ fontSize: '11.5px', color: 'var(--primary)', fontWeight: 'bold', display: 'block', marginTop: '6px' }}>
                         ➔ Nhấp vào đây để xem chi tiết
                       </span>
                     )}
@@ -373,10 +421,14 @@ export default function NotificationsPage({ currentUser, navigateTo }) {
                     <button
                       onClick={() => handleMarkRead(n.id)}
                       style={{
-                        padding: '6px', background: '#E0F2FE', color: '#0284C7',
-                        border: '1.5px solid #000000', borderRadius: '8px', cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        padding: '8px', background: '#E0F2FE', color: '#0284C7',
+                        border: 'none', borderRadius: '8px', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        transition: 'all 0.15s ease',
+                        boxShadow: '0 1px 3px rgba(2, 132, 199, 0.1)'
                       }}
+                      onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.background = '#bae6fd'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.background = '#E0F2FE'; }}
                       title="Đánh dấu đã đọc"
                     >
                       <HiCheck style={{ fontSize: '16px' }} />
@@ -385,10 +437,14 @@ export default function NotificationsPage({ currentUser, navigateTo }) {
                   <button
                     onClick={() => handleDelete(n.id)}
                     style={{
-                      padding: '6px', background: '#FEE2E2', color: '#EF4444',
-                      border: '1.5px solid #000000', borderRadius: '8px', cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      padding: '8px', background: '#FEE2E2', color: '#EF4444',
+                      border: 'none', borderRadius: '8px', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: 'all 0.15s ease',
+                      boxShadow: '0 1px 3px rgba(239, 68, 68, 0.1)'
                     }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.background = '#fecaca'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.background = '#FEE2E2'; }}
                     title="Xóa thông báo"
                   >
                     <HiTrash style={{ fontSize: '16px' }} />
@@ -398,10 +454,10 @@ export default function NotificationsPage({ currentUser, navigateTo }) {
             );
           })
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '240px', background: '#FFFFFF', border: '2.5px solid #000000', borderRadius: '16px', boxShadow: '3px 3px 0px #000000' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '240px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
             <HiInbox style={{ fontSize: '48px', color: '#D1D5DB', marginBottom: '12px' }} />
-            <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#374151' }}>Không tìm thấy thông báo nào</h3>
-            <p style={{ fontSize: '13px', color: '#6B7280', marginTop: '4px' }}>Hãy thử điều chỉnh bộ lọc hoặc từ khóa tìm kiếm của bạn.</p>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--text-main)' }}>Không tìm thấy thông báo nào</h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>Hãy thử điều chỉnh bộ lọc hoặc từ khóa tìm kiếm của bạn.</p>
           </div>
         )}
       </div>
@@ -413,23 +469,51 @@ export default function NotificationsPage({ currentUser, navigateTo }) {
             disabled={page === 1}
             onClick={() => setPage(p => p - 1)}
             style={{
-              padding: '8px 12px', border: '2px solid #000000', borderRadius: '8px',
-              background: page === 1 ? '#F3F4F6' : '#FFFFFF', cursor: page === 1 ? 'not-allowed' : 'pointer',
-              display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold', fontSize: '12.5px'
+              padding: '8px 16px', border: '1px solid var(--border)', borderRadius: '8px',
+              background: page === 1 ? '#F3F4F6' : 'var(--bg-card)', cursor: page === 1 ? 'not-allowed' : 'pointer',
+              display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600', fontSize: '12.5px',
+              color: page === 1 ? 'var(--text-muted)' : 'var(--text-secondary)',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              if (page !== 1) {
+                e.currentTarget.style.borderColor = 'var(--primary-light)';
+                e.currentTarget.style.color = 'var(--primary)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (page !== 1) {
+                e.currentTarget.style.borderColor = 'var(--border)';
+                e.currentTarget.style.color = 'var(--text-secondary)';
+              }
             }}
           >
             <HiChevronLeft /> Trước
           </button>
-          <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-main)' }}>
+          <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)' }}>
             Trang {pagination.page} / {pagination.totalPages}
           </span>
           <button
             disabled={page === pagination.totalPages}
             onClick={() => setPage(p => p + 1)}
             style={{
-              padding: '8px 12px', border: '2px solid #000000', borderRadius: '8px',
-              background: page === pagination.totalPages ? '#F3F4F6' : '#FFFFFF', cursor: page === pagination.totalPages ? 'not-allowed' : 'pointer',
-              display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold', fontSize: '12.5px'
+              padding: '8px 16px', border: '1px solid var(--border)', borderRadius: '8px',
+              background: page === pagination.totalPages ? '#F3F4F6' : 'var(--bg-card)', cursor: page === pagination.totalPages ? 'not-allowed' : 'pointer',
+              display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600', fontSize: '12.5px',
+              color: page === pagination.totalPages ? 'var(--text-muted)' : 'var(--text-secondary)',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              if (page !== pagination.totalPages) {
+                e.currentTarget.style.borderColor = 'var(--primary-light)';
+                e.currentTarget.style.color = 'var(--primary)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (page !== pagination.totalPages) {
+                e.currentTarget.style.borderColor = 'var(--border)';
+                e.currentTarget.style.color = 'var(--text-secondary)';
+              }
             }}
           >
             Sau <HiChevronRight />
