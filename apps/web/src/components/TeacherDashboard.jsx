@@ -1116,21 +1116,21 @@ export default function TeacherDashboard({
                       position: 'absolute',
                       top: '50px',
                       right: 0,
-                      width: '320px',
+                      width: '420px',
                       background: '#ffffff',
                       borderRadius: '14px',
                       boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
                       border: '1px solid #e2e8f0',
-                      padding: '16px',
+                      padding: '20px',
                       zIndex: 999,
                       textAlign: 'left'
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px' }}>
-                      <span style={{ fontSize: '13px', fontWeight: '850', color: '#1e293b' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
+                      <span style={{ fontSize: '14px', fontWeight: '850', color: '#1e293b' }}>
                         🔔 THÔNG BÁO ({dbStats?.notifications?.filter(n => !n.read && !n.isRead).length || 0})
                       </span>
-                      {(dbStats?.notifications?.filter(n => !n.read && !n.isRead).length || 0) > 0 && (
+                      {dbStats?.notifications && dbStats.notifications.length > 0 && (
                         <button
                           onClick={() => {
                             api.markAllNotificationsAsRead().then(() => {
@@ -1142,16 +1142,15 @@ export default function TeacherDashboard({
                                 };
                               });
                             }).catch(console.error);
-                            setShowNotifDropdown(false);
                           }}
-                          style={{ background: 'none', border: 'none', color: '#6c5ce7', fontSize: '11px', cursor: 'pointer', fontWeight: '700' }}
+                          style={{ background: 'none', border: 'none', color: '#6c5ce7', fontSize: '13px', cursor: 'pointer', fontWeight: '700' }}
                         >
                           Đọc tất cả
                         </button>
                       )}
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '260px', overflowY: 'auto', paddingRight: '4px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '380px', overflowY: 'auto', paddingRight: '4px' }}>
                       {dbStats?.notifications && dbStats.notifications.length > 0 ? (
                         dbStats.notifications.slice(0, 5).map((n) => {
                           const icon = n.icon || (n.type === 'SUCCESS' ? '✅' : n.type === 'WARNING' ? '⚠️' : n.type === 'ERROR' ? '❌' : '🔔');
@@ -1177,30 +1176,30 @@ export default function TeacherDashboard({
                                 handleTabChange('notifications');
                               }}
                               style={{
-                                padding: '8px 10px', borderRadius: '10px',
+                                padding: '12px 16px', borderRadius: '12px',
                                 background: isReadNotif ? 'transparent' : 'rgba(108, 92, 231, 0.04)',
                                 border: '1px solid #e2e8f0',
                                 borderLeft: `5px solid ${borderLeftColor}`,
-                                fontSize: '11.5px', lineHeight: '1.4',
+                                fontSize: '13px', lineHeight: '1.45',
                                 cursor: 'pointer',
                                 transition: 'all 0.15s ease',
-                                display: 'flex', gap: '8px', alignItems: 'flex-start'
+                                display: 'flex', gap: '12px', alignItems: 'flex-start'
                               }}
                             >
-                              <div style={{ fontSize: '14px', marginTop: '1px' }}>{icon}</div>
+                              <div style={{ fontSize: '18px', marginTop: '2px' }}>{icon}</div>
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontWeight: '750', color: '#1e293b', fontSize: '12px', marginBottom: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.title || 'Thông báo'}</div>
-                                <p style={{ color: '#64748b', margin: 0, fontSize: '11px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{n.text || n.message}</p>
+                                <div style={{ fontWeight: '750', color: '#1e293b', fontSize: '13.5px', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.title || 'Thông báo'}</div>
+                                <p style={{ color: '#64748b', margin: 0, fontSize: '12.5px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{n.text || n.message}</p>
                               </div>
                             </div>
                           );
                         })
                       ) : (
-                        <p style={{ fontSize: '12px', color: '#64748b', textAlign: 'center', padding: '16px 0', fontWeight: '500' }}>Không có thông báo mới.</p>
+                        <p style={{ fontSize: '13px', color: '#64748b', textAlign: 'center', padding: '24px 0', fontWeight: '500' }}>Không có thông báo mới.</p>
                       )}
                     </div>
 
-                    <div style={{ marginTop: '12px', borderTop: '1px solid #f1f5f9', paddingTop: '8px', textAlign: 'center' }}>
+                    <div style={{ marginTop: '14px', borderTop: '1px solid #f1f5f9', paddingTop: '12px', textAlign: 'center' }}>
                       <button
                         onClick={() => {
                           setShowNotifDropdown(false);
@@ -1208,7 +1207,7 @@ export default function TeacherDashboard({
                         }}
                         style={{
                           background: 'none', border: 'none', color: '#6c5ce7',
-                          fontSize: '11.5px', fontWeight: '700', cursor: 'pointer'
+                          fontSize: '13.5px', fontWeight: '700', cursor: 'pointer'
                         }}
                       >
                         Xem tất cả thông báo ➔

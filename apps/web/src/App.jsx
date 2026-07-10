@@ -1335,7 +1335,7 @@ export default function App() {
     try {
       await api.markAllNotificationsAsRead();
       setNotifications(prev => prev.map(n => ({ ...n, read: true, isRead: true })));
-      toast('Đã đánh dấu tất cả thông báo là đã đọc!', 'success');
+      showToast.current?.('Đã đánh dấu tất cả thông báo là đã đọc!', 'success');
     } catch (err) {
       console.error('[Clear Notifications Error]', err);
     }

@@ -17,6 +17,30 @@ import {
 
 const EMPTY_ARRAY = [];
 
+const getCategoryIcon = (cat, customIcon) => {
+  if (customIcon) return customIcon;
+  switch (cat) {
+    case 'PAYMENT': return '💰';
+    case 'COURSE': return '📚';
+    case 'EXAM': return '📝';
+    case 'ACCOUNT': return '🔐';
+    case 'AI': return '🤖';
+    case 'REPORT': return '🛡️';
+    case 'TEACHER': return '👨‍🏫';
+    case 'ADMIN': return '👑';
+    default: return '📢';
+  }
+};
+
+const getCategoryColor = (type) => {
+  switch (type) {
+    case 'SUCCESS': return '#10B981';
+    case 'WARNING': return '#F59E0B';
+    case 'ERROR': return '#EF4444';
+    default: return '#6c5ce7';
+  }
+};
+
 export default function Header({
   role,
   userProfile,
@@ -343,30 +367,29 @@ export default function Header({
         <div
           style={{
             position: 'absolute', top: '75px', right: '60px',
-            width: '340px', background: '#FFFFFF',
+            width: '420px', background: '#FFFFFF',
             border: '2px solid #000000', borderRadius: '16px',
-            boxShadow: '4px 4px 0px #000000', zIndex: 2000, padding: '16px',
+            boxShadow: '4px 4px 0px #000000', zIndex: 2000, padding: '20px',
             animation: 'fadeInUp 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards'
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '2px solid #F3F4F6', paddingBottom: '8px' }}>
-            <span style={{ fontSize: '12px', fontWeight: '900', color: '#1E293B', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '2px solid #F3F4F6', paddingBottom: '10px' }}>
+            <span style={{ fontSize: '14px', fontWeight: '900', color: '#1E293B', display: 'flex', alignItems: 'center', gap: '6px' }}>
               🔔 THÔNG BÁO ({unreadCount})
             </span>
-            {unreadCount > 0 && (
+            {notifications.length > 0 && (
               <button
                 onClick={() => {
                   onClearNotifications();
-                  setShowNotif(false);
                 }}
-                style={{ background: 'none', border: 'none', color: '#6c5ce7', fontSize: '11px', cursor: 'pointer', fontWeight: '900' }}
+                style={{ background: 'none', border: 'none', color: '#6c5ce7', fontSize: '13px', cursor: 'pointer', fontWeight: '900' }}
               >
                 Đọc tất cả
               </button>
             )}
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '280px', overflowY: 'auto', paddingRight: '4px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '380px', overflowY: 'auto', paddingRight: '4px' }}>
             {notifications.length > 0 ? (
               notifications.map((n) => {
                 const icon = getCategoryIcon(n.category, n.icon);
@@ -381,14 +404,14 @@ export default function Header({
                       setShowNotif(false);
                     }}
                     style={{
-                      padding: '10px 12px', borderRadius: '12px',
+                      padding: '12px 16px', borderRadius: '12px',
                       background: isReadNotif ? '#FFFFFF' : 'rgba(108, 92, 231, 0.05)',
                       border: '1.5px solid #000000',
                       borderLeft: `6px solid ${borderLeftColor}`,
-                      fontSize: '11.5px', lineHeight: '1.45',
+                      fontSize: '13px', lineHeight: '1.45',
                       cursor: 'pointer',
                       transition: 'all 0.15s ease',
-                      display: 'flex', gap: '10px', alignItems: 'flex-start',
+                      display: 'flex', gap: '12px', alignItems: 'flex-start',
                       boxShadow: isReadNotif ? 'none' : '2px 2px 0px rgba(0,0,0,0.15)'
                     }}
                     onMouseEnter={e => {
@@ -400,21 +423,21 @@ export default function Header({
                       e.currentTarget.style.boxShadow = isReadNotif ? 'none' : '2px 2px 0px rgba(0,0,0,0.15)';
                     }}
                   >
-                    <div style={{ fontSize: '16px', marginTop: '2px' }}>{icon}</div>
+                    <div style={{ fontSize: '18px', marginTop: '2px' }}>{icon}</div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: '900', color: '#1E293B', fontSize: '12px', marginBottom: '2px' }}>{n.title || 'Thông báo'}</div>
-                      <p style={{ color: '#4B5563', margin: 0, fontSize: '11px', fontWeight: isReadNotif ? 'normal' : '500' }}>{n.text || n.message}</p>
-                      <span style={{ fontSize: '9px', color: '#9CA3AF', marginTop: '4px', display: 'block' }}>{n.time}</span>
+                      <div style={{ fontWeight: '900', color: '#1E293B', fontSize: '13.5px', marginBottom: '4px' }}>{n.title || 'Thông báo'}</div>
+                      <p style={{ color: '#4B5563', margin: 0, fontSize: '12.5px', fontWeight: isReadNotif ? 'normal' : '500' }}>{n.text || n.message}</p>
+                      <span style={{ fontSize: '10.5px', color: '#9CA3AF', marginTop: '6px', display: 'block' }}>{n.time}</span>
                     </div>
                   </div>
                 );
               })
             ) : (
-              <p style={{ fontSize: '12px', color: '#6B7280', textAlign: 'center', padding: '24px 0', fontWeight: 'bold' }}>Không có thông báo mới.</p>
+              <p style={{ fontSize: '13px', color: '#6B7280', textAlign: 'center', padding: '28px 0', fontWeight: 'bold' }}>Không có thông báo mới.</p>
             )}
           </div>
 
-          <div style={{ marginTop: '12px', borderTop: '2px solid #F3F4F6', paddingTop: '10px', textAlign: 'center' }}>
+          <div style={{ marginTop: '14px', borderTop: '2px solid #F3F4F6', paddingTop: '12px', textAlign: 'center' }}>
             <button
               onClick={() => {
                 setShowNotif(false);
@@ -426,7 +449,7 @@ export default function Header({
               }}
               style={{
                 background: 'none', border: 'none', color: '#6c5ce7',
-                fontSize: '11.5px', fontWeight: '900', cursor: 'pointer',
+                fontSize: '13.5px', fontWeight: '900', cursor: 'pointer',
                 display: 'inline-flex', alignItems: 'center', gap: '4px'
               }}
             >

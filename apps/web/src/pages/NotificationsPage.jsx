@@ -22,24 +22,26 @@ export default function NotificationsPage({ currentUser, navigateTo }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [pagination, setPagination] = useState({ page: 1, limit: 10, totalPages: 1, total: 0 });
   const [page, setPage] = useState(1);
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
 
   const categories = [
-    { id: 'ALL', label: 'Tất cả' },
-    { id: 'SYSTEM', label: 'Hệ thống ⚙️' },
-    { id: 'ACCOUNT', label: 'Tài khoản 🔐' },
-    { id: 'COURSE', label: 'Khóa học 📚' },
-    { id: 'EXAM', label: 'Đề thi 📝' },
-    { id: 'PAYMENT', label: 'Giao dịch 💰' },
-    { id: 'AI', label: 'AI Coach 🤖' },
-    { id: 'REPORT', label: 'Báo cáo 🛡️' }
+    { id: 'ALL', label: 'Tất cả danh mục', emoji: '📂' },
+    { id: 'SYSTEM', label: 'Hệ thống', emoji: '⚙️' },
+    { id: 'ACCOUNT', label: 'Tài khoản', emoji: '🔐' },
+    { id: 'COURSE', label: 'Khóa học', emoji: '📚' },
+    { id: 'EXAM', label: 'Đề thi', emoji: '📝' },
+    { id: 'PAYMENT', label: 'Giao dịch', emoji: '💰' },
+    { id: 'AI', label: 'AI Coach', emoji: '🤖' },
+    { id: 'REPORT', label: 'Báo cáo', emoji: '🛡️' }
   ];
 
   const types = [
-    { id: 'ALL', label: 'Mọi cấp độ' },
-    { id: 'INFO', label: 'Thông tin 🔵' },
-    { id: 'SUCCESS', label: 'Thành công 🟢' },
-    { id: 'WARNING', label: 'Cảnh báo 🟡' },
-    { id: 'ERROR', label: 'Quan trọng 🔴' }
+    { id: 'ALL', label: 'Mọi cấp độ', emoji: '⚡' },
+    { id: 'INFO', label: 'Thông tin', emoji: '🔵' },
+    { id: 'SUCCESS', label: 'Thành công', emoji: '🟢' },
+    { id: 'WARNING', label: 'Cảnh báo', emoji: '🟡' },
+    { id: 'ERROR', label: 'Quan trọng', emoji: '🔴' }
   ];
 
   const fetchNotifications = async () => {
@@ -225,125 +227,261 @@ export default function NotificationsPage({ currentUser, navigateTo }) {
       </div>
 
       {/* Filter panel */}
-      <div className="card" style={{ padding: '20px', marginBottom: '24px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* Categories Row */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <HiFilter /> Danh mục:
+      <div className="card" style={{ padding: '12px 20px', marginBottom: '24px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+          
+          {/* Left filters */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <HiFilter style={{ fontSize: '16px', color: 'var(--primary)' }} /> Bộ lọc:
             </span>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {categories.map(cat => (
-                <button
-                  key={cat.id}
-                  onClick={() => { setActiveCategory(cat.id); setPage(1); }}
-                  style={{
-                    padding: '6px 14px', borderRadius: '20px',
-                    border: activeCategory === cat.id ? '1px solid var(--primary)' : '1px solid var(--border)',
-                    background: activeCategory === cat.id ? 'var(--primary)' : 'var(--bg-card)',
-                    color: activeCategory === cat.id ? '#FFFFFF' : 'var(--text-secondary)',
-                    fontWeight: '500', fontSize: '12px', cursor: 'pointer',
-                    boxShadow: 'none',
-                    transition: 'all 0.15s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (activeCategory !== cat.id) {
-                      e.currentTarget.style.borderColor = 'var(--primary-light)';
-                      e.currentTarget.style.color = 'var(--primary)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (activeCategory !== cat.id) {
-                      e.currentTarget.style.borderColor = 'var(--border)';
-                      e.currentTarget.style.color = 'var(--text-secondary)';
-                    }
-                  }}
-                >
-                  {cat.label}
-                </button>
-              ))}
-            </div>
-          </div>
 
-          {/* Types and Search Row */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-main)' }}>Cấp độ:</span>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                {types.map(t => (
-                  <button
-                    key={t.id}
-                    onClick={() => { setActiveType(t.id); setPage(1); }}
+            {/* Category Dropdown */}
+            <div style={{ position: 'relative', zIndex: 100 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setCategoryDropdownOpen(!categoryDropdownOpen);
+                  setTypeDropdownOpen(false);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-card, #FFFFFF)',
+                  color: 'var(--text-main)',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  boxShadow: 'var(--shadow-sm)',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <span>{categories.find(c => c.id === activeCategory)?.emoji}</span>
+                <span>{categories.find(c => c.id === activeCategory)?.label}</span>
+                <span style={{ fontSize: '9px', opacity: 0.6, transition: 'transform 0.2s', transform: categoryDropdownOpen ? 'rotate(180deg)' : 'none', display: 'inline-block' }}>▼</span>
+              </button>
+
+              {categoryDropdownOpen && (
+                <>
+                  <div
+                    onClick={() => setCategoryDropdownOpen(false)}
+                    style={{ position: 'fixed', inset: 0, zIndex: 998 }}
+                  />
+                  <div
                     style={{
-                      padding: '6px 14px', borderRadius: '20px',
-                      border: activeType === t.id ? '1px solid var(--text-main)' : '1px solid var(--border)',
-                      background: activeType === t.id ? 'var(--text-main)' : 'var(--bg-card)',
-                      color: activeType === t.id ? 'var(--bg-card)' : 'var(--text-secondary)',
-                      fontWeight: '500', fontSize: '12px', cursor: 'pointer',
-                      boxShadow: 'none',
-                      transition: 'all 0.15s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (activeType !== t.id) {
-                        e.currentTarget.style.borderColor = 'var(--text-main)';
-                        e.currentTarget.style.color = 'var(--text-main)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (activeType !== t.id) {
-                        e.currentTarget.style.borderColor = 'var(--border)';
-                        e.currentTarget.style.color = 'var(--text-secondary)';
-                      }
+                      position: 'absolute',
+                      top: '40px',
+                      left: 0,
+                      minWidth: '220px',
+                      background: '#FFFFFF',
+                      borderRadius: '12px',
+                      boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
+                      border: '1px solid var(--border, #E2E8F0)',
+                      padding: '6px',
+                      zIndex: 999,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '2px',
+                      animation: 'fadeInUp 0.12s ease forwards'
                     }}
                   >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
+                    {categories.map(cat => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveCategory(cat.id);
+                          setPage(1);
+                          setCategoryDropdownOpen(false);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          width: '100%',
+                          padding: '8px 12px',
+                          border: 'none',
+                          borderRadius: '8px',
+                          background: activeCategory === cat.id ? 'rgba(108, 92, 231, 0.08)' : 'transparent',
+                          color: activeCategory === cat.id ? 'var(--primary, #6c5ce7)' : 'var(--text-secondary, #475569)',
+                          fontSize: '13px',
+                          fontWeight: activeCategory === cat.id ? '700' : '500',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (activeCategory !== cat.id) {
+                            e.currentTarget.style.background = '#F3F4F6';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (activeCategory !== cat.id) {
+                            e.currentTarget.style.background = 'transparent';
+                          }
+                        }}
+                      >
+                        <span style={{ fontSize: '15px' }}>{cat.emoji}</span>
+                        <span>{cat.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
 
-            {/* Search Box */}
-            <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '8px' }}>
-              <div className="admin-search-wrapper" style={{ margin: 0, width: '260px', position: 'relative' }}>
-                <HiSearch className="admin-search-icon" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748B' }} />
-                <input
-                  type="text"
-                  placeholder="Tìm kiếm nội dung..."
-                  className="admin-search-input"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  style={{
-                    paddingLeft: '36px',
-                    width: '100%',
-                    border: '1px solid var(--border)',
-                    paddingTop: '8px',
-                    paddingBottom: '8px',
-                    paddingRight: '14px',
-                    borderRadius: '8px',
-                    fontSize: '13px',
-                    background: '#F8FAFC',
-                    color: '#1E293B',
-                    fontWeight: '500',
-                    outline: 'none'
-                  }}
-                />
-              </div>
+            {/* Level Dropdown */}
+            <div style={{ position: 'relative', zIndex: 100 }}>
               <button
-                type="submit"
-                style={{
-                  background: 'var(--primary)', color: '#FFFFFF', border: 'none',
-                  fontWeight: '600', fontSize: '12.5px',
-                  padding: '0 18px', borderRadius: '8px', cursor: 'pointer',
-                  boxShadow: 'var(--shadow-sm)',
-                  transition: 'all 0.2s ease'
+                type="button"
+                onClick={() => {
+                  setTypeDropdownOpen(!typeDropdownOpen);
+                  setCategoryDropdownOpen(false);
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-card, #FFFFFF)',
+                  color: 'var(--text-main)',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  boxShadow: 'var(--shadow-sm)',
+                  transition: 'all 0.15s ease'
+                }}
               >
-                Tìm
+                <span>{types.find(t => t.id === activeType)?.emoji}</span>
+                <span>{types.find(t => t.id === activeType)?.label}</span>
+                <span style={{ fontSize: '9px', opacity: 0.6, transition: 'transform 0.2s', transform: typeDropdownOpen ? 'rotate(180deg)' : 'none', display: 'inline-block' }}>▼</span>
               </button>
-            </form>
+
+              {typeDropdownOpen && (
+                <>
+                  <div
+                    onClick={() => setTypeDropdownOpen(false)}
+                    style={{ position: 'fixed', inset: 0, zIndex: 998 }}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '40px',
+                      left: 0,
+                      minWidth: '180px',
+                      background: '#FFFFFF',
+                      borderRadius: '12px',
+                      boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
+                      border: '1px solid var(--border, #E2E8F0)',
+                      padding: '6px',
+                      zIndex: 999,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '2px',
+                      animation: 'fadeInUp 0.12s ease forwards'
+                    }}
+                  >
+                    {types.map(t => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveType(t.id);
+                          setPage(1);
+                          setTypeDropdownOpen(false);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          width: '100%',
+                          padding: '8px 12px',
+                          border: 'none',
+                          borderRadius: '8px',
+                          background: activeType === t.id ? 'rgba(108, 92, 231, 0.08)' : 'transparent',
+                          color: activeType === t.id ? 'var(--primary, #6c5ce7)' : 'var(--text-secondary, #475569)',
+                          fontSize: '13px',
+                          fontWeight: activeType === t.id ? '700' : '500',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (activeType !== t.id) {
+                            e.currentTarget.style.background = '#F3F4F6';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (activeType !== t.id) {
+                            e.currentTarget.style.background = 'transparent';
+                          }
+                        }}
+                      >
+                        <span style={{ fontSize: '15px' }}>{t.emoji}</span>
+                        <span>{t.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
+
+          {/* Search Box */}
+          <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div className="admin-search-wrapper" style={{ margin: 0, width: '240px', position: 'relative' }}>
+              <HiSearch className="admin-search-icon" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748B' }} />
+              <input
+                type="text"
+                placeholder="Tìm kiếm nội dung..."
+                className="admin-search-input"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{
+                  paddingLeft: '36px',
+                  width: '100%',
+                  border: '1px solid var(--border)',
+                  paddingTop: '8px',
+                  paddingBottom: '8px',
+                  paddingRight: '14px',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  background: '#F8FAFC',
+                  color: '#1E293B',
+                  fontWeight: '500',
+                  outline: 'none'
+                }}
+              />
+            </div>
+            <button
+              type="submit"
+              style={{
+                background: 'var(--primary)',
+                color: '#FFFFFF',
+                border: 'none',
+                fontWeight: '600',
+                fontSize: '12.5px',
+                padding: '8px 18px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                boxShadow: 'var(--shadow-sm)',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; }}
+            >
+              Tìm kiếm
+            </button>
+          </form>
+
         </div>
       </div>
 
