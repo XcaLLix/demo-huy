@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   HiCalendar, 
   HiBookOpen, 
@@ -30,9 +31,12 @@ import sunLogoImg from '../../assets/sun_logo.png';
 import '../../styles/studentDashboard.css';
 import ContinueLearningRail from '../courses/catalog/ContinueLearningRail';
 
-export default function StudentDashboard({ currentUser, setActiveTab, navigateTo, onUpdateUser, activeTab, currentTab: passedCurrentTab, onLogout, children }) {
+export default function StudentDashboard({ currentUser, setActiveTab, navigateTo, onUpdateUser, activeTab, currentTab: passedCurrentTab, onLogout, unreadCount = 0, notifications = [], children }) {
   // --- STATES & STORES ---
   const currentTab = activeTab || passedCurrentTab || 'home';
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const [notifDropdownPos, setNotifDropdownPos] = useState({ top: 0, left: 0 });
+  const notifRef = useRef(null);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [onboardingData, setOnboardingData] = useState(() => {
     const saved = localStorage.getItem('student_onboarding_data');
@@ -190,7 +194,8 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
     }
 
     loadDashboardResources();
-  }, [currentUser]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id]);
 
   // Fetch attendance records
   useEffect(() => {
@@ -222,7 +227,8 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
       }
     };
     loadAttendanceData();
-  }, [currentUser, streakViewMode, currentStreakDate, currentTab]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id, streakViewMode, currentStreakDate, currentTab]);
 
 
 
@@ -237,7 +243,7 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
       setProfileTargetScore(currentUser.targetScore || parseFloat(onboardingData.targetScore) || 25.0);
       setProfileTargetUniversity(currentUser.targetUniversity || onboardingData.targetSchool);
     }
-  }, [currentUser, currentTab]);
+  }, [currentUser?.id, currentTab]);
 
   // Show onboarding automatically if not completed
   useEffect(() => {
@@ -643,6 +649,32 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
 
           {/* CÁ NHÂN */}
           <div className="sdb-menu-category-title">Cá nhân</div>
+          {/* Notification Bell */}
+          <button
+            className={`sdb-menu-item ${currentTab === 'notifications' ? 'active' : ''}`}
+            onClick={() => {
+              navigateTo('/user/notifications');
+            }}
+            style={{ width: '100%' }}
+          >
+            <span className="sdb-menu-icon"><HiBell /></span>
+            <span>Thông báo</span>
+            {unreadCount > 0 && (
+              <span style={{
+                marginLeft: 'auto',
+                background: '#ef4444',
+                color: '#fff',
+                fontSize: '10px',
+                fontWeight: '700',
+                borderRadius: '10px',
+                padding: '1px 6px',
+                minWidth: '18px',
+                textAlign: 'center',
+                lineHeight: '16px'
+              }}>{unreadCount > 99 ? '99+' : unreadCount}</span>
+            )}
+          </button>
+
           <button 
             className={`sdb-menu-item ${currentTab === 'settings' || currentTab === 'profile' ? 'active' : ''}`}
             onClick={() => navigateTo('/user/settings')}

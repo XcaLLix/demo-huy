@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from '../utils/toast';
 import { api } from '../api';
-import { HiArrowRight, HiCheck, HiStar, HiLightningBolt, HiMenuAlt3, HiX, HiTrendingUp, HiSparkles, HiLockClosed, HiClock, HiPlay, HiShoppingCart, HiBookOpen, HiShare, HiUser, HiMail, HiPhone, HiAcademicCap, HiCode, HiUserGroup } from 'react-icons/hi';
+import { HiArrowRight, HiCheck, HiStar, HiLightningBolt, HiMenuAlt3, HiX, HiTrendingUp, HiSparkles, HiLockClosed, HiClock, HiPlay, HiShoppingCart, HiBookOpen, HiShare, HiUser, HiMail, HiPhone, HiAcademicCap, HiCode, HiUserGroup, HiBell } from 'react-icons/hi';
 import FooterSunMascot from './FooterSunMascot';
 import Forum from './Forum';
 import SubjectsPage from './SubjectsPage';
@@ -757,11 +757,15 @@ export default function LandingPage({
   currentPath,
   navigateTo,
   cartCourses,
-  onAddToCart
+  onAddToCart,
+  notifications = [],
+  unreadCount = 0,
+  onClearNotifications
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
   const [activeLandingView, setActiveLandingView] = useState('home'); // 'home' | 'courses' | 'exams' | 'features' | 'ai-tutor' | 'question-bank' | 'leaderboard' | 'forum' | 'about'
   const [activeTab, setActiveTab] = useState('teacher'); // 'teacher' | 'student' | 'school'
   const [feedbackIndex, setFeedbackIndex] = useState(0);
@@ -1668,6 +1672,168 @@ export default function LandingPage({
                   >
                     Vào học ngay 🚀
                   </button>
+
+                  <button
+                    onClick={() => {
+                      setNotifDropdownOpen(!notifDropdownOpen);
+                      setProfileDropdownOpen(false);
+                    }}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: '50%',
+                      width: '38px',
+                      height: '38px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      color: '#ffffff',
+                      position: 'relative',
+                      transition: 'all 0.2s ease',
+                      outline: 'none',
+                      marginRight: '4px'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                    }}
+                    title="Thông báo"
+                  >
+                    <HiBell style={{ fontSize: '18px' }} />
+                    {unreadCount > 0 && (
+                      <span
+                        style={{
+                          position: 'absolute',
+                          top: '-3px',
+                          right: '-3px',
+                          backgroundColor: '#ef4444',
+                          color: '#ffffff',
+                          fontSize: '9px',
+                          fontWeight: 'bold',
+                          borderRadius: '50%',
+                          width: '16px',
+                          height: '16px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: '1.5px solid var(--lp-bg, #0f172a)'
+                        }}
+                      >
+                        {unreadCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Notifications Dropdown Menu */}
+                  {notifDropdownOpen && (
+                    <>
+                      <div
+                        onClick={() => setNotifDropdownOpen(false)}
+                        style={{
+                          position: 'fixed',
+                          top: 0, left: 0, right: 0, bottom: 0,
+                          zIndex: 998
+                        }}
+                      />
+                      <div
+                        className="lp-dropdown-menu animate-in"
+                        style={{
+                          position: 'absolute',
+                          top: '46px',
+                          right: '54px',
+                          width: '420px',
+                          background: 'var(--bg-card, #ffffff)',
+                          borderRadius: '14px',
+                          boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+                          border: '1px solid var(--border, #e2e8f0)',
+                          padding: '20px',
+                          zIndex: 999,
+                          textAlign: 'left'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid var(--border, #f1f5f9)', paddingBottom: '10px' }}>
+                          <span style={{ fontSize: '14px', fontWeight: '850', color: 'var(--text-main, #1e293b)' }}>
+                            🔔 THÔNG BÁO ({unreadCount})
+                          </span>
+                          {notifications.length > 0 && (
+                            <button
+                              onClick={() => {
+                                onClearNotifications();
+                              }}
+                              style={{ background: 'none', border: 'none', color: '#6c5ce7', fontSize: '13px', cursor: 'pointer', fontWeight: '700' }}
+                            >
+                              Đọc tất cả
+                            </button>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '380px', overflowY: 'auto', paddingRight: '4px' }}>
+                          {notifications.length > 0 ? (
+                            notifications.slice(0, 5).map((n) => {
+                              const icon = n.icon || (n.type === 'SUCCESS' ? '✅' : n.type === 'WARNING' ? '⚠️' : n.type === 'ERROR' ? '❌' : '🔔');
+                              const borderLeftColor = n.type === 'SUCCESS' ? '#10B981' : n.type === 'WARNING' ? '#F59E0B' : n.type === 'ERROR' ? '#EF4444' : '#6c5ce7';
+                              const isReadNotif = n.read || n.isRead;
+
+                              return (
+                                <div
+                                  key={n.id}
+                                  onClick={() => {
+                                    if (navigateTo) {
+                                      if (!isReadNotif) {
+                                        api.markNotificationAsRead(n.id).catch(console.error);
+                                      }
+                                      if (n.link) navigateTo(n.link);
+                                    }
+                                    setNotifDropdownOpen(false);
+                                  }}
+                                  style={{
+                                    padding: '12px 16px', borderRadius: '12px',
+                                    background: isReadNotif ? 'transparent' : 'rgba(108, 92, 231, 0.04)',
+                                    border: '1px solid var(--border, #e2e8f0)',
+                                    borderLeft: `5px solid ${borderLeftColor}`,
+                                    fontSize: '13px', lineHeight: '1.45',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease',
+                                    display: 'flex', gap: '12px', alignItems: 'flex-start'
+                                  }}
+                                >
+                                  <div style={{ fontSize: '18px', marginTop: '2px' }}>{icon}</div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontWeight: '750', color: 'var(--text-main, #1e293b)', fontSize: '13.5px', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.title || 'Thông báo'}</div>
+                                    <p style={{ color: 'var(--text-muted, #64748b)', margin: 0, fontSize: '12.5px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{n.text || n.message}</p>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <p style={{ fontSize: '13px', color: 'var(--text-muted, #64748b)', textAlign: 'center', padding: '24px 0', fontWeight: '500' }}>Không có thông báo mới.</p>
+                          )}
+                        </div>
+
+                        <div style={{ marginTop: '14px', borderTop: '1px solid var(--border, #f1f5f9)', paddingTop: '12px', textAlign: 'center' }}>
+                          <button
+                            onClick={() => {
+                              setNotifDropdownOpen(false);
+                              if (navigateTo) {
+                                navigateTo('/user/notifications');
+                              }
+                            }}
+                            style={{
+                              background: 'none', border: 'none', color: '#6c5ce7',
+                              fontSize: '13.5px', fontWeight: '700', cursor: 'pointer'
+                            }}
+                          >
+                            Xem tất cả thông báo ➔
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   {/* Profile Avatar Trigger */}
                   <div style={{ position: 'relative' }}>

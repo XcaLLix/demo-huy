@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { logSystemEvent } from '../utils/logger.js';
+import { NotificationService } from '../services/notification.service.js';
 
 // Helper interface
 interface AuthRequest extends Request {
@@ -326,7 +327,8 @@ export const approveCourse = async (req: AuthRequest, res: Response) => {
     const adminId = req.user?.id || 1;
 
     const course = await prisma.course.findUnique({
-      where: { id: Number(id) }
+      where: { id: Number(id) },
+      include: { teacher: { include: { user: true } } }
     });
 
     if (!course) {
@@ -364,6 +366,14 @@ export const approveCourse = async (req: AuthRequest, res: Response) => {
       metadata: { courseId: course.id, title: course.title },
       level: 'INFO'
     });
+
+    try {
+      await NotificationService.sendTemplate('COURSE_APPROVED', course.teacherId, { courseName: course.title });
+      const teacherName = course.teacher?.user?.fullName || 'Giáo viên';
+      await NotificationService.sendTemplate('COURSE_PUBLISHED', null, { courseName: course.title, teacherName });
+    } catch (notifErr) {
+      console.error('[Notification Error] Failed to send COURSE_APPROVED/PUBLISHED notifications:', notifErr);
+    }
 
     return res.status(200).json({
       success: true,
@@ -424,6 +434,12 @@ export const rejectCourse = async (req: AuthRequest, res: Response) => {
       level: 'WARNING'
     });
 
+    try {
+      await NotificationService.sendTemplate('COURSE_REJECTED', course.teacherId, { courseName: course.title, reason: reason.trim() });
+    } catch (notifErr) {
+      console.error('[Notification Error] Failed to send COURSE_REJECTED notification:', notifErr);
+    }
+
     return res.status(200).json({
       success: true,
       message: 'Đã từ chối phê duyệt khóa học thành công!'
@@ -478,6 +494,12 @@ export const hideCourse = async (req: AuthRequest, res: Response) => {
       metadata: { courseId: course.id, title: course.title, reason: reason.trim() },
       level: 'WARNING'
     });
+
+    try {
+      await NotificationService.sendTemplate('COURSE_HIDDEN', course.teacherId, { courseName: course.title, reason: reason.trim() });
+    } catch (notifErr) {
+      console.error('[Notification Error] Failed to send COURSE_HIDDEN notification:', notifErr);
+    }
 
     return res.status(200).json({
       success: true,

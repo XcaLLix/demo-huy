@@ -90,6 +90,9 @@ model Student {
   school       String?
   targetScore      Float?
   targetUniversity String?
+
+  @@index([grade])
+  @@index([province])
 }
 
 model Teacher {
@@ -252,6 +255,9 @@ model TestAttempt {
   student             Student             @relation(fields: [studentId], references: [userId], onDelete: Cascade)
   attemptAnswers      TestAttemptAnswer[]
   examEvents          ExamEvent[]
+
+  @@index([studentId, status])
+  @@index([examId])
 }
 
 model ExamEvent {
@@ -295,15 +301,54 @@ model ChatMessage {
   createdAt DateTime @default(now())
   student   Student  @relation(fields: [studentId], references: [userId], onDelete: Cascade)
 }
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+}
+
+enum NotificationCategory {
+  SYSTEM
+  ACCOUNT
+  COURSE
+  EXAM
+  PAYMENT
+  AI
+  REPORT
+  TEACHER
+  ADMIN
+}
 
 model Notification {
-  id        Int      @id @default(autoincrement())
+  id        Int                  @id @default(autoincrement())
   userId    Int
   title     String
   message   String
-  isRead    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType     @default(INFO)
+  category  NotificationCategory @default(SYSTEM)
+  icon      String?
+  link      String?
+  isRead    Boolean              @default(false)
+  readAt    DateTime?
+  metadata  Json?
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @default(now()) @updatedAt
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NotificationTemplate {
+  id          Int                  @id @default(autoincrement())
+  code        String               @unique
+  title       String
+  message     String
+  type        NotificationType     @default(INFO)
+  category    NotificationCategory @default(SYSTEM)
+  icon        String?
+  defaultLink String?
+  isActive    Boolean              @default(true)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @default(now()) @updatedAt
 }
 
 model Review {
@@ -671,8 +716,11 @@ model UserGamification {
   streakDays        Int             @default(0)
   lastActiveDate    DateTime?
   milestonesReached Json?
-  
+
   updatedAt         DateTime        @updatedAt
+
+  @@index([xp])
+  @@index([streakDays])
 }
 
 model ForumReport {

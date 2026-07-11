@@ -39,6 +39,8 @@ import {
 import { getAdminLogs, getAdminLogById, getAdminLogsStatistics } from './controllers/adminLogs.js';
 import { getSettings, updateSettings } from './controllers/systemSettings.js';
 import { SystemSettingService } from './services/systemSetting.service.js';
+import notificationRoutes from './routes/notification.routes.js';
+import { NotificationTemplateService } from './services/notificationTemplate.service.js';
 import { seedSystemSettings } from './seedSettings.js';
 
 import {
@@ -288,10 +290,10 @@ app.delete('/user-documents/:id', authenticateJWT, requireRole(['STUDENT', 'TEAC
 
 // Protected Exam Routes
 app.get('/exams', getExams);
-app.get('/exams/:id', getExamById);
-app.get('/exams/:id/questions', getExamQuestionsPublic);
 app.get('/exams/attempts', authenticateJWT, requireRole(['STUDENT', 'TEACHER', 'ADMIN']), getAttempts);
 app.get('/exams/attempts/:attemptId', authenticateJWT, requireRole(['STUDENT', 'TEACHER', 'ADMIN']), ownsAttempt, getAttemptById);
+app.get('/exams/:id', getExamById);
+app.get('/exams/:id/questions', getExamQuestionsPublic);
 app.post('/exams/:id/attempts', authenticateJWT, requireRole(['STUDENT', 'TEACHER', 'ADMIN']), startAttempt);
 app.post('/exams/:id/attempts/:attemptId/submit', authenticateJWT, requireRole(['STUDENT', 'TEACHER', 'ADMIN']), ownsAttempt, submitAttempt);
 app.post('/exams/import', authenticateJWT, requireRole(['TEACHER', 'ADMIN']), importExam);
@@ -415,6 +417,9 @@ app.post('/forum/moderation/reports', authenticateJWT, createReport);
 app.get('/forum/moderation/reports', authenticateJWT, requireRole(['ADMIN']), getReports);
 app.put('/forum/moderation/reports/:id/resolve', authenticateJWT, requireRole(['ADMIN']), resolveReport);
 
+// Notification Center Router
+app.use('/notifications', notificationRoutes);
+
 // =========================================================================
 // AFFILIATE SYSTEM ROUTING
 // =========================================================================
@@ -477,6 +482,7 @@ app.post('/admin/materials/:id/reject', authenticateJWT, requireRole(['ADMIN']),
 app.get('/', (req, res) => {
   res.json({ success: true, data: "EduPath API Server is online!" });
 });
+
 
 // Dev reset endpoint for automation
 app.post('/dev/reset', async (req, res) => {
@@ -545,6 +551,7 @@ async function seedDefaultCategories() {
 
 // Auto-seed on startup
 seedDefaultCategories();
+NotificationTemplateService.seedDefaultTemplates();
 
 // Global Error Handler Middleware to catch exceptions and log them
 app.use((err: any, req: any, res: any, next: any) => {

@@ -15,22 +15,48 @@ import {
   HiMenu
 } from 'react-icons/hi';
 
+const EMPTY_ARRAY = [];
+
+const getCategoryIcon = (cat, customIcon) => {
+  if (customIcon) return customIcon;
+  switch (cat) {
+    case 'PAYMENT': return '💰';
+    case 'COURSE': return '📚';
+    case 'EXAM': return '📝';
+    case 'ACCOUNT': return '🔐';
+    case 'AI': return '🤖';
+    case 'REPORT': return '🛡️';
+    case 'TEACHER': return '👨‍🏫';
+    case 'ADMIN': return '👑';
+    default: return '📢';
+  }
+};
+
+const getCategoryColor = (type) => {
+  switch (type) {
+    case 'SUCCESS': return '#10B981';
+    case 'WARNING': return '#F59E0B';
+    case 'ERROR': return '#EF4444';
+    default: return '#6c5ce7';
+  }
+};
+
 export default function Header({
   role,
   userProfile,
   theme,
   onToggleTheme,
-  notifications = [],
+  notifications = EMPTY_ARRAY,
   onClearNotifications,
   onLogout,
   onChangePassword,
   onNavigateSettings,
   addLog,
-  cartCourses = [],
+  cartCourses = EMPTY_ARRAY,
   onCheckoutCourse,
   navigateTo,
   currentPath = '',
-  courses = []
+  courses = EMPTY_ARRAY
 }) {
   const [showNotif, setShowNotif] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -315,77 +341,120 @@ export default function Header({
               }}
             />
           ) : (
-            <div
-              className="header-avatar"
-              style={{
-                background: 'linear-gradient(135deg, #a29bfe, #6C5CE7)',
-                color: '#FFFFFF',
-                width: '38px',
-                height: '38px',
-                borderRadius: '50%',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: '800',
-                fontSize: '13px'
-              }}
-              onClick={() => {
-                setShowProfileMenu(!showProfileMenu);
-                setShowNotif(false);
-              }}
-            >
-              {userProfile?.avatar && userProfile.avatar.length <= 10 ? userProfile.avatar : ((userProfile?.fullName || userProfile?.name) ? (userProfile.fullName || userProfile.name).slice(0, 2).toUpperCase() : 'U')}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div 
+                id="user-profile-menu-btn"
+                style={{
+                  width: '36px', height: '36px', borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%)',
+                  color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 'bold', fontSize: '13px', border: '2px solid #000000', cursor: 'pointer',
+                  boxShadow: '2px 2px 0px #000000'
+                }}
+                onClick={() => {
+                  setShowProfileMenu(!showProfileMenu);
+                  setShowNotif(false);
+                }}
+              >
+                {userProfile?.fullName ? userProfile.fullName.substring(0, 2).toUpperCase() : 'US'}
+              </div>
             </div>
-          )
-        )}
-      </div>
+          ))}
+        </div>
 
       {/* Notifications Drawer */}
       {showNotif && (
         <div
           style={{
             position: 'absolute', top: '75px', right: '60px',
-            width: '320px', background: '#FFFFFF',
-            border: '1px solid rgba(79, 63, 203, 0.1)', borderRadius: '16px',
-            boxShadow: '0 10px 30px rgba(79, 63, 203, 0.15)', zIndex: 2000, padding: '16px',
-            animation: 'fadeInUp 0.2s ease forwards'
+            width: '420px', background: '#FFFFFF',
+            border: '2px solid #000000', borderRadius: '16px',
+            boxShadow: '4px 4px 0px #000000', zIndex: 2000, padding: '20px',
+            animation: 'fadeInUp 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards'
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid rgba(79, 63, 203, 0.05)', paddingBottom: '8px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--fts-text-primary)' }}>THÔNG BÁO ({unreadCount})</span>
-            {unreadCount > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '2px solid #F3F4F6', paddingBottom: '10px' }}>
+            <span style={{ fontSize: '14px', fontWeight: '900', color: '#1E293B', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              🔔 THÔNG BÁO ({unreadCount})
+            </span>
+            {notifications.length > 0 && (
               <button
                 onClick={() => {
                   onClearNotifications();
-                  setShowNotif(false);
                 }}
-                style={{ background: 'none', border: 'none', color: 'var(--fts-purple)', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}
+                style={{ background: 'none', border: 'none', color: '#6c5ce7', fontSize: '13px', cursor: 'pointer', fontWeight: '900' }}
               >
                 Đọc tất cả
               </button>
             )}
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '240px', overflowY: 'auto', paddingRight: '4px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '380px', overflowY: 'auto', paddingRight: '4px' }}>
             {notifications.length > 0 ? (
-              notifications.map((n) => (
-                <div
-                  key={n.id}
-                  style={{
-                    padding: '8px 10px', borderRadius: '8px',
-                    background: n.read ? 'transparent' : 'var(--fts-purple-bg)',
-                    borderLeft: n.read ? 'none' : '3px solid var(--fts-purple)',
-                    fontSize: '11.5px', lineHeight: '1.4'
-                  }}
-                >
-                  <p style={{ color: 'var(--fts-text-primary)', fontWeight: n.read ? 'normal' : '600', margin: 0 }}>{n.text}</p>
-                  <span style={{ fontSize: '9px', color: 'var(--fts-text-muted)', marginTop: '4px', display: 'block' }}>{n.time}</span>
-                </div>
-              ))
+              notifications.map((n) => {
+                const icon = getCategoryIcon(n.category, n.icon);
+                const borderLeftColor = getCategoryColor(n.type);
+                const isReadNotif = n.read || n.isRead;
+
+                return (
+                  <div
+                    key={n.id}
+                    onClick={() => {
+                      if (onNotificationClick) onNotificationClick(n);
+                      setShowNotif(false);
+                    }}
+                    style={{
+                      padding: '12px 16px', borderRadius: '12px',
+                      background: isReadNotif ? '#FFFFFF' : 'rgba(108, 92, 231, 0.05)',
+                      border: '1.5px solid #000000',
+                      borderLeft: `6px solid ${borderLeftColor}`,
+                      fontSize: '13px', lineHeight: '1.45',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      display: 'flex', gap: '12px', alignItems: 'flex-start',
+                      boxShadow: isReadNotif ? 'none' : '2px 2px 0px rgba(0,0,0,0.15)'
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.transform = 'translate(-1px, -1px)';
+                      e.currentTarget.style.boxShadow = '3px 3px 0px #000000';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.transform = 'none';
+                      e.currentTarget.style.boxShadow = isReadNotif ? 'none' : '2px 2px 0px rgba(0,0,0,0.15)';
+                    }}
+                  >
+                    <div style={{ fontSize: '18px', marginTop: '2px' }}>{icon}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: '900', color: '#1E293B', fontSize: '13.5px', marginBottom: '4px' }}>{n.title || 'Thông báo'}</div>
+                      <p style={{ color: '#4B5563', margin: 0, fontSize: '12.5px', fontWeight: isReadNotif ? 'normal' : '500' }}>{n.text || n.message}</p>
+                      <span style={{ fontSize: '10.5px', color: '#9CA3AF', marginTop: '6px', display: 'block' }}>{n.time}</span>
+                    </div>
+                  </div>
+                );
+              })
             ) : (
-              <p style={{ fontSize: '12px', color: 'var(--fts-text-muted)', textAlign: 'center', padding: '16px 0' }}>Không có thông báo mới.</p>
+              <p style={{ fontSize: '13px', color: '#6B7280', textAlign: 'center', padding: '28px 0', fontWeight: 'bold' }}>Không có thông báo mới.</p>
             )}
+          </div>
+
+          <div style={{ marginTop: '14px', borderTop: '2px solid #F3F4F6', paddingTop: '12px', textAlign: 'center' }}>
+            <button
+              onClick={() => {
+                setShowNotif(false);
+                const redirectPath = 
+                  role === 'admin' ? '/dashboard/notifications' : 
+                  role === 'teacher' ? '/teacher/notifications' : 
+                  '/dashboard/notifications';
+                navigateTo(redirectPath);
+              }}
+              style={{
+                background: 'none', border: 'none', color: '#6c5ce7',
+                fontSize: '13.5px', fontWeight: '900', cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', gap: '4px'
+              }}
+            >
+              Xem tất cả thông báo ➔
+            </button>
           </div>
         </div>
       )}

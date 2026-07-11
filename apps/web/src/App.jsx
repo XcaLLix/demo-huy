@@ -43,6 +43,7 @@ import './styles/dashboard.css';
 import './styles/courses.css';
 import AITutorPage from './pages/AITutorPage';
 import './styles/aitutor.css';
+import NotificationsPage from './pages/NotificationsPage';
 import FlashcardPage from './pages/FlashcardPage';
 import './styles/flashcards.css';
 import ExamBankPage from './pages/ExamBankPage';
@@ -53,7 +54,8 @@ import DevToolsPage from './pages/DevToolsPage';
 
 
 import { HiPlay, HiDocumentDownload, HiBeaker, HiX, HiBookOpen } from 'react-icons/hi';
-import { api } from './api';
+import { io } from 'socket.io-client';
+import { api, API_BASE } from './api';
 
 
 
@@ -1329,6 +1331,128 @@ export default function App() {
     { id: 1, text: "Chào mừng bạn gia nhập EduPath AI! Hãy bắt đầu khám phá lộ trình của bạn.", time: "Vừa xong", read: false }
   ]);
 
+  const handleClearNotifications = async () => {
+    try {
+      await api.markAllNotificationsAsRead();
+      setNotifications(prev => prev.map(n => ({ ...n, read: true, isRead: true })));
+      showToast.current?.('Đã đánh dấu tất cả thông báo là đã đọc!', 'success');
+    } catch (err) {
+      console.error('[Clear Notifications Error]', err);
+    }
+  };
+
+  const handleNotificationClick = async (notif) => {
+    try {
+      if (!notif.read && !notif.isRead) {
+        await api.markNotificationAsRead(notif.id);
+        setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true, isRead: true } : n));
+      }
+      if (notif.link) {
+        navigateTo(notif.link);
+      }
+    } catch (err) {
+      console.error('[Notification Click Error]', err);
+    }
+  };
+
+  function formatRelativeTime(dateString) {
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+
+      if (diffMins < 1) return 'Vừa xong';
+      if (diffMins < 60) return `${diffMins} phút trước`;
+      if (diffHours < 24) return `${diffHours} giờ trước`;
+      if (diffDays === 1) return 'Hôm qua';
+      if (diffDays < 7) return `${diffDays} ngày trước`;
+      return date.toLocaleDateString('vi-VN', { day: 'numeric', month: 'numeric', year: 'numeric' });
+    } catch (e) {
+      return 'Vừa xong';
+    }
+  }
+
+  useEffect(() => {
+    if (!currentUser) {
+      setNotifications([]);
+      return;
+    }
+
+    const fetchNotifications = async () => {
+      try {
+        const res = await api.getNotifications({ limit: 20 });
+        if (res && res.notifications) {
+          setNotifications(res.notifications.map(n => ({
+            id: n.id,
+            text: n.message,
+            title: n.title,
+            message: n.message,
+            read: n.isRead,
+            isRead: n.isRead,
+            type: n.type,
+            category: n.category,
+            icon: n.icon,
+            link: n.link,
+            time: formatRelativeTime(n.createdAt)
+          })));
+        }
+      } catch (err) {
+        console.error('Lỗi lấy thông báo:', err);
+      }
+    };
+    fetchNotifications();
+
+    const socket = io(API_BASE);
+
+    socket.on('connect', () => {
+      console.log('[Socket] Connected to server in App.jsx');
+      socket.emit('join_user_room', currentUser.id);
+    });
+
+    socket.on('notification_received', (notif) => {
+      console.log('[Socket] Real-time notification received:', notif);
+      setNotifications(prev => [
+        {
+          id: notif.id,
+          text: notif.message,
+          title: notif.title,
+          message: notif.message,
+          read: notif.isRead,
+          isRead: notif.isRead,
+          type: notif.type,
+          category: notif.category,
+          icon: notif.icon,
+          link: notif.link,
+          time: 'Vừa xong'
+        },
+        ...prev
+      ]);
+
+      const typeStyleMap = {
+        SUCCESS: 'success',
+        WARNING: 'warning',
+        ERROR: 'error',
+        INFO: 'info'
+      };
+      const toastType = typeStyleMap[notif.type] || 'info';
+      showToast.current?.(`${notif.icon ? notif.icon + ' ' : ''}${notif.title}: ${notif.message}`, toastType);
+
+      try {
+        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-500.wav');
+        audio.volume = 0.3;
+        audio.play().catch(() => {});
+      } catch (e) {}
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [currentUser?.id]);
+
+  const unreadCount = notifications.filter(n => !n.read && !n.isRead).length;
 
   const [systemLogs, setSystemLogs] = useState(() => JSON.parse(localStorage.getItem('app_logs')) || [
     { id: 1, time: new Date().toLocaleTimeString(), tag: 'sys', text: "Hệ thống Adaptive AI-Assisted Learning khởi động thành công..." },
@@ -1473,7 +1597,7 @@ export default function App() {
       navigateTo('/');
       setActiveTab('login');
     }
-  }, [currentUser, role, parsedRoute.route]);
+  }, [currentUser?.id, role, parsedRoute.route]);
 
   // Redirect guest users away from leaderboard, and redirect logged-in users away from dashboard leaderboard
   useEffect(() => {
@@ -1484,14 +1608,14 @@ export default function App() {
     } else if (parsedRoute.route === 'dashboard' && parsedRoute.tab === 'leaderboard') {
       navigateTo('/leaderboard');
     }
-  }, [currentUser, role, parsedRoute.route, parsedRoute.tab]);
+  }, [currentUser?.id, role, parsedRoute.route, parsedRoute.tab]);
 
   // Guard dashboard routes and redirect to home if not logged in
   useEffect(() => {
     if ((role === 'guest' || !currentUser) && parsedRoute.route === 'dashboard') {
       navigateTo('/');
     }
-  }, [currentUser, role, parsedRoute.route]);
+  }, [currentUser?.id, role, parsedRoute.route]);
 
   // Redirect teachers visiting /dashboard routes to /teacher routes
   useEffect(() => {
@@ -1499,7 +1623,7 @@ export default function App() {
       const tab = parsedRoute.tab || 'home';
       navigateTo(`/teacher/${tab}`);
     }
-  }, [currentUser, role, parsedRoute.route, parsedRoute.tab]);
+  }, [currentUser?.id, role, parsedRoute.route, parsedRoute.tab]);
 
   // Auto-redirect logged-in admin/teacher away from student dashboard routes to their respective dashboards
   useEffect(() => {
@@ -1511,7 +1635,7 @@ export default function App() {
         navigateTo('/teacher');
       }
     }
-  }, [currentUser, role, currentPath]);
+  }, [currentUser?.id, role, currentPath]);
 
   useEffect(() => {
     if (currentUser) {
@@ -1529,7 +1653,8 @@ export default function App() {
       setSettingsLinkedFb(!!currentUser.linkedFacebook);
       setSettingsLinkedGg(!!currentUser.linkedGoogle);
     }
-  }, [currentUser, activeTab]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id, activeTab]);
 
   // Guard admin routes and redirect to login if not authenticated with real credentials
   useEffect(() => {
@@ -1542,7 +1667,7 @@ export default function App() {
         if (role !== 'admin') setRole('admin');
       }
     }
-  }, [currentPath, role, currentUser]);
+  }, [currentPath, role, currentUser?.id]);
 
   // Sync state data to localStorage
   useEffect(() => {
@@ -1613,7 +1738,7 @@ export default function App() {
         localStorage.setItem('supabase_mock_exams', JSON.stringify(massiveList));
       }
     } catch (err) {
-      console.warn("Không thể tải danh sách đề thi từ backend API.");
+      console.warn("Không thể tải danh sách đề thi từ backend API:", err);
     }
 
     try {
@@ -1623,7 +1748,7 @@ export default function App() {
         setAttemptsHistory(history);
       }
     } catch (err) {
-      console.warn("Không thể tải lịch sử thi thử từ backend API.");
+      console.warn("Không thể tải lịch sử thi thử từ backend API:", err);
     }
 
     // Dynamic loading of admin lists from PostgreSQL / Supabase
@@ -1648,7 +1773,8 @@ export default function App() {
 
   useEffect(() => {
     fetchInitialData();
-  }, [currentUser, activeTab]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id, currentUser?.role, activeTab]);
 
   useEffect(() => {
     const loadCourses = async () => {
@@ -2389,7 +2515,8 @@ export default function App() {
                 theme={theme}
                 onToggleTheme={handleToggleTheme}
                 notifications={notifications}
-                onClearNotifications={() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))}
+                onClearNotifications={handleClearNotifications}
+                onNotificationClick={handleNotificationClick}
                 onLogout={handleLogout}
                 onChangePassword={handleChangePassword}
                 onNavigateSettings={() => { navigateTo('/dashboard/settings'); }}
@@ -2484,6 +2611,9 @@ export default function App() {
                 <LandingPage
                   courses={courses}
                   currentUser={currentUser}
+                  notifications={notifications}
+                  unreadCount={unreadCount}
+                  onClearNotifications={handleClearNotifications}
                   onNavigateToAuth={(mode) => { navigateTo('/'); setActiveTab(mode); }}
                   onBackToDashboard={handleBackToDashboard}
                   onLogout={handleLogout}
@@ -2588,7 +2718,8 @@ export default function App() {
                 theme={theme}
                 onToggleTheme={handleToggleTheme}
                 notifications={notifications}
-                onClearNotifications={() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))}
+                onClearNotifications={handleClearNotifications}
+                onNotificationClick={handleNotificationClick}
                 onLogout={handleLogout}
                 onChangePassword={handleChangePassword}
                 onNavigateSettings={() => { navigateTo('/user/settings'); }}
@@ -2722,11 +2853,14 @@ export default function App() {
                   else if (tab === 'streak') navigateTo('/user/streak');
                   else if (tab === 'leaderboard') navigateTo('/user/leaderboard');
                   else if (tab === 'settings') navigateTo('/user/settings');
+                  else if (tab === 'notifications') navigateTo('/user/notifications');
                   else navigateTo('/user/home');
                 }}
                 navigateTo={navigateTo}
                 onUpdateUser={handleSaveProfile}
                 onLogout={handleLogout}
+                unreadCount={unreadCount}
+                notifications={notifications}
               >
 
               {/* Learning path adaptive roadmap tab */}
@@ -3351,6 +3485,14 @@ export default function App() {
               {/* Library docs downloads tab */}
               {parsedRoute.tab === 'library' && (
                 <LibraryCabinet addLog={addLog} />
+              )}
+
+              {/* Notifications Tab */}
+              {parsedRoute.tab === 'notifications' && (
+                <NotificationsPage
+                  currentUser={currentUser}
+                  navigateTo={navigateTo}
+                />
               )}
 
               {/* Settings Profile tab (natively handled by StudentDashboard) */}

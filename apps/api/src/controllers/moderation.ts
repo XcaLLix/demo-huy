@@ -2,6 +2,7 @@ import type { Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import type { AuthRequest } from '../middleware/auth.js';
 import { logSystemEvent } from '../utils/logger.js';
+import { NotificationService } from '../services/notification.service.js';
 
 // GET /api/admin/reports/statistics
 export async function getAdminReportStatistics(req: AuthRequest, res: Response) {
@@ -326,6 +327,12 @@ export async function approveAdminReport(req: AuthRequest, res: Response) {
       level: 'INFO'
     });
 
+    try {
+      await NotificationService.sendTemplate('REPORT_RESOLVED', report.reporterId, { status: 'Đã duyệt phê duyệt' });
+    } catch (notifErr) {
+      console.error('[Notification Error] Failed to send report approval notification:', notifErr);
+    }
+
     return res.status(200).json({
       success: true,
       message: 'Duyệt báo cáo thành công',
@@ -375,6 +382,12 @@ export async function rejectAdminReport(req: AuthRequest, res: Response) {
       level: 'INFO'
     });
 
+    try {
+      await NotificationService.sendTemplate('REPORT_RESOLVED', report.reporterId, { status: `Từ chối phê duyệt (Lý do: ${reason.trim()})` });
+    } catch (notifErr) {
+      console.error('[Notification Error] Failed to send report rejection notification:', notifErr);
+    }
+
     return res.status(200).json({
       success: true,
       message: 'Từ chối báo cáo thành công',
@@ -419,6 +432,12 @@ export async function closeAdminReport(req: AuthRequest, res: Response) {
       metadata: { reportId: report.id, notes },
       level: 'INFO'
     });
+
+    try {
+      await NotificationService.sendTemplate('REPORT_RESOLVED', report.reporterId, { status: 'Đã đóng và xử lý xong' });
+    } catch (notifErr) {
+      console.error('[Notification Error] Failed to send report close notification:', notifErr);
+    }
 
     return res.status(200).json({
       success: true,
@@ -490,14 +509,18 @@ export async function createAdminReportWarning(req: AuthRequest, res: Response) 
       }
     });
 
-    // Send Notification to user
-    await prisma.notification.create({
-      data: {
+    // Send Notification to user using NotificationService
+    try {
+      await NotificationService.send({
         userId: targetUserId,
         title: 'Cảnh báo từ Quản trị viên ⚠️',
-        message: `Tài khoản của bạn nhận được cảnh báo: "${message.trim()}" liên quan đến nội dung bị báo cáo #${report.id}.`
-      }
-    });
+        message: `Tài khoản của bạn nhận được cảnh báo: "${message.trim()}" liên quan đến nội dung bị báo cáo #${report.id}.`,
+        category: 'REPORT',
+        type: 'WARNING'
+      });
+    } catch (notifErr) {
+      console.error('[Notification Error] Failed to send warn notification:', notifErr);
+    }
 
     const adminId = req.user?.id;
     await logSystemEvent(req as any, {

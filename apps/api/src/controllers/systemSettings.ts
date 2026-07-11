@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { SystemSettingService } from '../services/systemSetting.service.js';
 import { logSystemEvent } from '../utils/logger.js';
+import { NotificationService } from '../services/notification.service.js';
 
 /**
  * GET /admin/system-settings
@@ -90,6 +91,26 @@ export async function updateSettings(req: Request, res: Response) {
       const { key, value } = update;
       const updated = await SystemSettingService.set(key, String(value));
       updatedSettings.push(updated);
+
+      // Phát thông báo bảo trì hệ thống hoặc AI nếu được bật
+      if (key === 'MAINTENANCE_MODE' && value === 'true') {
+        try {
+          await NotificationService.sendTemplate('SYSTEM_MAINTENANCE', null, {
+            startTime: 'ngay bây giờ',
+            endTime: 'khi hoàn tất nâng cấp'
+          });
+        } catch (notifErr) {
+          console.error('[Notification Error] Failed to send maintenance notification:', notifErr);
+        }
+      }
+
+      if (key === 'AI_MAINTENANCE_MODE' && value === 'true') {
+        try {
+          await NotificationService.sendTemplate('AI_MAINTENANCE', null, {});
+        } catch (notifErr) {
+          console.error('[Notification Error] Failed to send AI maintenance notification:', notifErr);
+        }
+      }
 
       // Lưu log kiểm toán hệ thống
       await logSystemEvent(req, {
