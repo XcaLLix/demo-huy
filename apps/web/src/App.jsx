@@ -1992,7 +1992,7 @@ export default function App() {
   };
 
   // Student purchases course(s)
-  const handlePaymentSuccess = async (courseIdOrIds) => {
+  const handlePaymentSuccess = async (courseIdOrIds, voucherCode) => {
     const ids = Array.isArray(courseIdOrIds) 
       ? courseIdOrIds.map(id => id.toString()) 
       : [courseIdOrIds.toString()];
@@ -2008,7 +2008,7 @@ export default function App() {
           await enrollmentService.enrollCourse(currentUser.id, id, priceNum);
           
           // Persist the course enrollment in the backend database
-          await api.enrollCourseDemo(id);
+          await api.enrollCourseDemo({ courseId: Number(id), voucherCode });
         } catch (err) {
           console.error('Failed to log payment enrollment data:', err);
         }
@@ -4036,8 +4036,8 @@ export default function App() {
               setPaymentSuccessRedirect(false);
             }
           }}
-          onPaymentSuccess={(ids) => {
-            handlePaymentSuccess(ids);
+          onPaymentSuccess={(ids, code) => {
+            handlePaymentSuccess(ids, code);
             setPaymentSuccessRedirect(true);
           }}
           onRemoveCourse={(courseId) => {

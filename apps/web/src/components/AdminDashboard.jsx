@@ -18,13 +18,15 @@ import {
   HiShieldCheck,
   HiCurrencyDollar,
   HiAcademicCap,
-  HiChevronDown
+  HiChevronDown,
+  HiTag
 } from 'react-icons/hi';
 import { AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { api } from '../api';
 import { mockExamService } from '../services/mockExamService';
 import Header from './Header';
 import AdminExamManager from './AdminExamManager';
+import AdminVoucherManager from './AdminVoucherManager';
 
 // Custom Neo-Brutalist Select component with rounded corners and theme support
 const NeoSelect = ({ value, onChange, options, placeholder = 'Chọn...' }) => {
@@ -2604,6 +2606,12 @@ export default function AdminDashboard({
             <HiCurrencyDollar style={{ fontSize: '18px' }} /> Doanh thu & Chi trả
           </button>
           <button 
+            className={`admin-menu-item ${activeTab === 'vouchers' ? 'active' : ''}`}
+            onClick={() => setActiveTab('vouchers')}
+          >
+            <HiTag style={{ fontSize: '18px' }} /> Quản lý Voucher
+          </button>
+          <button 
             className={`admin-menu-item ${activeTab === 'system-logs' ? 'active' : ''}`}
             onClick={() => setActiveTab('system-logs')}
           >
@@ -2660,6 +2668,7 @@ export default function AdminDashboard({
                 {activeTab === 'moderation' && 'KIỂM DUYỆT BÁO CÁO VI PHẠM'}
                 {activeTab === 'finance' && 'QUẢN LÝ TÀI CHÍNH & CHI TRẢ'}
                 {activeTab === 'system-logs' && 'NHẬT KÝ HOẠT ĐỘNG HỆ THỐNG'}
+                {activeTab === 'vouchers' && 'QUẢN LÝ VOUCHER (MÃ GIẢM GIÁ)'}
               </h2>
               {activeTab === 'stats' && (
                 <p className="admin-header-subtitle-date">{getCurrentDateVietnamese()}</p>
@@ -5686,6 +5695,13 @@ export default function AdminDashboard({
               </div>
 
             </div>
+          )}
+
+          {activeTab === 'vouchers' && (
+            <AdminVoucherManager
+              currentUser={currentUser}
+              addLog={addLog}
+            />
           )}
         </div>
       </main>

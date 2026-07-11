@@ -1378,17 +1378,31 @@ export default function LandingPage({
     }, 1200);
   };
 
-  const handleApplyPromoCode = () => {
+  const handleApplyPromoCode = async () => {
     const code = pricingPromoCode.trim().toUpperCase();
-    if (code === 'FREE100') {
+    if (!code) return;
+
+    const originalPrice = selectedPackage === 'elite' ? 1499000 : 599000;
+    try {
+      const res = await api.validateVoucher({
+        code,
+        type: 'PREMIUM',
+        originalPrice
+      });
       setPricingPromoStatus('success');
-      setPricingDiscountPercent(100);
-    } else if (code === 'EDUPATH2026' || code === 'THPT2026' || code === 'KHUYENMAI20') {
-      setPricingPromoStatus('success');
-      setPricingDiscountPercent(20);
-    } else {
+      const pct = (res.discountAmount / originalPrice) * 100;
+      setPricingDiscountPercent(pct);
+      
+      // Reserve the voucher
+      await api.reserveVoucher({
+        code,
+        type: 'PREMIUM'
+      });
+      toast(`Áp dụng mã ${code} thành công! Giảm ${res.discountAmount.toLocaleString('vi-VN')}đ`, 'success');
+    } catch (err) {
       setPricingPromoStatus('invalid');
       setPricingDiscountPercent(0);
+      toast(err.message || 'Mã giảm giá không hợp lệ!', 'error');
     }
   };
 

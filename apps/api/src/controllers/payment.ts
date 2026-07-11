@@ -6,6 +6,7 @@ import { addBothRevenue } from '../lib/monthlyStats.js';
 import { logSystemEvent } from '../utils/logger.js';
 import { SystemSettingService } from '../services/systemSetting.service.js';
 import { NotificationService } from '../services/notification.service.js';
+import { VoucherService } from '../services/voucher.service.js';
 
 
 const VNPAY_TMN_CODE = process.env.VNPAY_TMN_CODE || 'EDUPATH123';
@@ -14,7 +15,7 @@ const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
 // Generate VNPay Payment Checkout URL
 export async function createVNPayPayment(req: AuthRequest, res: Response) {
-  const { courseId } = req.body;
+  const { courseId, voucherCode } = req.body;
   const studentId = req.user?.id;
 
   if (!studentId) return res.status(401).json({ success: false, error: 'Chưa xác thực!' });
@@ -26,7 +27,25 @@ export async function createVNPayPayment(req: AuthRequest, res: Response) {
     const orderId = `EDUPATH_${Date.now()}`;
     const basePrice = course.price < 10000 ? course.price * 1000 : course.price;
     const salePrice = basePrice * (1 - (course.discount || 0) / 100);
-    const amount = Math.round(salePrice) * 100; // VNPay uses cents (x100)
+
+    let finalAmount = salePrice;
+    if (voucherCode) {
+      const valResult = await VoucherService.validateVoucher(
+        voucherCode,
+        studentId as number,
+        'COURSE',
+        Number(courseId),
+        salePrice
+      );
+      if (!valResult.isValid) {
+        return res.status(400).json({ success: false, error: (valResult as any).error });
+      }
+      finalAmount = valResult.finalPrice as number;
+      // Reserve the voucher
+      await VoucherService.reserveVoucher(voucherCode, studentId as number, 'COURSE', Number(courseId));
+    }
+
+    const amount = Math.round(finalAmount) * 100; // VNPay uses cents (x100)
     
     // Compile standard VNPay queries parameters
     const vnpParams: any = {
@@ -192,6 +211,13 @@ export async function sepayWebhook(req: any, res: Response) {
         data: { isPro: true }
       });
 
+      const txnId = id ? String(id) : `SEPAY_${Date.now()}`;
+      try {
+        await VoucherService.recordUsage(studentId, undefined, true, txnId, Number(transferAmount));
+      } catch (vErr) {
+        console.error('[Voucher Error] Lỗi ghi nhận sử dụng voucher Premium:', vErr);
+      }
+
       console.log(`[SePay Webhook] Đã nâng cấp PRO thành công cho học sinh "${user.fullName}"!`);
 
       try {
@@ -307,6 +333,12 @@ export async function sepayWebhook(req: any, res: Response) {
       }
     });
 
+    try {
+      await VoucherService.recordUsage(studentId, courseId, false, txnId, expectedAmount);
+    } catch (vErr) {
+      console.error('[Voucher Error] Lỗi ghi nhận sử dụng voucher Course:', vErr);
+    }
+
     // Create notifications for teacher and student
     try {
       await NotificationService.sendTemplate('PAYMENT_SUCCESS', studentId, {
@@ -383,7 +415,7 @@ export async function checkEnrollmentStatus(req: AuthRequest, res: Response) {
 // Demo Enrollment — create a real DB enrollment without payment (POST /enrollments/demo)
 export async function createDemoEnrollment(req: AuthRequest, res: Response) {
   const studentId = req.user?.id;
-  const { courseId } = req.body;
+  const { courseId, voucherCode } = req.body;
 
   if (!studentId) return res.status(401).json({ success: false, error: 'Chưa xác thực!' });
   if (!courseId) return res.status(400).json({ success: false, error: 'Thiếu courseId!' });
@@ -411,6 +443,25 @@ export async function createDemoEnrollment(req: AuthRequest, res: Response) {
       return res.status(404).json({ success: false, error: 'Không tìm thấy khóa học!' });
     }
 
+    const basePrice = course.price < 10000 ? course.price * 1000 : course.price;
+    const salePrice = basePrice * (1 - (course.discount || 0) / 100);
+
+    let finalAmount = salePrice;
+    let valResult: any = null;
+    if (voucherCode) {
+      valResult = await VoucherService.validateVoucher(
+        voucherCode,
+        studentId as number,
+        'COURSE',
+        Number(courseId),
+        salePrice
+      );
+      if (!valResult.isValid) {
+        return res.status(400).json({ success: false, error: (valResult as any).error });
+      }
+      finalAmount = valResult.finalPrice as number;
+    }
+
     // Check if already enrolled (idempotent)
     const existing = await prisma.enrollment.findFirst({
       where: { studentId, courseId: Number(courseId) }
@@ -434,6 +485,27 @@ export async function createDemoEnrollment(req: AuthRequest, res: Response) {
         paidAt: new Date()
       }
     });
+
+    if (voucherCode && valResult?.isValid) {
+      try {
+        await prisma.voucherUsage.create({
+          data: {
+            userId: studentId,
+            voucherId: valResult.voucher.id,
+            paymentId: txnId,
+            discountAmount: valResult.discountAmount
+          }
+        });
+        await prisma.voucher.update({
+          where: { id: valResult.voucher.id },
+          data: {
+            usedQuantity: valResult.voucher.usedQuantity + 1
+          }
+        });
+      } catch (vErr) {
+        console.error('[Demo Voucher Error] Failed to record usage:', vErr);
+      }
+    }
 
     // Create notifications for teacher and student (Demo)
     try {

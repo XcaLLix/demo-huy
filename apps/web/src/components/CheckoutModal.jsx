@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { HiX, HiCheckCircle, HiLockOpen, HiCheck, HiDuplicate, HiRefresh, HiSparkles, HiTrash, HiChevronLeft, HiCreditCard } from 'react-icons/hi';
-import { API_BASE } from '../api';
+import { API_BASE, api } from '../api';
 import { toast } from '../utils/toast';
 
 export default function CheckoutModal({ courses = [], onClose, onPaymentSuccess, onRemoveCourse, addLog }) {
@@ -12,8 +12,9 @@ export default function CheckoutModal({ courses = [], onClose, onPaymentSuccess,
 
   // Promo Code states
   const [promoCode, setPromoCode] = useState('');
-  const [discountPercent, setDiscountPercent] = useState(0);
+  const [discountVal, setDiscountVal] = useState(0);
   const [promoStatus, setPromoStatus] = useState(''); // 'success' | 'invalid' | ''
+  const [promoError, setPromoError] = useState('');
 
   const currentUser = JSON.parse(localStorage.getItem('current_user')) || {};
   const studentId = currentUser.id || 1;
@@ -34,8 +35,8 @@ export default function CheckoutModal({ courses = [], onClose, onPaymentSuccess,
   };
 
   const originalAmount = courses.reduce((sum, c) => sum + parsePrice(c.priceSale || c.price || c.priceOriginal), 0);
-  const discountAmount = Math.round(originalAmount * (discountPercent / 100));
-  const finalAmount = originalAmount - discountAmount;
+  const discountAmount = discountVal;
+  const finalAmount = Math.max(0, originalAmount - discountAmount);
 
   // Bank accounts config
   const BANK_ID = 'ACB'; // Ngân hàng TMCP Á Châu
@@ -94,27 +95,49 @@ export default function CheckoutModal({ courses = [], onClose, onPaymentSuccess,
     }
   }, [seconds, step]);
 
-  const handleApplyPromoCode = () => {
+  const handleApplyPromoCode = async () => {
     const code = promoCode.trim().toUpperCase();
-    if (code === 'FREE100') {
-      setDiscountPercent(100);
+    if (!code) return;
+
+    try {
+      const res = await api.validateVoucher({
+        code,
+        type: 'COURSE',
+        courseId: courses[0]?.id,
+        originalPrice: originalAmount
+      });
+      setDiscountVal(res.discountAmount);
       setPromoStatus('success');
-    } else if (code === 'EDUPATH2026' || code === 'THPT2026' || code === 'KHUYENMAI20') {
-      setDiscountPercent(20);
-      setPromoStatus('success');
-    } else {
-      setDiscountPercent(0);
+      setPromoError('');
+    } catch (err) {
+      setDiscountVal(0);
       setPromoStatus('invalid');
+      setPromoError(err.message || 'Mã giảm giá không hợp lệ!');
     }
+  };
+
+  const handleProceedToCheckout = async () => {
+    if (promoCode && promoStatus === 'success') {
+      try {
+        await api.reserveVoucher({
+          code: promoCode.trim().toUpperCase(),
+          type: 'COURSE',
+          courseId: courses[0]?.id
+        });
+      } catch (err) {
+        console.error('[Voucher Reserve Error] Failed to reserve voucher:', err);
+      }
+    }
+    setStep(2);
   };
 
   const handleFreeCheckout = () => {
     const titleSummary = courses.map(c => `"${c.title}"`).join(', ');
-    addLog(`[Free Code] Kích hoạt nhóm khóa học ${titleSummary} miễn phí 100% bằng mã giảm giá...`, 'sys');
+    addLog(`[Voucher] Áp dụng mã giảm giá ${promoCode.trim().toUpperCase()} kích hoạt khóa học ${titleSummary}...`, 'sys');
     setStep(3);
     setTimeout(() => {
-      addLog(`[Free Code] Kích hoạt thành công! Đã mở khóa nhóm khóa học: ${titleSummary}`, 'sys');
-      onPaymentSuccess(courses.map(c => c.id));
+      addLog(`[Voucher] Kích hoạt thành công! Đã mở khóa nhóm khóa học: ${titleSummary}`, 'sys');
+      onPaymentSuccess(courses.map(c => c.id), promoCode.trim().toUpperCase());
       setStep(4);
     }, 1200);
   };
@@ -125,8 +148,8 @@ export default function CheckoutModal({ courses = [], onClose, onPaymentSuccess,
     setStep(3);
     setTimeout(() => {
       addLog(`[Demo Mode] Xác nhận thành công! Đã kích hoạt quyền sở hữu nhóm khóa học.`, 'sys');
+      onPaymentSuccess(courses.map(c => c.id), promoCode.trim().toUpperCase());
       setStep(4);
-      onPaymentSuccess(courses.map(c => c.id));
     }, 1500);
   };
 
@@ -365,12 +388,12 @@ export default function CheckoutModal({ courses = [], onClose, onPaymentSuccess,
                 </div>
                 {promoStatus === 'success' && (
                   <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: 'var(--accent-green)', fontWeight: 'bold' }}>
-                    ✓ Áp dụng thành công! Giảm {discountPercent}% ({discountPercent === 100 ? 'Miễn phí đặc biệt' : 'Mã THPTQG'}).
+                    ✓ Áp dụng thành công! Đã giảm {discountVal.toLocaleString('vi-VN')}đ vào tổng đơn hàng.
                   </p>
                 )}
                 {promoStatus === 'invalid' && (
                   <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: 'var(--accent-red)', fontWeight: 'bold' }}>
-                    ✗ Mã giảm giá không đúng hoặc hết hạn.
+                    ✗ {promoError || 'Mã giảm giá không đúng hoặc hết hạn.'}
                   </p>
                 )}
               </div>
@@ -391,7 +414,7 @@ export default function CheckoutModal({ courses = [], onClose, onPaymentSuccess,
                   </div>
                   {discountAmount > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--accent-red)', fontWeight: 'bold' }}>
-                      <span>Giảm giá (-{discountPercent}%):</span>
+                      <span>Giảm giá:</span>
                       <span>-{discountAmount.toLocaleString('vi-VN')}đ</span>
                     </div>
                   )}
@@ -404,7 +427,7 @@ export default function CheckoutModal({ courses = [], onClose, onPaymentSuccess,
 
                 <button
                   type="button"
-                  onClick={finalAmount === 0 ? handleFreeCheckout : () => setStep(2)}
+                  onClick={finalAmount === 0 ? handleFreeCheckout : handleProceedToCheckout}
                   style={{
                     width: '100%', padding: '14px', background: '#FFE259',
                     color: '#000', border: '3.5px solid #000', borderRadius: '12px',

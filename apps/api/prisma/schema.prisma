@@ -72,6 +72,8 @@ model User {
   warningsReceived     Warning[]           @relation("UserWarnings")
   learningAttendances  LearningAttendance[]
   userEffort           UserEffort?
+  voucherUsages        VoucherUsage[]
+  voucherReservations  VoucherReservation[]
 }
 
 
@@ -1256,6 +1258,78 @@ model SystemSetting {
 
   @@map("system_settings")
 }
+
+enum VoucherStatus {
+  ACTIVE
+  INACTIVE
+  EXPIRED
+}
+
+enum VoucherDiscountType {
+  PERCENT
+  FIXED
+}
+
+enum VoucherApplicableType {
+  ALL
+  COURSE
+  PREMIUM
+  SPECIFIC_COURSES
+}
+
+model Voucher {
+  id                  Int                   @id @default(autoincrement())
+  code                String                @unique
+  name                String
+  description         String?               @db.Text
+  discountType        VoucherDiscountType
+  discountValue       Float                 // Tỉ lệ % hoặc số tiền cố định
+  minimumOrderValue   Float                 @default(0) // Giá trị đơn hàng tối thiểu
+  maximumDiscount     Float?                // Giảm tối đa (chỉ áp dụng cho PERCENT)
+  totalQuantity       Int?                  // Tổng lượt sử dụng tối đa (null = không giới hạn)
+  usedQuantity        Int                   @default(0)
+  limitPerUser        Int                   @default(1) // Số lần sử dụng tối đa của mỗi user (1, 2, 5...)
+  applicableType      VoucherApplicableType @default(ALL)
+  applicableCourseIds Int[]                 // Danh sách mã khóa học cụ thể áp dụng
+  status              VoucherStatus         @default(ACTIVE)
+  startDate           DateTime?
+  endDate             DateTime?
+  createdBy           Int
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  usages              VoucherUsage[]
+  reservations        VoucherReservation[]
+
+  @@map("vouchers")
+}
+
+model VoucherUsage {
+  id             Int          @id @default(autoincrement())
+  voucherId      Int
+  voucher        Voucher      @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  userId         Int
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  paymentId      String?      // Mã giao dịch/hóa đơn liên quan (transactionId)
+  discountAmount Float        // Số tiền thực tế đã giảm trong giao dịch
+  usedAt         DateTime     @default(now())
+
+  @@map("voucher_usages")
+}
+
+model VoucherReservation {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  voucherId Int
+  voucher   Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  courseId  Int?     // null nếu nâng cấp Premium
+  isPremium Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, voucherId, courseId, isPremium])
+  @@map("voucher_reservations")
+}
+
 
 
 
