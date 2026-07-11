@@ -21,6 +21,11 @@ export function initSocket(server: HTTPServer) {
       console.log(`[Socket] Socket ${socket.id} joined room: ${roomId}`);
     });
 
+    socket.on('join_user_room', (userId: string | number) => {
+      socket.join(`user_${userId}`);
+      console.log(`[Socket] Socket ${socket.id} joined personal room: user_${userId}`);
+    });
+
     // Forum post thread live updates
     socket.on('join_post', (postId: string | number) => {
       const room = `post_${postId}`;

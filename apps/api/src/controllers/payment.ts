@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma.js';
 import { addBothRevenue } from '../lib/monthlyStats.js';
 import { logSystemEvent } from '../utils/logger.js';
 import { SystemSettingService } from '../services/systemSetting.service.js';
+import { NotificationService } from '../services/notification.service.js';
 
 
 const VNPAY_TMN_CODE = process.env.VNPAY_TMN_CODE || 'EDUPATH123';
@@ -193,6 +194,12 @@ export async function sepayWebhook(req: any, res: Response) {
 
       console.log(`[SePay Webhook] Đã nâng cấp PRO thành công cho học sinh "${user.fullName}"!`);
 
+      try {
+        await NotificationService.sendTemplate('PREMIUM_ACTIVATED', studentId, { fullName: user.fullName });
+      } catch (notifErr) {
+        console.error('[Notification Error] Failed to send PREMIUM_ACTIVATED notification:', notifErr);
+      }
+
       return res.status(200).json({
         success: true,
         message: 'Nâng cấp tài khoản PRO thành công!',
@@ -300,17 +307,22 @@ export async function sepayWebhook(req: any, res: Response) {
       }
     });
 
-    // Create notification for the teacher
+    // Create notifications for teacher and student
     try {
-      await prisma.notification.create({
-        data: {
-          userId: course.teacherId,
-          title: 'Đăng ký khóa học mới',
-          message: `Học sinh ${studentUser.fullName} đã đăng ký khóa học "${course.title}".`
-        }
+      await NotificationService.sendTemplate('PAYMENT_SUCCESS', studentId, {
+        courseName: course.title,
+        transactionId: txnId,
+        amount: String(paidAmount)
+      });
+      await NotificationService.send({
+        userId: course.teacherId,
+        title: 'Đăng ký khóa học mới 🎓',
+        message: `Học sinh ${studentUser.fullName} đã đăng ký học khóa học "${course.title}".`,
+        category: 'COURSE',
+        type: 'SUCCESS'
       });
     } catch (notifErr) {
-      console.error('[Notification Error] Failed to create teacher notification (SePay):', notifErr);
+      console.error('[Notification Error] Failed to send PAYMENT_SUCCESS/Teacher notifications:', notifErr);
     }
 
     console.log(`[SePay Webhook] Đã kích hoạt thành công khóa học "${course.title}" cho học sinh "${studentUser.fullName}".`);
@@ -423,17 +435,24 @@ export async function createDemoEnrollment(req: AuthRequest, res: Response) {
       }
     });
 
-    // Create notification for the teacher
+    // Create notifications for teacher and student (Demo)
     try {
-      await prisma.notification.create({
-        data: {
-          userId: course.teacherId,
-          title: 'Đăng ký khóa học mới',
-          message: `Học sinh ${studentUser.fullName} đã đăng ký khóa học "${course.title}".`
-        }
+      const basePrice = course.price < 10000 ? course.price * 1000 : course.price;
+      const salePrice = basePrice * (1 - (course.discount || 0) / 100);
+      await NotificationService.sendTemplate('PAYMENT_SUCCESS', studentId, {
+        courseName: course.title,
+        transactionId: txnId,
+        amount: String(Math.round(salePrice))
+      });
+      await NotificationService.send({
+        userId: course.teacherId,
+        title: 'Đăng ký khóa học mới (Demo) 🎓',
+        message: `Học sinh ${studentUser.fullName} đã đăng ký học khóa học "${course.title}" (Chế độ Demo).`,
+        category: 'COURSE',
+        type: 'SUCCESS'
       });
     } catch (notifErr) {
-      console.error('[Notification Error] Failed to create teacher notification (Demo):', notifErr);
+      console.error('[Notification Error] Failed to send demo PAYMENT_SUCCESS notifications:', notifErr);
     }
 
     console.log(`[Demo Enrollment] Đã kích hoạt khóa học ID=${courseId} cho học sinh ID=${studentId} (Demo Mode).`);

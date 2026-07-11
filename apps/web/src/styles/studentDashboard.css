@@ -29,7 +29,8 @@
 .student-dashboard-layout {
   display: grid;
   grid-template-columns: 280px 1fr;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background-color: var(--bg-main);
   font-family: 'Outfit', 'Inter', sans-serif;
   color: var(--text-primary);
@@ -47,9 +48,7 @@
   flex-direction: column;
   gap: 28px;
   overflow-y: auto;
-  max-height: 100vh;
-  position: sticky;
-  top: 0;
+  height: 100vh;
 }
 
 .sdb-logo-section {
@@ -1212,6 +1211,8 @@
 @media (max-width: 768px) {
   .student-dashboard-layout {
     grid-template-columns: 1fr;
+    height: auto;
+    overflow: visible;
   }
   
   .sdb-left-sidebar {
@@ -1221,6 +1222,7 @@
     gap: 20px;
     position: relative;
     max-height: none;
+    height: auto;
   }
   
   .sdb-courses-grid {

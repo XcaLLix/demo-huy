@@ -81,6 +81,7 @@ export default function TeacherDashboard({
   // --- DATABASE DRIVEN STATES ---
   const [dbStats, setDbStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
 
   const loadTeacherStats = async () => {
     try {
@@ -1084,14 +1085,138 @@ export default function TeacherDashboard({
             </div>
 
             {/* Notification Bell Icon */}
-            <button 
-              className="tdb-action-icon-btn" 
-              onClick={() => handleTabChange('notifications')}
-              title="Thông báo mới"
-            >
-              <HiBell />
-              {essays.length > 0 && <span className="tdb-icon-badge">{essays.length}</span>}
-            </button>
+            <div style={{ position: 'relative' }}>
+              <button 
+                className="tdb-action-icon-btn" 
+                onClick={() => setShowNotifDropdown(!showNotifDropdown)}
+                title="Thông báo mới"
+              >
+                <HiBell />
+                {(dbStats?.notifications?.filter(n => !n.read && !n.isRead).length || 0) > 0 && (
+                  <span className="tdb-icon-badge">
+                    {dbStats.notifications.filter(n => !n.read && !n.isRead).length}
+                  </span>
+                )}
+              </button>
+
+              {/* Notifications Dropdown Menu */}
+              {showNotifDropdown && (
+                <>
+                  <div
+                    onClick={() => setShowNotifDropdown(false)}
+                    style={{
+                      position: 'fixed',
+                      top: 0, left: 0, right: 0, bottom: 0,
+                      zIndex: 998
+                    }}
+                  />
+                  <div
+                    className="lp-dropdown-menu animate-in"
+                    style={{
+                      position: 'absolute',
+                      top: '50px',
+                      right: 0,
+                      width: '420px',
+                      background: '#ffffff',
+                      borderRadius: '14px',
+                      boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+                      border: '1px solid #e2e8f0',
+                      padding: '20px',
+                      zIndex: 999,
+                      textAlign: 'left'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
+                      <span style={{ fontSize: '14px', fontWeight: '850', color: '#1e293b' }}>
+                        🔔 THÔNG BÁO ({dbStats?.notifications?.filter(n => !n.read && !n.isRead).length || 0})
+                      </span>
+                      {dbStats?.notifications && dbStats.notifications.length > 0 && (
+                        <button
+                          onClick={() => {
+                            api.markAllNotificationsAsRead().then(() => {
+                              setDbStats(prev => {
+                                if (!prev) return prev;
+                                return {
+                                  ...prev,
+                                  notifications: prev.notifications.map(n => ({ ...n, read: true, isRead: true }))
+                                };
+                              });
+                            }).catch(console.error);
+                          }}
+                          style={{ background: 'none', border: 'none', color: '#6c5ce7', fontSize: '13px', cursor: 'pointer', fontWeight: '700' }}
+                        >
+                          Đọc tất cả
+                        </button>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '380px', overflowY: 'auto', paddingRight: '4px' }}>
+                      {dbStats?.notifications && dbStats.notifications.length > 0 ? (
+                        dbStats.notifications.slice(0, 5).map((n) => {
+                          const icon = n.icon || (n.type === 'SUCCESS' ? '✅' : n.type === 'WARNING' ? '⚠️' : n.type === 'ERROR' ? '❌' : '🔔');
+                          const borderLeftColor = n.type === 'SUCCESS' ? '#10B981' : n.type === 'WARNING' ? '#F59E0B' : n.type === 'ERROR' ? '#EF4444' : '#6c5ce7';
+                          const isReadNotif = n.read || n.isRead;
+
+                          return (
+                            <div
+                              key={n.id}
+                              onClick={() => {
+                                if (!isReadNotif) {
+                                  api.markNotificationAsRead(n.id).then(() => {
+                                    setDbStats(prev => {
+                                      if (!prev) return prev;
+                                      return {
+                                        ...prev,
+                                        notifications: prev.notifications.map(item => item.id === n.id ? { ...item, read: true, isRead: true } : item)
+                                      };
+                                    });
+                                  }).catch(console.error);
+                                }
+                                setShowNotifDropdown(false);
+                                handleTabChange('notifications');
+                              }}
+                              style={{
+                                padding: '12px 16px', borderRadius: '12px',
+                                background: isReadNotif ? 'transparent' : 'rgba(108, 92, 231, 0.04)',
+                                border: '1px solid #e2e8f0',
+                                borderLeft: `5px solid ${borderLeftColor}`,
+                                fontSize: '13px', lineHeight: '1.45',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                                display: 'flex', gap: '12px', alignItems: 'flex-start'
+                              }}
+                            >
+                              <div style={{ fontSize: '18px', marginTop: '2px' }}>{icon}</div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontWeight: '750', color: '#1e293b', fontSize: '13.5px', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.title || 'Thông báo'}</div>
+                                <p style={{ color: '#64748b', margin: 0, fontSize: '12.5px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{n.text || n.message}</p>
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <p style={{ fontSize: '13px', color: '#64748b', textAlign: 'center', padding: '24px 0', fontWeight: '500' }}>Không có thông báo mới.</p>
+                      )}
+                    </div>
+
+                    <div style={{ marginTop: '14px', borderTop: '1px solid #f1f5f9', paddingTop: '12px', textAlign: 'center' }}>
+                      <button
+                        onClick={() => {
+                          setShowNotifDropdown(false);
+                          handleTabChange('notifications');
+                        }}
+                        style={{
+                          background: 'none', border: 'none', color: '#6c5ce7',
+                          fontSize: '13.5px', fontWeight: '700', cursor: 'pointer'
+                        }}
+                      >
+                        Xem tất cả thông báo ➔
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
 
             {/* Profile Avatar & Info */}
             <div className="tdb-header-user">

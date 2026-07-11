@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { startOfDayUTC } from '../lib/monthlyStats.js';
 import { logSystemEvent } from '../utils/logger.js';
+import { NotificationService } from '../services/notification.service.js';
 
 // ────────────────────────────────────────────────────────────
 // Utilities
@@ -692,6 +693,12 @@ export const blockUser = async (req: Request, res: Response) => {
       level: 'WARNING'
     });
 
+    try {
+      await NotificationService.sendTemplate('ACCOUNT_LOCKED', updated.id, { reason: updated.blockedReason || 'Không có lý do cụ thể' });
+    } catch (notifErr) {
+      console.error('[Notification Error] Failed to send ACCOUNT_LOCKED notification:', notifErr);
+    }
+
     res.json({
       success: true,
       message: 'Khóa tài khoản thành công',
@@ -735,6 +742,12 @@ export const unblockUser = async (req: Request, res: Response) => {
       metadata: { targetUserId: updated.id, email: updated.email },
       level: 'INFO'
     });
+
+    try {
+      await NotificationService.sendTemplate('ACCOUNT_UNLOCKED', updated.id, {});
+    } catch (notifErr) {
+      console.error('[Notification Error] Failed to send ACCOUNT_UNLOCKED notification:', notifErr);
+    }
 
     res.json({
       success: true,

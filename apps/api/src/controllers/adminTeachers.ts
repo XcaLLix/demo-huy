@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import bcrypt from 'bcrypt';
 import { logSystemEvent } from '../utils/logger.js';
+import { NotificationService } from '../services/notification.service.js';
 
 // ────────────────────────────────────────────────────────────
 // Get Teacher Stats (KPI cards)
@@ -335,6 +336,12 @@ export const approveTeacherProfile = async (req: Request, res: Response) => {
       level: 'INFO'
     });
 
+    try {
+      await NotificationService.sendTemplate('TEACHER_APPROVED', teacher.id, { fullName: teacher.fullName });
+    } catch (notifErr) {
+      console.error('[Notification Error] Failed to send TEACHER_APPROVED notification:', notifErr);
+    }
+
     return res.status(200).json({
       success: true,
       message: 'Duyệt hồ sơ giáo viên thành công!'
@@ -388,6 +395,12 @@ export const rejectTeacherProfile = async (req: Request, res: Response) => {
       metadata: { teacherId: teacher.id, email: teacher.email, reason: reason.trim() },
       level: 'WARNING'
     });
+
+    try {
+      await NotificationService.sendTemplate('TEACHER_REJECTED', teacher.id, { reason: reason.trim() });
+    } catch (notifErr) {
+      console.error('[Notification Error] Failed to send TEACHER_REJECTED notification:', notifErr);
+    }
 
     return res.status(200).json({
       success: true,
