@@ -546,9 +546,44 @@ export default function NotificationsPage({ currentUser, navigateTo }) {
                       {n.message}
                     </p>
                     {n.link && (
-                      <span style={{ fontSize: '11.5px', color: 'var(--primary)', fontWeight: 'bold', display: 'block', marginTop: '6px' }}>
-                        ➔ Nhấp vào đây để xem chi tiết
-                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!n.isRead) handleMarkRead(n.id);
+                          if (navigateTo) navigateTo(n.link);
+                        }}
+                        style={{
+                          marginTop: '12px',
+                          padding: '6px 14px',
+                          borderRadius: '8px',
+                          background: statusColor,
+                          color: '#FFFFFF',
+                          border: '1.5px solid #000000',
+                          boxShadow: '1.5px 1.5px 0px #000000',
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          transition: 'all 0.1s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translate(-1px, -1px)';
+                          e.currentTarget.style.boxShadow = '2.5px 2.5px 0px #000000';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'none';
+                          e.currentTarget.style.boxShadow = '1.5px 1.5px 0px #000000';
+                        }}
+                      >
+                        {n.category === 'COURSE' && 'Vào học ngay 🚀'}
+                        {n.category === 'EXAM' && 'Luyện tập ngay 📝'}
+                        {n.category === 'PAYMENT' && 'Xem chi tiết 🧾'}
+                        {n.category === 'TEACHER' && 'Xem lớp học 👨‍🏫'}
+                        {n.category === 'AI' && 'Khám phá AI 🤖'}
+                        {!['COURSE', 'EXAM', 'PAYMENT', 'TEACHER', 'AI'].includes(n.category) && 'Xem chi tiết ➔'}
+                      </button>
                     )}
                   </div>
                 </div>

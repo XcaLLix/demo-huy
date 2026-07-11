@@ -3955,6 +3955,7 @@ export default function App() {
                   onAddQuestion={handleAddQuestion}
                   addLog={addLog}
                   activeTab={parsedRoute.tab}
+                  navigateTo={navigateTo}
                   setActiveTab={(tab) => {
                     const prefix = parsedRoute.route === 'teacher' ? '/teacher' : '/dashboard';
                     if (tab === 'courses') navigateTo(`${prefix}/courses`);

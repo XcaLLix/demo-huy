@@ -1803,9 +1803,54 @@ export default function LandingPage({
                                   }}
                                 >
                                   <div style={{ fontSize: '18px', marginTop: '2px' }}>{icon}</div>
-                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                                     <div style={{ fontWeight: '750', color: 'var(--text-main, #1e293b)', fontSize: '13.5px', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.title || 'Thông báo'}</div>
                                     <p style={{ color: 'var(--text-muted, #64748b)', margin: 0, fontSize: '12.5px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{n.text || n.message}</p>
+                                    {n.link && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (navigateTo) {
+                                            if (!isReadNotif) {
+                                              api.markNotificationAsRead(n.id).catch(console.error);
+                                            }
+                                            navigateTo(n.link);
+                                          }
+                                          setNotifDropdownOpen(false);
+                                        }}
+                                        style={{
+                                          marginTop: '10px',
+                                          padding: '6px 12px',
+                                          borderRadius: '8px',
+                                          background: borderLeftColor,
+                                          color: '#FFFFFF',
+                                          border: '1.5px solid #000000',
+                                          boxShadow: '1.5px 1.5px 0px #000000',
+                                          fontSize: '11px',
+                                          fontWeight: 'bold',
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          transition: 'all 0.1s ease',
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          e.currentTarget.style.transform = 'translate(-1px, -1px)';
+                                          e.currentTarget.style.boxShadow = '2.5px 2.5px 0px #000000';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.currentTarget.style.transform = 'none';
+                                          e.currentTarget.style.boxShadow = '1.5px 1.5px 0px #000000';
+                                        }}
+                                      >
+                                        {n.category === 'COURSE' && 'Vào học ngay 🚀'}
+                                        {n.category === 'EXAM' && 'Luyện tập ngay 📝'}
+                                        {n.category === 'PAYMENT' && 'Xem chi tiết 🧾'}
+                                        {n.category === 'TEACHER' && 'Xem lớp học 👨‍🏫'}
+                                        {n.category === 'AI' && 'Khám phá AI 🤖'}
+                                        {!['COURSE', 'EXAM', 'PAYMENT', 'TEACHER', 'AI'].includes(n.category) && 'Xem chi tiết ➔'}
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
                               );

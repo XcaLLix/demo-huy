@@ -48,6 +48,7 @@ export default function Header({
   onToggleTheme,
   notifications = EMPTY_ARRAY,
   onClearNotifications,
+  onNotificationClick,
   onLogout,
   onChangePassword,
   onNavigateSettings,
@@ -424,9 +425,49 @@ export default function Header({
                     }}
                   >
                     <div style={{ fontSize: '18px', marginTop: '2px' }}>{icon}</div>
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                       <div style={{ fontWeight: '900', color: '#1E293B', fontSize: '13.5px', marginBottom: '4px' }}>{n.title || 'Thông báo'}</div>
                       <p style={{ color: '#4B5563', margin: 0, fontSize: '12.5px', fontWeight: isReadNotif ? 'normal' : '500' }}>{n.text || n.message}</p>
+                      {n.link && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onNotificationClick) onNotificationClick(n);
+                            setShowNotif(false);
+                          }}
+                          style={{
+                            marginTop: '10px',
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            background: borderLeftColor,
+                            color: '#FFFFFF',
+                            border: '1.5px solid #000000',
+                            boxShadow: '1.5px 1.5px 0px #000000',
+                            fontSize: '11.5px',
+                            fontWeight: '900',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.1s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translate(-1px, -1px)';
+                            e.currentTarget.style.boxShadow = '2.5px 2.5px 0px #000000';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'none';
+                            e.currentTarget.style.boxShadow = '1.5px 1.5px 0px #000000';
+                          }}
+                        >
+                          {n.category === 'COURSE' && 'Vào học ngay 🚀'}
+                          {n.category === 'EXAM' && 'Luyện tập ngay 📝'}
+                          {n.category === 'PAYMENT' && 'Xem chi tiết 🧾'}
+                          {n.category === 'TEACHER' && 'Xem lớp học 👨‍🏫'}
+                          {n.category === 'AI' && 'Khám phá AI 🤖'}
+                          {!['COURSE', 'EXAM', 'PAYMENT', 'TEACHER', 'AI'].includes(n.category) && 'Xem chi tiết ➔'}
+                        </button>
+                      )}
                       <span style={{ fontSize: '10.5px', color: '#9CA3AF', marginTop: '6px', display: 'block' }}>{n.time}</span>
                     </div>
                   </div>
