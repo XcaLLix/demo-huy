@@ -277,11 +277,17 @@ export const api = {
   reactForumPost: (id, type) =>
     request(`/forum/posts/${id}/react`, { method: 'POST', body: { type } }),
 
+  toggleSaveForumPost: (id) =>
+    request(`/forum/posts/${id}/save`, { method: 'POST' }),
+
   getForumComments: (postId) =>
     request(`/forum/posts/${postId}/comments`, { method: 'GET' }),
 
   createForumComment: (postId, content, parentId = null) =>
     request(`/forum/posts/${postId}/comments`, { method: 'POST', body: { content, parentId } }),
+
+  reactForumComment: (id, type) =>
+    request(`/forum/comments/${id}/react`, { method: 'POST', body: { type } }),
 
   acceptCommentSolution: (id) =>
     request(`/forum/comments/${id}/accept`, { method: 'PUT' }),

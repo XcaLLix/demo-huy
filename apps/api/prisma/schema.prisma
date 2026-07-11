@@ -42,6 +42,7 @@ model User {
   forumPosts         ForumPost[]
   forumComments      ForumComment[]
   forumReactions     ForumReaction[]
+  savedPosts         SavedForumPost[]
   moderatedCategories ForumCategory[]     @relation("CategoryModerators")
   createdGroups      StudyGroup[]        @relation("GroupCreator")
   groupMemberships   StudyGroupMember[]
@@ -494,6 +495,7 @@ model ForumPost {
   studyGroupId   Int?
   studyGroup     StudyGroup?     @relation(fields: [studyGroupId], references: [id], onDelete: SetNull)
   reports        ForumReport[]
+  savedBy        SavedForumPost[]
   
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
@@ -542,6 +544,19 @@ model ForumReaction {
   @@unique([userId, commentId, type])
   @@index([postId])
   @@index([commentId])
+}
+
+model SavedForumPost {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId    Int
+  post      ForumPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+
+  @@unique([userId, postId])
+  @@index([userId])
+  @@index([postId])
 }
 
 model ForumTag {
