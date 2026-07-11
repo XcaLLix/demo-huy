@@ -99,6 +99,19 @@ export default function Forum({ currentUser }) {
   const [replyTargetId, setReplyTargetId] = useState(null); // Track which comment we are replying to
   const [submitting, setSubmitting] = useState(false);
 
+  // Advanced Filtering controls
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [filterDifficulty, setFilterDifficulty] = useState('All');
+  const [filterResolved, setFilterResolved] = useState('All');
+  const [filterHasAttachment, setFilterHasAttachment] = useState(false);
+  const [filterDateRange, setFilterDateRange] = useState('All');
+
+  // Image Upload Previews & Drag states
+  const [postImages, setPostImages] = useState([]);
+  const [commentImages, setCommentImages] = useState([]);
+  const [dragOverPost, setDragOverPost] = useState(false);
+  const [dragOverComment, setDragOverComment] = useState(false);
+
   // Socket setup
   const socketRef = useRef(null);
 
@@ -157,7 +170,7 @@ export default function Forum({ currentUser }) {
 
   // Fetch posts on filters change or tab change
   useEffect(() => {
-    if (activeTab === 'feed') {
+    if (activeTab === 'feed' || activeTab === 'saved') {
       fetchPosts();
     } else if (activeTab === 'groups') {
       fetchStudyGroups();
@@ -165,7 +178,7 @@ export default function Forum({ currentUser }) {
       fetchLeaderboard();
     }
     fetchGamifyProfile();
-  }, [activeTab, selectedCategory, selectedType, selectedTag, sortType]);
+  }, [activeTab, selectedCategory, selectedType, selectedTag, sortType, filterDifficulty, filterResolved, filterHasAttachment, filterDateRange]);
 
   // Monitor room join / leave on post selection
   useEffect(() => {
@@ -223,7 +236,12 @@ export default function Forum({ currentUser }) {
         postType: selectedType === 'All' ? '' : selectedType,
         tag: selectedTag,
         search: searchQuery,
-        sort: sortType === 'newest' ? '' : sortType
+        sort: sortType === 'newest' ? '' : sortType,
+        difficulty: filterDifficulty === 'All' ? '' : filterDifficulty,
+        resolved: filterResolved === 'All' ? '' : filterResolved,
+        hasAttachment: filterHasAttachment ? 'true' : '',
+        dateRange: filterDateRange === 'All' ? '' : filterDateRange,
+        isSaved: activeTab === 'saved' ? 'true' : ''
       };
       const data = await api.getForumPosts(params);
       setPosts(data || []);
@@ -387,9 +405,14 @@ export default function Forum({ currentUser }) {
         .map(t => t.trim())
         .filter(t => t.length > 0);
 
+      let finalContent = newContent.trim();
+      if (postImages.length > 0) {
+        finalContent += '\n\n' + postImages.map(img => `![ảnh](${img})`).join('\n');
+      }
+
       const postPayload = {
         title: newTitle,
-        content: newContent,
+        content: finalContent,
         categoryId: Number(newCategoryId),
         postType: newPostType,
         difficulty: newPostType === 'QA' ? newDifficulty : undefined,
@@ -404,6 +427,7 @@ export default function Forum({ currentUser }) {
       setNewContent('');
       setNewTagsString('');
       setResourceFile(null);
+      setPostImages([]);
       setShowCreateModal(false);
       
       // Reload stream
@@ -426,8 +450,8 @@ export default function Forum({ currentUser }) {
     try {
       const data = await api.uploadFile(file);
       if (data && data.url) {
-        setNewContent(prev => prev + (prev ? '\n' : '') + `![ảnh](${data.url})`);
-        toast('Tải ảnh lên thành công và đã thêm vào nội dung!', 'success');
+        setPostImages(prev => [...prev, data.url]);
+        toast('Tải ảnh lên thành công!', 'success');
       }
     } catch (err) {
       toast(err.message || 'Tải ảnh lên thất bại!', 'error');
@@ -443,8 +467,8 @@ export default function Forum({ currentUser }) {
     try {
       const data = await api.uploadFile(file);
       if (data && data.url) {
-        setCommentText(prev => prev + (prev ? ' ' : '') + `![ảnh](${data.url})`);
-        toast('Tải ảnh lên thành công và đã thêm vào bình luận!', 'success');
+        setCommentImages(prev => [...prev, data.url]);
+        toast('Tải ảnh lên thành công!', 'success');
       }
     } catch (err) {
       toast(err.message || 'Tải ảnh lên thất bại!', 'error');
@@ -453,7 +477,7 @@ export default function Forum({ currentUser }) {
     }
   };
 
-  const handlePasteImage = async (e, setContent) => {
+  const handlePasteImage = async (e, isPost = true) => {
     const items = e.clipboardData?.items;
     if (!items) return;
     
@@ -467,23 +491,12 @@ export default function Forum({ currentUser }) {
         try {
           const data = await api.uploadFile(file);
           if (data && data.url) {
-            const markdownImage = `![ảnh](${data.url})`;
-            
-            const textarea = e.target;
-            const start = textarea.selectionStart || 0;
-            const end = textarea.selectionEnd || 0;
-            const text = textarea.value || '';
-            const newText = text.substring(0, start) + markdownImage + text.substring(end);
-            
-            setContent(newText);
-            
-            setTimeout(() => {
-              textarea.focus();
-              const newCursorPos = start + markdownImage.length;
-              textarea.setSelectionRange(newCursorPos, newCursorPos);
-            }, 0);
-            
-            toast('Đã dán và tải ảnh lên thành công!', 'success');
+            if (isPost) {
+              setPostImages(prev => [...prev, data.url]);
+            } else {
+              setCommentImages(prev => [...prev, data.url]);
+            }
+            toast('Dán ảnh thành công!', 'success');
           }
         } catch (err) {
           toast(err.message || 'Tải ảnh từ clipboard thất bại!', 'error');
@@ -495,12 +508,46 @@ export default function Forum({ currentUser }) {
     }
   };
 
+  const handleDropImage = async (e, isPost = true) => {
+    e.preventDefault();
+    const files = e.dataTransfer?.files;
+    if (!files || files.length === 0) return;
+    
+    const file = files[0];
+    if (file.type.indexOf('image') === -1) {
+      toast('Chỉ hỗ trợ tải lên tệp hình ảnh!', 'warning');
+      return;
+    }
+    
+    setUploadingImage(true);
+    try {
+      const data = await api.uploadFile(file);
+      if (data && data.url) {
+        if (isPost) {
+          setPostImages(prev => [...prev, data.url]);
+        } else {
+          setCommentImages(prev => [...prev, data.url]);
+        }
+        toast('Tải ảnh lên từ kéo thả thành công!', 'success');
+      }
+    } catch (err) {
+      toast(err.message || 'Tải ảnh lên thất bại!', 'error');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const handleSendComment = async (e) => {
     e.preventDefault();
     if (!commentText.trim() || submitting) return;
     setSubmitting(true);
     try {
-      const newComment = await api.createForumComment(selectedPost.id, commentText, replyTargetId);
+      let finalComment = commentText.trim();
+      if (commentImages.length > 0) {
+        finalComment += '\n\n' + commentImages.map(img => `![ảnh](${img})`).join('\n');
+      }
+
+      const newComment = await api.createForumComment(selectedPost.id, finalComment, replyTargetId);
 
       if (replyTargetId) {
         setComments(prev => prev.map(c => {
@@ -518,6 +565,7 @@ export default function Forum({ currentUser }) {
       }
 
       setCommentText('');
+      setCommentImages([]);
       setReplyTargetId(null);
       fetchGamifyProfile();
     } catch (err) {
@@ -528,24 +576,29 @@ export default function Forum({ currentUser }) {
   };
 
   const handleLikePost = async (postId) => {
+    await handleReactPost(postId, 'UPVOTE');
+  };
+
+  const handleReactPost = async (postId, type) => {
     if (!currentUser) {
-      toast('Vui lòng đăng nhập để bình chọn!', 'warning');
+      toast('Vui lòng đăng nhập để bày tỏ cảm xúc!', 'warning');
       return;
     }
     try {
-      const result = await api.reactForumPost(postId, 'UPVOTE');
+      const result = await api.reactForumPost(postId, type);
       
-      // Update local UI state
       setPosts(prev => prev.map(p => {
         if (p.id === postId) {
-          const userHasLiked = p.likedBy?.includes(currentUser.id);
-          const nextLikedBy = userHasLiked
-            ? p.likedBy.filter(id => id !== currentUser.id)
-            : [...(p.likedBy || []), currentUser.id];
+          const userReaction = result.userReaction;
+          const likedBy = userReaction 
+            ? (p.likedBy?.includes(currentUser.id) ? p.likedBy : [...(p.likedBy || []), currentUser.id])
+            : p.likedBy?.filter(id => id !== currentUser.id);
           return {
             ...p,
             likes: result.likes,
-            likedBy: nextLikedBy
+            likedBy,
+            reactionCounts: result.reactionCounts,
+            userReaction: result.userReaction
           };
         }
         return p;
@@ -553,19 +606,81 @@ export default function Forum({ currentUser }) {
 
       if (selectedPost && selectedPost.id === postId) {
         setSelectedPost(prev => {
-          const userHasLiked = prev.likedBy?.includes(currentUser.id);
-          const nextLikedBy = userHasLiked
-            ? prev.likedBy.filter(id => id !== currentUser.id)
-            : [...(prev.likedBy || []), currentUser.id];
+          const userReaction = result.userReaction;
+          const likedBy = userReaction 
+            ? (prev.likedBy?.includes(currentUser.id) ? prev.likedBy : [...(prev.likedBy || []), currentUser.id])
+            : prev.likedBy?.filter(id => id !== currentUser.id);
           return {
             ...prev,
             likes: result.likes,
-            likedBy: nextLikedBy
+            likedBy,
+            reactionCounts: result.reactionCounts,
+            userReaction: result.userReaction
           };
         });
       }
     } catch (err) {
-      toast(err.message || 'Thao tác vote thất bại!', 'error');
+      toast(err.message || 'Thao tác bày tỏ cảm xúc thất bại!', 'error');
+    }
+  };
+
+  const handleReactComment = async (commentId, type) => {
+    if (!currentUser) {
+      toast('Vui lòng đăng nhập để bày tỏ cảm xúc!', 'warning');
+      return;
+    }
+    try {
+      const result = await api.reactForumComment(commentId, type);
+      
+      setComments(prev => {
+        const updateReplies = (replies) => {
+          return (replies || []).map(r => {
+            if (r.id === commentId) {
+              return { ...r, reactionCounts: result.reactionCounts, userReaction: result.userReaction };
+            }
+            return { ...r, replies: updateReplies(r.replies) };
+          });
+        };
+
+        return prev.map(c => {
+          if (c.id === commentId) {
+            return { ...c, reactionCounts: result.reactionCounts, userReaction: result.userReaction };
+          }
+          return { ...c, replies: updateReplies(c.replies) };
+        });
+      });
+    } catch (err) {
+      toast(err.message || 'Thao tác bày tỏ cảm xúc thất bại!', 'error');
+    }
+  };
+
+  const handleToggleSavePost = async (e, post) => {
+    e.stopPropagation();
+    if (!currentUser) {
+      toast('Vui lòng đăng nhập để lưu bài viết!', 'warning');
+      return;
+    }
+    try {
+      const res = await api.toggleSaveForumPost(post.id);
+      
+      setPosts(prev => prev.map(p => {
+        if (p.id === post.id) {
+          return { ...p, isSaved: res.isSaved };
+        }
+        return p;
+      }));
+
+      if (selectedPost && selectedPost.id === post.id) {
+        setSelectedPost(prev => ({ ...prev, isSaved: res.isSaved }));
+      }
+      
+      toast(res.message, 'success');
+      
+      if (activeTab === 'saved' && !res.isSaved) {
+        setPosts(prev => prev.filter(p => p.id !== post.id));
+      }
+    } catch (err) {
+      toast(err.message || 'Lỗi lưu bài viết!', 'error');
     }
   };
 
@@ -659,7 +774,7 @@ export default function Forum({ currentUser }) {
         </div>
         
         <div style={{ display: 'flex', gap: '10px' }}>
-          {activeTab === 'feed' && (
+          {(activeTab === 'feed' || activeTab === 'saved') && (
             <button 
               className="btn-primary" 
               onClick={() => setShowCreateModal(true)} 
@@ -733,7 +848,8 @@ export default function Forum({ currentUser }) {
           <div style={{ display: 'flex', marginBottom: '24px', gap: '12px' }}>
             {[
               { id: 'feed', label: 'Bài thảo luận', icon: <HiChat /> },
-              { id: 'groups', label: 'Nhóm học tập', icon: <HiUserGroup /> }
+              { id: 'groups', label: 'Nhóm học tập', icon: <HiUserGroup /> },
+              { id: 'saved', label: 'Bài viết đã lưu', icon: <HiStar /> }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -837,20 +953,63 @@ export default function Forum({ currentUser }) {
               )}
 
               {/* Action Buttons Row */}
-              <div style={{ display: 'flex', gap: '20px', borderTop: '1px solid var(--border)', paddingTop: '16px', marginBottom: '24px' }}>
-                <button 
-                  onClick={() => handleLikePost(selectedPost.id)}
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '16px', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+                <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    {[
+                      { type: 'LIKE', emoji: '👍', label: 'Thích' },
+                      { type: 'LOVE', emoji: '❤️', label: 'Yêu thích' },
+                      { type: 'LAUGH', emoji: '😄', label: 'Cười' },
+                      { type: 'CLAP', emoji: '👏', label: 'Vỗ tay' }
+                    ].map(reaction => {
+                      const count = selectedPost.reactionCounts?.[reaction.type] || 0;
+                      const isUserReacted = selectedPost.userReaction === reaction.type;
+                      return (
+                        <button
+                          key={reaction.type}
+                          onClick={() => handleReactPost(selectedPost.id, reaction.type)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            background: isUserReacted ? 'var(--primary-bg)' : 'transparent',
+                            border: isUserReacted ? '1px solid var(--primary)' : '1px solid transparent',
+                            borderRadius: '20px',
+                            padding: '6px 12px',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            color: isUserReacted ? 'var(--primary)' : 'var(--text-secondary)',
+                            transition: 'all 0.15s ease'
+                          }}
+                          title={reaction.label}
+                        >
+                          <span>{reaction.emoji}</span>
+                          {count > 0 && <span style={{ fontWeight: 'bold' }}>{count}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                    <HiChat style={{ fontSize: '18px' }} /> {comments.length} Phản hồi
+                  </span>
+                </div>
+                
+                <button
+                  onClick={(e) => handleToggleSavePost(e, selectedPost)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: '6px', border: 'none', background: 'none',
-                    color: selectedPost.likedBy?.includes(currentUser?.id) ? 'var(--accent-red)' : 'var(--text-secondary)',
-                    cursor: 'pointer', fontWeight: 'bold'
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    border: 'none',
+                    background: 'none',
+                    color: selectedPost.isSaved ? '#f1c40f' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '13px'
                   }}
                 >
-                  <HiHeart style={{ fontSize: '18px' }} /> {selectedPost.likes || 0} Hữu ích
+                  <HiStar style={{ fontSize: '18px' }} /> {selectedPost.isSaved ? 'Đã lưu' : 'Lưu lại'}
                 </button>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)' }}>
-                  <HiChat style={{ fontSize: '18px' }} /> {comments.length} Phản hồi
-                </span>
               </div>
 
               {/* Comments Section */}
@@ -914,6 +1073,41 @@ export default function Forum({ currentUser }) {
                           {renderSanitizedContent(c.content)}
                         </div>
 
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', paddingLeft: '36px', marginTop: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                          {[
+                            { type: 'LIKE', emoji: '👍', label: 'Thích' },
+                            { type: 'LOVE', emoji: '❤️', label: 'Yêu thích' },
+                            { type: 'LAUGH', emoji: '😄', label: 'Cười' },
+                            { type: 'CLAP', emoji: '👏', label: 'Vỗ tay' }
+                          ].map(reaction => {
+                            const count = c.reactionCounts?.[reaction.type] || 0;
+                            const isUserReacted = c.userReaction === reaction.type;
+                            return (
+                              <button
+                                key={reaction.type}
+                                onClick={() => handleReactComment(c.id, reaction.type)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  background: isUserReacted ? 'var(--primary-bg)' : 'transparent',
+                                  border: isUserReacted ? '1px solid var(--primary)' : '1px solid transparent',
+                                  borderRadius: '20px',
+                                  padding: '2px 8px',
+                                  fontSize: '11px',
+                                  cursor: 'pointer',
+                                  color: isUserReacted ? 'var(--primary)' : 'var(--text-secondary)',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                title={reaction.label}
+                              >
+                                <span>{reaction.emoji}</span>
+                                {count > 0 && <span style={{ fontWeight: 'bold' }}>{count}</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+
                         {/* Nesting replies handler */}
                         <div style={{ paddingLeft: '36px', marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                           {c.replies && c.replies.map(reply => (
@@ -944,37 +1138,73 @@ export default function Forum({ currentUser }) {
                 </div>
 
                 {/* Reply form */}
-                <form onSubmit={handleSendComment} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder={replyTargetId ? "Viết phản hồi của bạn... (Hỗ trợ Ctrl+V để dán ảnh)" : "Giải pháp hoặc ý kiến thảo luận của bạn... (Hỗ trợ Ctrl+V để dán ảnh)"}
-                    value={commentText}
-                    onChange={e => setCommentText(e.target.value)}
-                    onPaste={(e) => handlePasteImage(e, setCommentText)}
-                    style={{ flex: 1 }}
-                    required
-                  />
-                  <label className="btn-outline" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: '8px 12px', fontSize: '14px', margin: 0, height: '38px', boxSizing: 'border-box' }} title="Tải ảnh lên">
-                    {uploadingImage ? '⏳' : '📷'}
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      onChange={handleUploadImageForComment} 
-                      disabled={uploadingImage || submitting} 
-                      style={{ display: 'none' }} 
+                <form onSubmit={handleSendComment} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    <textarea
+                      className="form-control"
+                      placeholder={replyTargetId ? "Viết phản hồi của bạn... (Kéo thả ảnh hoặc dán Ctrl+V trực tiếp vào đây)" : "Giải pháp hoặc ý kiến thảo luận của bạn... (Kéo thả ảnh hoặc dán Ctrl+V trực tiếp vào đây)"}
+                      value={commentText}
+                      onChange={e => setCommentText(e.target.value)}
+                      onPaste={(e) => handlePasteImage(e, false)}
+                      onDragOver={(e) => { e.preventDefault(); setDragOverComment(true); }}
+                      onDragLeave={() => setDragOverComment(false)}
+                      onDrop={(e) => { setDragOverComment(false); handleDropImage(e, false); }}
+                      style={{
+                        flex: 1,
+                        minHeight: '80px',
+                        resize: 'vertical',
+                        border: dragOverComment ? '2px dashed #6c5ce7' : '2.5px solid #000000',
+                        background: dragOverComment ? '#f3f0ff' : '#FFFFFF',
+                        transition: 'all 0.15s ease'
+                      }}
+                      required
                     />
-                  </label>
-                  <button type="submit" className="btn-primary" style={{ padding: '8px 16px', height: '38px' }} disabled={submitting}>
-                    {submitting ? 'Gửi...' : 'Gửi'}
-                  </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <label className="btn-outline" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: '8px 12px', fontSize: '14px', margin: 0, height: '38px', boxSizing: 'border-box' }} title="Tải ảnh lên">
+                        {uploadingImage ? '⏳' : '📷'}
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          onChange={handleUploadImageForComment} 
+                          disabled={uploadingImage || submitting} 
+                          style={{ display: 'none' }} 
+                        />
+                      </label>
+                      <button type="submit" className="btn-primary" style={{ padding: '8px 16px', height: '38px' }} disabled={submitting}>
+                        {submitting ? 'Gửi...' : 'Gửi'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {commentImages.length > 0 && (
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '4px' }}>
+                      {commentImages.map((url, idx) => (
+                        <div key={idx} style={{ position: 'relative', width: '60px', height: '60px', border: '2px solid #000000', borderRadius: '8px', overflow: 'hidden' }}>
+                          <img src={url} alt="Comment Uploaded preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <button
+                            type="button"
+                            onClick={() => setCommentImages(prev => prev.filter((_, i) => i !== idx))}
+                            style={{
+                              position: 'absolute', top: '2px', right: '2px',
+                              background: '#ff7675', color: '#fff', border: '1px solid #000',
+                              borderRadius: '50%', width: '16px', height: '16px',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              cursor: 'pointer', fontSize: '8px', fontWeight: 'bold'
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </form>
               </div>
             </div>
           ) : (
             /* LISTINGS OR TABS */
             <div>
-              {activeTab === 'feed' && (
+              {(activeTab === 'feed' || activeTab === 'saved') && (
                 <div>
                   {/* Filters Bar */}
                   <div className="card" style={{
@@ -1082,7 +1312,29 @@ export default function Forum({ currentUser }) {
                       <option value="pinned">Đã ghim lên đầu</option>
                     </select>
 
-                    {(searchQuery || selectedCategory !== 'All' || selectedType !== 'All' || selectedTag) && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                      style={{
+                        padding: '10px 18px',
+                        border: '2px solid #000000',
+                        background: showAdvancedFilters ? '#6c5ce7' : '#FFFFFF',
+                        color: showAdvancedFilters ? '#FFFFFF' : '#1E293B',
+                        fontWeight: 'bold',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        transition: 'all 0.15s',
+                        boxShadow: '2px 2px 0px #000000',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      Lọc nâng cao {showAdvancedFilters ? '▲' : '▼'}
+                    </button>
+
+                    {(searchQuery || selectedCategory !== 'All' || selectedType !== 'All' || selectedTag || filterDifficulty !== 'All' || filterResolved !== 'All' || filterHasAttachment || filterDateRange !== 'All') && (
                       <button 
                         className="btn-outline" 
                         onClick={() => {
@@ -1091,6 +1343,10 @@ export default function Forum({ currentUser }) {
                           setSelectedType('All');
                           setSelectedTag('');
                           setSortType('newest');
+                          setFilterDifficulty('All');
+                          setFilterResolved('All');
+                          setFilterHasAttachment(false);
+                          setFilterDateRange('All');
                         }}
                         style={{
                           padding: '10px 18px',
@@ -1111,6 +1367,75 @@ export default function Forum({ currentUser }) {
                       </button>
                     )}
                   </div>
+
+                  {showAdvancedFilters && (
+                    <div className="card animate-in" style={{
+                      padding: '20px',
+                      marginBottom: '24px',
+                      background: '#F8FAFC',
+                      border: '2.5px solid #000000',
+                      borderRadius: '16px',
+                      boxShadow: '4px 4px 0px #000000',
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                      gap: '20px'
+                    }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12.5px', fontWeight: '900', color: '#1E293B', marginBottom: '8px' }}>⚙️ Độ khó (Q&A):</label>
+                        <select
+                          className="form-control"
+                          value={filterDifficulty}
+                          onChange={e => setFilterDifficulty(e.target.value)}
+                          style={{ width: '100%', border: '2px solid #000000', borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: 'bold', background: '#FFFFFF', outline: 'none' }}
+                        >
+                          <option value="All">Tất cả độ khó</option>
+                          <option value="EASY">Dễ</option>
+                          <option value="MEDIUM">Trung bình</option>
+                          <option value="HARD">Khó</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12.5px', fontWeight: '900', color: '#1E293B', marginBottom: '8px' }}>✓ Lời giải:</label>
+                        <select
+                          className="form-control"
+                          value={filterResolved}
+                          onChange={e => setFilterResolved(e.target.value)}
+                          style={{ width: '100%', border: '2px solid #000000', borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: 'bold', background: '#FFFFFF', outline: 'none' }}
+                        >
+                          <option value="All">Tất cả trạng thái</option>
+                          <option value="true">Đã duyệt lời giải hay</option>
+                          <option value="false">Chưa giải quyết</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12.5px', fontWeight: '900', color: '#1E293B', marginBottom: '8px' }}>📅 Thời gian đăng:</label>
+                        <select
+                          className="form-control"
+                          value={filterDateRange}
+                          onChange={e => setFilterDateRange(e.target.value)}
+                          style={{ width: '100%', border: '2px solid #000000', borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: 'bold', background: '#FFFFFF', outline: 'none' }}
+                        >
+                          <option value="All">Mọi thời gian</option>
+                          <option value="24h">Trong 24 giờ qua</option>
+                          <option value="7d">Trong 7 ngày qua</option>
+                          <option value="30d">Trong 30 ngày qua</option>
+                        </select>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '24px' }}>
+                        <input
+                          type="checkbox"
+                          id="filterHasAttachment"
+                          checked={filterHasAttachment}
+                          onChange={e => setFilterHasAttachment(e.target.checked)}
+                          style={{ cursor: 'pointer', width: '20px', height: '20px', accentColor: '#6c5ce7', border: '2px solid #000000' }}
+                        />
+                        <label htmlFor="filterHasAttachment" style={{ fontSize: '13px', fontWeight: '900', color: '#1E293B', cursor: 'pointer', userSelect: 'none' }}>📎 Có đính kèm tài liệu</label>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Popular Tags List */}
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px', alignItems: 'center' }}>
@@ -1184,13 +1509,31 @@ export default function Forum({ currentUser }) {
                               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <HiUser /> {post.author?.fullName}
                               </span>
-                              <div style={{ display: 'flex', gap: '14px' }}>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: post.likedBy?.includes(currentUser?.id) ? 'var(--accent-red)' : 'var(--text-secondary)' }}>
-                                  <HiHeart /> {post.likes || 0}
-                                </span>
+                              <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', gap: '4px' }}>
+                                  {['LIKE', 'LOVE', 'LAUGH', 'CLAP'].map(type => {
+                                    const count = post.reactionCounts?.[type] || 0;
+                                    if (count === 0) return null;
+                                    const emoji = type === 'LIKE' ? '👍' : type === 'LOVE' ? '❤️' : type === 'LAUGH' ? '😄' : '👏';
+                                    return <span key={type} title={type}>{emoji} {count}</span>;
+                                  })}
+                                </div>
                                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                   <HiChat /> {post.comments?.length || 0}
                                 </span>
+                                <button
+                                  onClick={(e) => handleToggleSavePost(e, post)}
+                                  style={{
+                                    border: 'none',
+                                    background: 'none',
+                                    padding: 0,
+                                    cursor: 'pointer',
+                                    color: post.isSaved ? '#f1c40f' : 'var(--text-muted)'
+                                  }}
+                                  title={post.isSaved ? "Bỏ lưu bài viết" : "Lưu bài viết"}
+                                >
+                                  <HiStar style={{ fontSize: '16px' }} />
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -1774,11 +2117,44 @@ export default function Forum({ currentUser }) {
                   </label>
                 </div>
                 <textarea 
-                  className="form-control" placeholder="Nhập nội dung chi tiết bài toán, bạn đã thử cách nào... (Hỗ trợ Ctrl+V để dán ảnh từ clipboard)"
+                  className="form-control" placeholder="Nhập nội dung chi tiết bài toán... (Kéo thả ảnh hoặc dán Ctrl+V trực tiếp vào đây)"
                   value={newContent} onChange={e => setNewContent(e.target.value)} 
-                  onPaste={(e) => handlePasteImage(e, setNewContent)}
-                  style={{ width: '100%', minHeight: '120px', resize: 'vertical' }} required
+                  onPaste={(e) => handlePasteImage(e, true)}
+                  onDragOver={(e) => { e.preventDefault(); setDragOverPost(true); }}
+                  onDragLeave={() => setDragOverPost(false)}
+                  onDrop={(e) => { setDragOverPost(false); handleDropImage(e, true); }}
+                  style={{
+                    width: '100%',
+                    minHeight: '120px',
+                    resize: 'vertical',
+                    border: dragOverPost ? '2px dashed #6c5ce7' : '2.5px solid #000000',
+                    background: dragOverPost ? '#f3f0ff' : '#FFFFFF',
+                    transition: 'all 0.15s ease'
+                  }} required
                 />
+
+                {postImages.length > 0 && (
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '10px' }}>
+                    {postImages.map((url, idx) => (
+                      <div key={idx} style={{ position: 'relative', width: '80px', height: '80px', border: '2px solid #000000', borderRadius: '8px', overflow: 'hidden' }}>
+                        <img src={url} alt="Uploaded preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <button
+                          type="button"
+                          onClick={() => setPostImages(prev => prev.filter((_, i) => i !== idx))}
+                          style={{
+                            position: 'absolute', top: '2px', right: '2px',
+                            background: '#ff7675', color: '#fff', border: '1px solid #000',
+                            borderRadius: '50%', width: '18px', height: '18px',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            cursor: 'pointer', fontSize: '9px', fontWeight: 'bold'
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
  
               <div className="form-group">

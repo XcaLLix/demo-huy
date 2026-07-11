@@ -63,3 +63,26 @@ export function requireRole(allowedRoles: ('GUEST' | 'STUDENT' | 'TEACHER' | 'AD
   };
 }
 
+export async function optionalAuthenticateJWT(req: AuthRequest, res: Response, next: NextFunction) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return next();
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const payload = jwt.verify(token, JWT_SECRET) as AuthRequest['user'];
+    const dbUser = await prisma.user.findUnique({
+      where: { id: payload?.id },
+      select: { status: true, isActive: true }
+    });
+    
+    if (dbUser && dbUser.isActive && dbUser.status !== 'BLOCKED') {
+      req.user = payload;
+    }
+  } catch (err: any) {
+    // Treat as guest
+  }
+  next();
+}
+

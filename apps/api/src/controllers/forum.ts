@@ -54,6 +54,78 @@ function getLevelFromXP(xp: number): number {
   return level - 1 || 1;
 }
 
+const TOXIC_WORDS = [
+  'địt', 'đéo', 'vcl', 'đcm', 'đệt', 'đũy', 'dâm', 'khiêu dâm', 'lô đề', 'soi cầu',
+  'nhà cái', 'cá độ', 'cờ bạc', 'tuyển ctv', 'kiem tien online', 'kiếm tiền online',
+  'mua bán acc', 'hack game', 'sex', 'phim người lớn', 'đĩ', 'chịch', 'nứng'
+];
+
+async function moderateContent(title: string, content: string): Promise<{ isSafe: boolean; reason?: string }> {
+  const combinedText = `${title} ${content}`.toLowerCase();
+
+  // 1. Local checks
+  for (const word of TOXIC_WORDS) {
+    if (combinedText.includes(word)) {
+      return { isSafe: false, reason: `Nội dung phát hiện từ ngữ thô tục hoặc spam: "${word}"` };
+    }
+  }
+
+  // 2. OpenRouter AI checks
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    return { isSafe: true };
+  }
+
+  try {
+    const model = process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash';
+    const systemPrompt = `Bạn là AI kiểm duyệt nội dung của diễn đàn giáo dục EduPath. Hãy kiểm tra nội dung sau xem có vi phạm: quảng cáo rác (spam), cá độ, cờ bạc, lừa đảo, hoặc từ ngữ thô tục, bạo lực, 18+.
+Hãy trả về duy nhất định dạng JSON sau:
+{
+  "isSafe": true hoặc false,
+  "reason": "Lý do bằng tiếng Việt nếu không an toàn, nếu an toàn thì để rỗng"
+}`;
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://edupath.vn',
+        'X-Title': 'EduPath Forum Moderation'
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Tiêu đề: ${title}\nNội dung: ${content}` }
+        ],
+        temperature: 0.1,
+        max_tokens: 150
+      })
+    });
+
+    if (response.ok) {
+      const resData = (await response.json()) as any;
+      const contentText = resData.choices?.[0]?.message?.content || '';
+      try {
+        const parsed = JSON.parse(contentText.trim().replace(/^```json|```$/g, ''));
+        return {
+          isSafe: typeof parsed.isSafe === 'boolean' ? parsed.isSafe : true,
+          reason: parsed.reason || undefined
+        };
+      } catch (e) {
+        if (contentText.toLowerCase().includes('"issafe": false') || contentText.toLowerCase().includes('false')) {
+          return { isSafe: false, reason: 'Nội dung không hợp lệ hoặc chứa từ ngữ không chuẩn mực.' };
+        }
+      }
+    }
+  } catch (err: any) {
+    console.error('[AI Moderation Error]', err.message);
+  }
+
+  return { isSafe: true };
+}
+
 // Award reputation XP and recalculate levels and badges
 async function awardXP(userId: number, points: number, action: any, referenceId?: string) {
   try {
@@ -252,9 +324,10 @@ export async function deleteCategory(req: AuthRequest, res: Response) {
 // =========================================================================
 
 export async function getPosts(req: AuthRequest, res: Response) {
-  const { categoryId, tag, search, postType, studyGroupId, sort } = req.query;
+  const { categoryId, tag, search, postType, studyGroupId, sort, difficulty, hasAttachment, resolved, dateRange, isSaved } = req.query;
+  const userId = req.user?.id;
 
-  const cacheKey = `posts:${categoryId || ''}_${tag || ''}_${search || ''}_${postType || ''}_${studyGroupId || ''}_${sort || ''}`;
+  const cacheKey = `posts:${categoryId || ''}_${tag || ''}_${search || ''}_${postType || ''}_${studyGroupId || ''}_${sort || ''}_${difficulty || ''}_${hasAttachment || ''}_${resolved || ''}_${dateRange || ''}_${isSaved || ''}_${userId || ''}`;
   const cachedData = ForumCache.get(cacheKey);
   if (cachedData) {
     return res.status(200).json({ success: true, data: cachedData });
@@ -267,8 +340,44 @@ export async function getPosts(req: AuthRequest, res: Response) {
     if (postType) filters.postType = postType as any;
     if (studyGroupId) filters.studyGroupId = Number(studyGroupId);
     else if (!categoryId) {
-      // Exclude study group posts from main public feed unless filtered explicitly
       filters.studyGroupId = null;
+    }
+
+    if (difficulty) {
+      filters.difficulty = difficulty as any;
+    }
+
+    if (hasAttachment === 'true') {
+      filters.resource = { isNot: null };
+    }
+
+    if (resolved === 'true') {
+      filters.comments = { some: { isSolution: true } };
+    } else if (resolved === 'false') {
+      filters.comments = { none: { isSolution: true } };
+    }
+
+    if (dateRange) {
+      const now = new Date();
+      let startDate: Date | null = null;
+      if (dateRange === '24h') {
+        startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      } else if (dateRange === '7d') {
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      } else if (dateRange === '30d') {
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      }
+      if (startDate) {
+        filters.createdAt = { gte: startDate };
+      }
+    }
+
+    if (isSaved === 'true' && userId) {
+      filters.savedBy = {
+        some: {
+          userId: userId
+        }
+      };
     }
 
     if (search) {
@@ -309,22 +418,36 @@ export async function getPosts(req: AuthRequest, res: Response) {
         reactions: {
           select: { userId: true, type: true }
         },
+        savedBy: {
+          where: { userId: userId || 0 },
+          select: { id: true }
+        },
         resource: true
       }
     });
 
-    // Map reaction count to simplify frontend parsing
     const mapped = posts.map(p => {
-      const upvotes = p.reactions.filter(r => r.type === 'UPVOTE').length;
+      const upvotes = p.reactions.filter(r => r.type === 'UPVOTE' || r.type === 'LIKE' || r.type === 'LOVE' || r.type === 'LAUGH' || r.type === 'CLAP').length;
       const downvotes = p.reactions.filter(r => r.type === 'DOWNVOTE').length;
       const likedBy = p.reactions.map(r => r.userId);
+      const isBookmarked = p.savedBy.length > 0;
       
-      const { reactions, ...rest } = p;
+      const reactionCounts: Record<string, number> = {};
+      p.reactions.forEach(r => {
+        reactionCounts[r.type] = (reactionCounts[r.type] || 0) + 1;
+      });
+
+      const userReaction = p.reactions.find(r => r.userId === userId)?.type || null;
+
+      const { reactions, savedBy, ...rest } = p;
       return {
         ...rest,
         likes: upvotes - downvotes,
         likedBy,
-        comments: new Array(p._count.comments).fill(null) // Mock array satisfying post.comments?.length
+        isSaved: isBookmarked,
+        reactionCounts,
+        userReaction,
+        comments: new Array(p._count.comments).fill(null)
       };
     });
 
@@ -338,6 +461,7 @@ export async function getPosts(req: AuthRequest, res: Response) {
 
 export async function getPostById(req: AuthRequest, res: Response) {
   const { id } = req.params;
+  const userId = req.user?.id;
   try {
     const post = await prisma.forumPost.findUnique({
       where: { id: Number(id) },
@@ -346,6 +470,10 @@ export async function getPostById(req: AuthRequest, res: Response) {
         author: { select: { fullName: true, avatarUrl: true, email: true } },
         tags: true,
         reactions: true,
+        savedBy: {
+          where: { userId: userId || 0 },
+          select: { id: true }
+        },
         resource: true
       }
     });
@@ -354,20 +482,31 @@ export async function getPostById(req: AuthRequest, res: Response) {
       return res.status(404).json({ success: false, error: 'Không tìm thấy bài viết này!' });
     }
 
-    // Increment view count asynchronously
     await prisma.forumPost.update({
       where: { id: Number(id) },
       data: { viewsCount: { increment: 1 } }
     });
 
-    const upvotes = post.reactions.filter(r => r.type === 'UPVOTE').length;
+    const upvotes = post.reactions.filter(r => r.type === 'UPVOTE' || r.type === 'LIKE' || r.type === 'LOVE' || r.type === 'LAUGH' || r.type === 'CLAP').length;
     const downvotes = post.reactions.filter(r => r.type === 'DOWNVOTE').length;
     const likedBy = post.reactions.map(r => r.userId);
+    const isBookmarked = post.savedBy.length > 0;
 
+    const reactionCounts: Record<string, number> = {};
+    post.reactions.forEach(r => {
+      reactionCounts[r.type] = (reactionCounts[r.type] || 0) + 1;
+    });
+
+    const userReaction = post.reactions.find(r => r.userId === userId)?.type || null;
+
+    const { reactions, savedBy, ...rest } = post;
     const mapped = {
-      ...post,
+      ...rest,
       likes: upvotes - downvotes,
-      likedBy
+      likedBy,
+      isSaved: isBookmarked,
+      reactionCounts,
+      userReaction
     };
 
     return res.status(200).json({ success: true, data: mapped });
@@ -383,6 +522,11 @@ export async function createPost(req: AuthRequest, res: Response) {
   if (!authorId) return res.status(401).json({ success: false, error: 'Chưa xác thực!' });
 
   try {
+    const modResult = await moderateContent(title || '', content || '');
+    if (!modResult.isSafe) {
+      return res.status(400).json({ success: false, error: modResult.reason || 'Nội dung vi phạm tiêu chuẩn cộng đồng.' });
+    }
+
     const slug = `${slugify(title)}-${Date.now().toString().slice(-6)}`;
 
     // Prepare tags
@@ -477,7 +621,7 @@ export async function togglePinPost(req: AuthRequest, res: Response) {
 
 export async function reactPost(req: AuthRequest, res: Response) {
   const { id } = req.params;
-  const { type } = req.body; // UPVOTE or DOWNVOTE
+  const { type } = req.body; // e.g. LIKE, LOVE, LAUGH, CLAP, UPVOTE, DOWNVOTE
   const userId = req.user?.id;
 
   if (!userId) return res.status(401).json({ success: false, error: 'Chưa xác thực!' });
@@ -490,12 +634,14 @@ export async function reactPost(req: AuthRequest, res: Response) {
       where: { userId, postId: Number(id) }
     });
 
+    const isPositiveType = (t: string) => ['UPVOTE', 'LIKE', 'LOVE', 'LAUGH', 'CLAP'].includes(t);
+
     if (existingReaction) {
       if (existingReaction.type === type) {
         // Toggle off reaction
         await prisma.forumReaction.delete({ where: { id: existingReaction.id } });
         // Reverse reputation logic
-        const points = type === 'UPVOTE' ? -5 : 2;
+        const points = isPositiveType(type) ? -5 : 2;
         await awardXP(post.authorId, points, 'UPVOTE_RECEIVED', `post_${post.id}`);
       } else {
         // Switch reaction type
@@ -503,8 +649,16 @@ export async function reactPost(req: AuthRequest, res: Response) {
           where: { id: existingReaction.id },
           data: { type }
         });
-        const points = type === 'UPVOTE' ? 7 : -7; // Switch adjustment
-        await awardXP(post.authorId, points, 'UPVOTE_RECEIVED', `post_${post.id}`);
+        
+        let points = 0;
+        if (isPositiveType(type) && !isPositiveType(existingReaction.type)) {
+          points = 7; // switch from negative to positive
+        } else if (!isPositiveType(type) && isPositiveType(existingReaction.type)) {
+          points = -7; // switch from positive to negative
+        }
+        if (points !== 0) {
+          await awardXP(post.authorId, points, 'UPVOTE_RECEIVED', `post_${post.id}`);
+        }
       }
     } else {
       // Create new reaction
@@ -515,21 +669,128 @@ export async function reactPost(req: AuthRequest, res: Response) {
           type
         }
       });
-      const points = type === 'UPVOTE' ? 5 : -2;
-      await awardXP(post.authorId, points, type === 'UPVOTE' ? 'UPVOTE_RECEIVED' : 'DOWNVOTE_RECEIVED', `post_${post.id}`);
+      const points = isPositiveType(type) ? 5 : -2;
+      await awardXP(post.authorId, points, isPositiveType(type) ? 'UPVOTE_RECEIVED' : 'DOWNVOTE_RECEIVED', `post_${post.id}`);
     }
 
-    // Recalculate upvote metrics
+    // Recalculate metrics
     const updatedPost = await prisma.forumPost.findUnique({
       where: { id: Number(id) },
       include: { reactions: true }
     });
-    const upvotes = updatedPost!.reactions.filter(r => r.type === 'UPVOTE').length;
+    
+    const upvotes = updatedPost!.reactions.filter(r => isPositiveType(r.type)).length;
     const downvotes = updatedPost!.reactions.filter(r => r.type === 'DOWNVOTE').length;
+
+    const reactionCounts: Record<string, number> = {};
+    updatedPost!.reactions.forEach(r => {
+      reactionCounts[r.type] = (reactionCounts[r.type] || 0) + 1;
+    });
+
+    const userReaction = updatedPost!.reactions.find(r => r.userId === userId)?.type || null;
 
     ForumCache.clear();
 
-    return res.status(200).json({ success: true, data: { likes: upvotes - downvotes } });
+    return res.status(200).json({ 
+      success: true, 
+      data: { 
+        likes: upvotes - downvotes,
+        reactionCounts,
+        userReaction
+      } 
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function reactComment(req: AuthRequest, res: Response) {
+  const { id } = req.params; // commentId
+  const { type } = req.body; // LIKE, LOVE, etc.
+  const userId = req.user?.id;
+
+  if (!userId) return res.status(401).json({ success: false, error: 'Chưa xác thực!' });
+
+  try {
+    const comment = await prisma.forumComment.findUnique({ where: { id: Number(id) } });
+    if (!comment) return res.status(404).json({ success: false, error: 'Không tìm thấy bình luận!' });
+
+    const existingReaction = await prisma.forumReaction.findFirst({
+      where: { userId, commentId: Number(id) }
+    });
+
+    if (existingReaction) {
+      if (existingReaction.type === type) {
+        await prisma.forumReaction.delete({ where: { id: existingReaction.id } });
+      } else {
+        await prisma.forumReaction.update({
+          where: { id: existingReaction.id },
+          data: { type }
+        });
+      }
+    } else {
+      await prisma.forumReaction.create({
+        data: {
+          userId,
+          commentId: Number(id),
+          type
+        }
+      });
+    }
+
+    const updatedComment = await prisma.forumComment.findUnique({
+      where: { id: Number(id) },
+      include: { reactions: true }
+    });
+
+    const reactionCounts: Record<string, number> = {};
+    updatedComment!.reactions.forEach(r => {
+      reactionCounts[r.type] = (reactionCounts[r.type] || 0) + 1;
+    });
+
+    const userReaction = updatedComment!.reactions.find(r => r.userId === userId)?.type || null;
+
+    return res.status(200).json({ success: true, data: { reactionCounts, userReaction } });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function toggleSavePost(req: AuthRequest, res: Response) {
+  const { id } = req.params;
+  const userId = req.user?.id;
+
+  if (!userId) return res.status(401).json({ success: false, error: 'Chưa xác thực!' });
+
+  try {
+    const post = await prisma.forumPost.findUnique({ where: { id: Number(id) } });
+    if (!post) return res.status(404).json({ success: false, error: 'Không tìm thấy bài viết!' });
+
+    const existingSave = await prisma.savedForumPost.findUnique({
+      where: {
+        userId_postId: {
+          userId,
+          postId: Number(id)
+        }
+      }
+    });
+
+    if (existingSave) {
+      await prisma.savedForumPost.delete({
+        where: { id: existingSave.id }
+      });
+      ForumCache.clear();
+      return res.status(200).json({ success: true, isSaved: false, message: 'Đã bỏ lưu bài viết!' });
+    } else {
+      await prisma.savedForumPost.create({
+        data: {
+          userId,
+          postId: Number(id)
+        }
+      });
+      ForumCache.clear();
+      return res.status(200).json({ success: true, isSaved: true, message: 'Đã lưu bài viết thành công!' });
+    }
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }
@@ -541,6 +802,7 @@ export async function reactPost(req: AuthRequest, res: Response) {
 
 export async function getComments(req: AuthRequest, res: Response) {
   const { postId } = req.params;
+  const userId = req.user?.id;
   try {
     const list = await prisma.forumComment.findMany({
       where: { postId: Number(postId) },
@@ -556,8 +818,16 @@ export async function getComments(req: AuthRequest, res: Response) {
     // Helper to build hierarchy tree local node map
     const map = new Map<number, any>();
     list.forEach(c => {
-      const upvotes = c.reactions.filter(r => r.type === 'UPVOTE').length;
+      const upvotes = c.reactions.filter(r => r.type === 'UPVOTE' || r.type === 'LIKE' || r.type === 'LOVE' || r.type === 'LAUGH' || r.type === 'CLAP').length;
       const downvotes = c.reactions.filter(r => r.type === 'DOWNVOTE').length;
+      
+      const reactionCounts: Record<string, number> = {};
+      c.reactions.forEach(r => {
+        reactionCounts[r.type] = (reactionCounts[r.type] || 0) + 1;
+      });
+
+      const userReaction = userId ? (c.reactions.find(r => r.userId === userId)?.type || null) : null;
+
       map.set(c.id, {
         id: c.id,
         postId: c.postId,
@@ -568,6 +838,8 @@ export async function getComments(req: AuthRequest, res: Response) {
         author: c.author.fullName,
         authorAvatar: c.author.avatarUrl || 'HS',
         likes: upvotes - downvotes,
+        reactionCounts,
+        userReaction,
         replies: []
       });
     });
@@ -596,6 +868,11 @@ export async function createComment(req: AuthRequest, res: Response) {
   if (!authorId) return res.status(401).json({ success: false, error: 'Chưa xác thực!' });
 
   try {
+    const modResult = await moderateContent('', content || '');
+    if (!modResult.isSafe) {
+      return res.status(400).json({ success: false, error: modResult.reason || 'Bình luận vi phạm tiêu chuẩn cộng đồng.' });
+    }
+
     const newComment = await prisma.forumComment.create({
       data: {
         postId: Number(postId),
@@ -622,6 +899,8 @@ export async function createComment(req: AuthRequest, res: Response) {
       author: newComment.author.fullName,
       authorAvatar: newComment.author.avatarUrl || 'HS',
       likes: 0,
+      reactionCounts: {},
+      userReaction: null,
       replies: []
     };
 

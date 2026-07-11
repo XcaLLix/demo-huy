@@ -17,7 +17,7 @@ import { streamAIChat, refreshRoadmap, generateAIQuestions, generateMindmap, sav
 import { chatbotConsult } from './controllers/chatbot.js';
 import { getDocumentResources, getDocumentComments, addDocumentComment, getUserDocuments, createUserDocument, deleteUserDocument } from './controllers/document.js';
 import { createVNPayPayment, vnpayWebhook, sepayWebhook, checkEnrollmentStatus, checkUserProStatus, createDemoEnrollment, getPremiumPricing } from './controllers/payment.js';
-import { authenticateJWT, requireRole } from './middleware/auth.js';
+import { authenticateJWT, requireRole, optionalAuthenticateJWT } from './middleware/auth.js';
 import { ownsCourse, ownsLesson, ownsAttempt } from './middleware/ownership.js';
 import { rateLimiter } from './middleware/rateLimit.js';
 import { auditLogger } from './middleware/audit.js';
@@ -97,11 +97,11 @@ import { uploadValidation } from './middleware/upload.js';
 import {
   getCategories, createCategory, deleteCategory,
   getPosts, getPostById, createPost, deletePost, togglePinPost, reactPost,
-  getComments, createComment, acceptCommentSolution,
+  getComments, createComment, acceptCommentSolution, reactComment,
   getStudyGroups, createStudyGroup, joinStudyGroup, leaveStudyGroup,
   getGroupAnnouncements, createGroupAnnouncement,
   getLeaderboard as getForumLeaderboard, getUserGamificationProfile,
-  downloadResource, createReport, getReports, resolveReport
+  downloadResource, createReport, getReports, resolveReport, toggleSavePost
 } from './controllers/forum.js';
 import { initCronJobs } from './cron/index.js';
 // Environment variables are loaded at the top of the file via import './env.js'
@@ -374,16 +374,18 @@ app.get('/forum/categories', getCategories);
 app.post('/forum/categories', authenticateJWT, requireRole(['ADMIN']), createCategory);
 app.delete('/forum/categories/:id', authenticateJWT, requireRole(['ADMIN']), deleteCategory);
 
-app.get('/forum/posts', getPosts);
-app.get('/forum/posts/:id', getPostById);
+app.get('/forum/posts', optionalAuthenticateJWT, getPosts);
+app.get('/forum/posts/:id', optionalAuthenticateJWT, getPostById);
 app.post('/forum/posts', authenticateJWT, createPost);
 app.delete('/forum/posts/:id', authenticateJWT, deletePost);
 app.put('/forum/posts/:id/pin', authenticateJWT, requireRole(['TEACHER', 'ADMIN']), togglePinPost);
 app.post('/forum/posts/:id/react', authenticateJWT, reactPost);
+app.post('/forum/posts/:id/save', authenticateJWT, toggleSavePost);
 
-app.get('/forum/posts/:postId/comments', getComments);
+app.get('/forum/posts/:postId/comments', optionalAuthenticateJWT, getComments);
 app.post('/forum/posts/:postId/comments', authenticateJWT, createComment);
 app.put('/forum/comments/:id/accept', authenticateJWT, acceptCommentSolution);
+app.post('/forum/comments/:id/react', authenticateJWT, reactComment);
 
 app.get('/forum/study-groups', authenticateJWT, getStudyGroups);
 app.post('/forum/study-groups', authenticateJWT, createStudyGroup);
