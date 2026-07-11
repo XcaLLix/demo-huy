@@ -6,6 +6,7 @@ import studentLearningImg from '../assets/student_learning.png';
 import studentSuccessImg from '../assets/student_success.png';
 import educatorsTeamImg from '../assets/educators_team.png';
 import ContinueLearningRail from './courses/catalog/ContinueLearningRail';
+import { enrollmentService } from '../services/enrollmentService';
 
 const getCourseImage = (course) => {
   const subject = course?.subject || '';
@@ -23,31 +24,40 @@ export default function CourseMall({ courses, currentUser, onSelectCourse, onLea
 
   const subjects = ['All', 'Toán học', 'Vật lý', 'Hóa học', 'Tiếng Anh'];
 
-  // Load progress details from DB / local
+  // Load progress details from DB / local in parallel to optimize speed
   useEffect(() => {
+    let isMounted = true;
     const loadAllProgress = async () => {
       try {
-        const { enrollmentService } = await import('../services/enrollmentService');
+        if (!courses || courses.length === 0) return;
         const progressMap = {};
-        for (const course of courses) {
+        
+        // Fetch all progressions in parallel instead of sequentially
+        await Promise.all(courses.map(async (course) => {
           let calculated = 0;
           if (currentUser) {
             const completed = await enrollmentService.getEnrolledCourseProgress(currentUser.id, course.id);
             const totalLessons = course.lessons?.length || 5;
-            const completedInCourse = completed.filter(id => {
+            const completedInCourse = (completed || []).filter(id => {
               return course.lessons?.some(l => l.id.toString() === id.toString());
             }).length;
             calculated = totalLessons > 0 ? Math.round((completedInCourse / totalLessons) * 100) : 0;
           }
           // Set mock progression baseline if calculated is 0 so it looks active in demo
           progressMap[course.id] = calculated > 0 ? calculated : (course.id === 1 ? 60 : (course.id === 2 ? 40 : 25));
+        }));
+
+        if (isMounted) {
+          setProgresses(progressMap);
         }
-        setProgresses(progressMap);
       } catch (err) {
         console.warn('[CourseMall] Failed to fetch progress:', err);
       }
     };
     loadAllProgress();
+    return () => {
+      isMounted = false;
+    };
   }, [courses, currentUser]);
 
   // Add rich visual mockup info to initial courses

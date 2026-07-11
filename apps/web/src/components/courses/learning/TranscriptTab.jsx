@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { HiSearch, HiTranslate, HiClock, HiVolumeUp } from 'react-icons/hi';
+import { HiSearch, HiTranslate, HiClock, HiVolumeUp, HiSparkles } from 'react-icons/hi';
 
 export default function TranscriptTab({
   transcript = [],
   videoTime = 0,
-  onSeek
+  onSeek,
+  onAskAI
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [languageMode, setLanguageMode] = useState('VI'); // VI, EN, DUAL
@@ -141,6 +142,19 @@ export default function TranscriptTab({
                 <div className="transcript-line-time">
                   <HiClock className="time-icon" />
                   <span>{formatTime(line.timeSeconds)}</span>
+                  {onAskAI && (
+                    <button
+                      type="button"
+                      className="btn-ask-ai-transcript"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAskAI(line.text);
+                      }}
+                      title="Yêu cầu AI giải thích câu này"
+                    >
+                      <HiSparkles /> Hỏi AI
+                    </button>
+                  )}
                 </div>
                 
                 <div className="transcript-line-text-container">
