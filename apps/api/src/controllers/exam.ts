@@ -5,6 +5,7 @@ import { Difficulty } from '@prisma/client';
 import { importExamFromObject } from '../utils/examImporter.js';
 import { logUserActivity, logAttendanceInternal } from './gamification.js';
 import { incrementBothStats } from '../lib/monthlyStats.js';
+import { LeaderboardService } from '../services/leaderboard.service.js';
 
 
 export async function getExams(req: AuthRequest, res: Response) {
@@ -343,6 +344,13 @@ export async function submitAttempt(req: AuthRequest, res: Response) {
       await incrementBothStats('totalAttempts', now);
     } catch (err) {
       console.error('[MonthlyStats] Lỗi cập nhật totalAttempts:', err);
+    }
+
+    // Invalidate leaderboard cache for score updates
+    try {
+      LeaderboardService.invalidateCache();
+    } catch (cacheErr: any) {
+      console.error('[submitAttempt Cache Invalidation Error]', cacheErr.message);
     }
 
     return res.status(200).json({ success: true, data: updatedAttempt });

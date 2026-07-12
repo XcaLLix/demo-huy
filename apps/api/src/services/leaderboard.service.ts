@@ -44,9 +44,9 @@ export class LeaderboardService {
   private static cache: Map<string, CacheEntry<any>> = new Map();
   private static rebuildingPromises: Map<string, Promise<any>> = new Map();
   
-  // SWR Configuration
-  private static readonly FRESH_TTL_MS = 15 * 1000;    // 15 seconds fresh duration
-  private static readonly STALE_TTL_MS = 10 * 60 * 1000; // 10 minutes stale duration
+  // SWR Configuration (Optimized to cache for 5 min fresh, 1 hour stale fallback)
+  private static readonly FRESH_TTL_MS = 5 * 60 * 1000;     // 5 minutes fresh duration
+  private static readonly STALE_TTL_MS = 60 * 60 * 1000;    // 1 hour stale duration
   
   // Telemetry metrics
   private static stats: LeaderboardStats = {

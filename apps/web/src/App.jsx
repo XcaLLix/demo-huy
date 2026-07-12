@@ -797,66 +797,184 @@ function InlineLeaderboardTab({ currentUser }) {
         </div>
       ) : (
         <>
-          {/* Top 3 High-contrast Cards */}
+          {/* Top 3 High-contrast 3D Podium Cards */}
           {top3.length > 0 && (
             <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-              gap: '24px'
+              display: 'flex',
+              alignItems: 'flex-end',
+              justifyContent: 'center',
+              gap: '24px',
+              margin: '40px 0 24px 0',
+              flexWrap: 'wrap'
             }}>
-              {top3.map((student, index) => {
-                const colors = [
-                  { bg: 'linear-gradient(135deg, #fef9c3, #fef08a)', medal: '🥇', label: 'Thủ khoa', text: '#854d0e' },
-                  { bg: 'linear-gradient(135deg, #f1f5f9, #e2e8f0)', medal: '🥈', label: 'Á khoa', text: '#475569' },
-                  { bg: 'linear-gradient(135deg, #ffedd5, #fed7aa)', medal: '🥉', label: 'Tam khoa', text: '#c2410c' }
-                ][index] || { bg: '#fff', medal: '⭐', label: 'Vinh danh', text: '#000' };
+              {(() => {
+                const podiumSpots = [];
+                if (top3.length === 3) {
+                  podiumSpots.push({ student: top3[1], index: 1 }); // Rank 2 (Left)
+                  podiumSpots.push({ student: top3[0], index: 0 }); // Rank 1 (Center)
+                  podiumSpots.push({ student: top3[2], index: 2 }); // Rank 3 (Right)
+                } else {
+                  top3.forEach((s, i) => podiumSpots.push({ student: s, index: i }));
+                }
 
-                const cardClass = index === 0 ? "leaderboard-top-card leaderboard-top1-card animate-slide-up" : "leaderboard-top-card animate-slide-up";
+                return podiumSpots.map(({ student, index }) => {
+                  const configs = [
+                    { 
+                      bg: 'linear-gradient(135deg, #FFFDF5 0%, #FEF3C7 100%)', 
+                      border: '3px solid #000', 
+                      medal: '👑', 
+                      label: 'Thủ Khoa', 
+                      textColor: '#854d0e',
+                      height: '310px',
+                      podiumHeight: '80px',
+                      podiumBg: 'linear-gradient(180deg, #F5C453 0%, #D97706 100%)',
+                      shadow: '4px 4px 0px #000',
+                      glowClass: 'leaderboard-top1-card animate-slide-up'
+                    },
+                    { 
+                      bg: 'linear-gradient(135deg, #F8FAFC 0%, #E2E8F0 100%)', 
+                      border: '3px solid #000', 
+                      medal: '🥈', 
+                      label: 'Á Khoa', 
+                      textColor: '#475569',
+                      height: '270px',
+                      podiumHeight: '60px',
+                      podiumBg: 'linear-gradient(180deg, #94A3B8 0%, #64748B 100%)',
+                      shadow: '4px 4px 0px #000',
+                      glowClass: 'leaderboard-top-card animate-slide-up'
+                    },
+                    { 
+                      bg: 'linear-gradient(135deg, #FFF7ED 0%, #FFDDBC 100%)', 
+                      border: '3px solid #000', 
+                      medal: '🥉', 
+                      label: 'Tam Khoa', 
+                      textColor: '#c2410c',
+                      height: '240px',
+                      podiumHeight: '40px',
+                      podiumBg: 'linear-gradient(180deg, #F97316 0%, #C2410C 100%)',
+                      shadow: '4px 4px 0px #000',
+                      glowClass: 'leaderboard-top-card animate-slide-up'
+                    }
+                  ][index] || { bg: '#FFFFFF', border: '3px solid #000', medal: '⭐', label: 'Vinh danh', textColor: '#000', height: '240px', podiumHeight: '30px', podiumBg: '#E2E8F0', shadow: '4px 4px 0px #000', glowClass: '' };
 
-                return (
-                  <div
-                    key={student.userId}
-                    className={cardClass}
-                    style={{
-                      background: colors.bg,
-                      border: '3px solid #000',
-                      borderRadius: '16px',
-                      padding: '24px 16px',
-                      textAlign: 'center',
-                      boxShadow: '4px 4px 0px #000',
-                      position: 'relative'
-                    }}
-                  >
-                    <span style={{
-                      position: 'absolute',
-                      top: '12px',
-                      right: '16px',
-                      fontSize: '11px',
-                      fontWeight: '900',
-                      background: '#000',
-                      color: '#fff',
-                      padding: '2px 8px',
-                      borderRadius: '10px'
-                    }}>
-                      Hạng {student.rank}
-                    </span>
-                    <span style={{ fontSize: '36px', display: 'block', marginBottom: '8px' }}>{colors.medal}</span>
-                    <h3 style={{ fontSize: '15px', fontWeight: '955', textTransform: 'uppercase', color: colors.text, margin: 0 }}>
-                      {colors.label} {subject ? subject.toUpperCase() : 'Toàn sàn'}
-                    </h3>
-                    
-                    {renderAvatar(student.avatar, student.name, 64, 3)}
+                  return (
+                    <div
+                      key={student.userId}
+                      className={configs.glowClass}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        width: '280px',
+                        position: 'relative',
+                        zIndex: index === 0 ? 10 : 1
+                      }}
+                    >
+                      {/* Interactive Card */}
+                      <div
+                        style={{
+                          background: configs.bg,
+                          border: configs.border,
+                          borderRadius: '24px',
+                          padding: '24px 20px 16px 20px',
+                          textAlign: 'center',
+                          boxShadow: configs.shadow,
+                          width: '100%',
+                          height: configs.height,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          boxSizing: 'border-box',
+                          position: 'relative'
+                        }}
+                      >
+                        {/* Rank Tag */}
+                        <span style={{
+                          position: 'absolute',
+                          top: '-12px',
+                          background: '#000',
+                          color: '#fff',
+                          padding: '3px 12px',
+                          borderRadius: '20px',
+                          fontSize: '11px',
+                          fontWeight: '900',
+                          border: '2px solid ' + (index === 0 ? '#F5C453' : '#000')
+                        }}>
+                          Hạng {student.rank}
+                        </span>
 
-                    <h4 style={{ fontSize: '16px', fontWeight: '900', color: '#000', margin: '10px 0 4px 0' }}>{student.name}</h4>
-                    <p style={{ fontSize: '12px', color: '#4b5563', margin: '0 0 6px 0' }}>
-                      Khối {student.grade || 'Chưa rõ'} • Tỉnh: {student.province || 'Chưa cập nhật'}
-                    </p>
-                    <p style={{ fontSize: '13px', fontWeight: '900', color: colors.text, margin: 0 }}>
-                      XP: <strong>{student.xp.toLocaleString()}</strong> • {getStreakDisplay(student)}
-                    </p>
-                  </div>
-                );
-              })}
+                        {/* Top Medal Icon */}
+                        <div style={{ fontSize: '32px', marginTop: '6px' }}>{configs.medal}</div>
+
+                        {/* Title label */}
+                        <h4 style={{ fontSize: '13px', fontWeight: '900', textTransform: 'uppercase', color: configs.textColor, margin: '2px 0 0 0', letterSpacing: '0.05em' }}>
+                          {configs.label} {subject ? subject.toUpperCase() : 'Toàn sàn'}
+                        </h4>
+
+                        {/* Crown/Medal frame on Avatar */}
+                        <div style={{ position: 'relative' }}>
+                          {index === 0 && (
+                            <span style={{ position: 'absolute', top: '-16px', left: '50%', transform: 'translateX(-50%) rotate(-10deg)', fontSize: '20px', zIndex: 11 }}>👑</span>
+                          )}
+                          {renderAvatar(student.avatar, student.name, index === 0 ? 76 : 64, index === 0 ? 3 : 2)}
+                        </div>
+
+                        {/* Student Info */}
+                        <div style={{ width: '100%' }}>
+                          <h4 style={{ fontSize: '16px', fontWeight: '900', color: '#000', margin: '0 0 4px 0', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                            {student.name}
+                          </h4>
+                          <p style={{ fontSize: '12px', color: '#4b5563', margin: '0 0 6px 0', fontWeight: '500' }}>
+                            Khối {student.grade || 'Chưa rõ'} • Tỉnh: {student.province || 'Chưa cập nhật'}
+                          </p>
+                        </div>
+
+                        {/* Metric Score info */}
+                        <div style={{ 
+                          width: '100%', 
+                          background: 'rgba(255,255,255,0.6)', 
+                          border: '2px solid #000', 
+                          borderRadius: '12px', 
+                          padding: '6px 12px', 
+                          fontSize: '12.5px', 
+                          fontWeight: '800', 
+                          color: '#000',
+                          boxSizing: 'border-box'
+                        }}>
+                          <span>XP: <strong style={{ color: '#000', fontSize: '13.5px' }}>{student.xp.toLocaleString()}</strong></span>
+                          <span style={{ color: '#000', margin: '0 6px' }}>|</span>
+                          <span>{getStreakDisplay(student)}</span>
+                        </div>
+                      </div>
+
+                      {/* 3D Podium Block */}
+                      <div
+                        style={{
+                          background: configs.podiumBg,
+                          width: '85%',
+                          height: configs.podiumHeight,
+                          borderTopLeftRadius: '12px',
+                          borderTopRightRadius: '12px',
+                          boxShadow: 'inset 0 4px 10px rgba(255,255,255,0.25), 4px 4px 0px #000',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#FFFFFF',
+                          fontWeight: '900',
+                          fontSize: '24px',
+                          textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                          border: '3px solid #000',
+                          borderBottom: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                      >
+                        {student.rank}
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
             </div>
           )}
 

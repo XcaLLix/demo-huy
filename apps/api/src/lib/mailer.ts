@@ -305,3 +305,82 @@ export async function sendRoleChangeNotification(
 }
 
 export const isRealSmtpActive = transporter !== null;
+
+export async function sendWeeklyPraiseEmail(
+  toEmail: string,
+  studentName: string,
+  rankType: string,
+  metricValue: string | number
+): Promise<boolean> {
+  const displayRankType = rankType === 'xp' 
+    ? 'Điểm tích lũy học tập (XP)' 
+    : (rankType === 'streak' ? 'Chuỗi ngày học liên tục (Streaks)' : 'Số lượng khóa học hoàn thành');
+  const unitLabel = rankType === 'xp' ? 'XP' : (rankType === 'streak' ? 'ngày' : 'khóa học');
+
+  if (!transporter) {
+    console.warn(
+      `\n============================================================\n` +
+      `[DEVELOPMENT WEEKLY PRAISE EMAIL FALLBACK] (No SMTP Configured)\n` +
+      `Gửi tới: ${toEmail}\n` +
+      `Tên học sinh: ${studentName}\n` +
+      `Hạng mục: Thủ khoa tuần - ${displayRankType}\n` +
+      `Thành tích đạt được: ${metricValue} ${unitLabel}\n` +
+      `============================================================\n`
+    );
+    return true;
+  }
+
+  const htmlContent = `
+    <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f6fa; padding: 30px 20px; color: #2d3436; line-height: 1.6;">
+      <div style="max-width: 540px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(108,92,231,0.08); border: 1px solid #e8ecf1;">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #f1c40f, #f39c12); padding: 32px 24px; text-align: center; color: #ffffff;">
+          <div style="font-size: 28px; margin-bottom: 8px;">🏆👑🏅</div>
+          <div style="font-size: 24px; font-weight: 800; letter-spacing: 0.5px; margin-bottom: 6px;">THƯ VINH DANH THỦ KHOA TUẦN</div>
+          <div style="font-size: 13px; opacity: 0.9; text-transform: uppercase; font-weight: 600; letter-spacing: 1px;">Bảng xếp hạng thành tích EduPath AI</div>
+        </div>
+        
+        <!-- Content Body -->
+        <div style="padding: 30px 24px; text-align: center;">
+          <h2 style="font-size: 18px; font-weight: 700; margin: 0 0 16px 0; color: #d35400;">CHÚC MỪNG THÀNH TÍCH XUẤT SẮC CỦA EM!</h2>
+          <p style="font-size: 14.5px; color: #2c3e50; text-align: left; margin: 0 0 20px 0;">
+            Chào <strong>${studentName}</strong>,<br/><br/>
+            Đội ngũ học thuật EduPath AI vô cùng tự hào được thông báo rằng em đã xuất sắc dẫn đầu bảng xếp hạng tuần qua tại hệ thống học tập thông minh EduPath AI.
+          </p>
+          
+          <div style="background: #fffdf0; border: 2px solid #f1c40f; border-radius: 12px; padding: 24px; text-align: center; margin: 24px 0; box-shadow: 0 4px 15px rgba(241,196,15,0.1);">
+            <div style="font-size: 12px; text-transform: uppercase; font-weight: 700; color: #d35400; letter-spacing: 1px; margin-bottom: 8px;">Hạng mục dẫn đầu</div>
+            <div style="font-size: 17px; font-weight: 800; color: #2c3e50; margin-bottom: 12px;">🌟 ${displayRankType} 🌟</div>
+            <div style="font-size: 13.5px; color: #7f8c8d; margin-bottom: 4px;">Thành tích ghi nhận trong tuần qua:</div>
+            <div style="font-size: 32px; font-weight: 900; color: #e67e22;">${metricValue} ${unitLabel}</div>
+          </div>
+          
+          <p style="font-size: 14.5px; color: #2d3436; text-align: left; margin: 20px 0 0 0; line-height: 1.6;">
+            Sự nỗ lực, kiên trì và tinh thần hiếu học phi thường của em chính là tấm gương sáng cho tất cả các bạn học sinh khác tại EduPath. Hy vọng em sẽ tiếp tục duy trì ngọn lửa đam mê và gặt hái thêm nhiều thành tựu rực rỡ hơn nữa trong chặng đường sắp tới!
+          </p>
+        </div>
+        
+        <!-- Footer -->
+        <div style="background: #f8fafc; padding: 20px 24px; text-align: center; border-top: 1px solid #e8ecf1; font-size: 11.5px; color: #94a3b8;">
+          <div>Đội ngũ hỗ trợ học tập EduPath AI</div>
+          <div style="margin-top: 4px; font-weight: 500; color: #f39c12;">Học đúng hướng · Thi đúng đích</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  try {
+    console.log(`[Mailer] Sending weekly praise email to: ${toEmail}...`);
+    await transporter.sendMail({
+      from: `"EduPath Support" <${smtpUser}>`,
+      to: toEmail,
+      subject: `[EduPath Tuyên Dương] Tuyên dương thủ khoa tuần học tập: ${studentName}`,
+      html: htmlContent
+    });
+    console.log(`[Mailer] Weekly praise email successfully delivered to: ${toEmail}`);
+    return true;
+  } catch (err) {
+    console.error(`[Mailer Error] Failed to send weekly praise email to ${toEmail}:`, err);
+    return false;
+  }
+}

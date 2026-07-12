@@ -408,6 +408,15 @@ app.get('/leaderboard/scores', getScoreLeaderboard);
 app.get('/leaderboard/streaks', getStreakLeaderboard);
 app.get('/leaderboard/courses', getCourseLeaderboard);
 app.get('/leaderboard/telemetry', getLeaderboardTelemetry);
+app.post('/leaderboard/trigger-weekly-email', async (req, res) => {
+  try {
+    const { sendAllWeeklyPraiseEmails } = await import('./cron/weeklyPraiseEmail.js');
+    await sendAllWeeklyPraiseEmails();
+    return res.status(200).json({ success: true, message: 'Đã kích hoạt gửi email tuyên dương!' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 app.post('/gamification/attendance', authenticateJWT, recordAttendance);
 app.get('/gamification/attendance', authenticateJWT, getAttendanceHistory);
