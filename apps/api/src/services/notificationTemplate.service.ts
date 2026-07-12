@@ -218,6 +218,24 @@ export class NotificationTemplateService {
         category: NotificationCategory.PAYMENT,
         icon: '👑',
         defaultLink: '/dashboard/home'
+      },
+      {
+        code: 'AI_STREAK',
+        title: 'AI Lộ trình: Duy trì Streak học tập 🏆',
+        message: 'Tuyệt vời! Bạn đã duy trì chuỗi học 3 ngày liên tiếp. Luyện tập thêm 15 phút hôm nay để không ngắt quãng lộ trình nhé!',
+        type: NotificationType.SUCCESS,
+        category: NotificationCategory.AI,
+        icon: '🏆',
+        defaultLink: '/dashboard/ai-tutor'
+      },
+      {
+        code: 'AI_KNOWLEDGE_GAP',
+        title: 'AI Lộ trình: Gợi ý ôn tập đề thi 📚',
+        message: 'Hệ thống nhận thấy bạn cần củng cố kiến thức phần \'Hàm số Mũ & Lôgarit\'. Hãy luyện tập với bài thi gợi ý dưới đây.',
+        type: NotificationType.WARNING,
+        category: NotificationCategory.AI,
+        icon: '📚',
+        defaultLink: '/dashboard/mock-exams'
       }
     ];
 

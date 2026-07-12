@@ -42,6 +42,8 @@ import { SystemSettingService } from './services/systemSetting.service.js';
 import notificationRoutes from './routes/notification.routes.js';
 import { NotificationTemplateService } from './services/notificationTemplate.service.js';
 import { seedSystemSettings } from './seedSettings.js';
+import voucherRoutes from './routes/voucher.routes.js';
+import { VoucherService } from './services/voucher.service.js';
 
 import {
   getLeaderboardRankings,
@@ -420,6 +422,9 @@ app.put('/forum/moderation/reports/:id/resolve', authenticateJWT, requireRole(['
 // Notification Center Router
 app.use('/notifications', notificationRoutes);
 
+// Voucher Management Router
+app.use('/', voucherRoutes);
+
 // =========================================================================
 // AFFILIATE SYSTEM ROUTING
 // =========================================================================
@@ -552,6 +557,7 @@ async function seedDefaultCategories() {
 // Auto-seed on startup
 seedDefaultCategories();
 NotificationTemplateService.seedDefaultTemplates();
+VoucherService.seedDefaultVouchers();
 
 // Global Error Handler Middleware to catch exceptions and log them
 app.use((err: any, req: any, res: any, next: any) => {

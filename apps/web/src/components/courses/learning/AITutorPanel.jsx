@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { HiSparkles, HiChevronRight, HiDatabase, HiTerminal, HiTrash, HiOutlineChat, HiOutlineLightBulb } from 'react-icons/hi';
 import { aiService } from '../../../services/aiService';
 
-export default function AITutorPanel({ lesson, onClose }) {
+export default function AITutorPanel({ lesson, onClose, initialQuery }) {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -96,6 +96,13 @@ export default function AITutorPanel({ lesson, onClose }) {
       setLoading(false);
     }
   };
+
+  // Handle initial query from parent (e.g. click Sparkle in transcript or explain in flashcards)
+  useEffect(() => {
+    if (initialQuery && typeof initialQuery === 'object' && initialQuery.text && initialQuery.text.trim()) {
+      handleSendQuery(initialQuery.text);
+    }
+  }, [initialQuery]);
 
   const handleClearHistory = () => {
     const defaultMsg = [

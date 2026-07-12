@@ -229,7 +229,10 @@ export const api = {
 
   checkEnrollmentStatus: (courseId) => request(`/enrollments/status?courseId=${courseId}`),
 
-  enrollCourseDemo: (courseId) => request('/enrollments/demo', { method: 'POST', body: { courseId } }),
+  enrollCourseDemo: (payload) => {
+    const body = typeof payload === 'object' ? payload : { courseId: payload };
+    return request('/enrollments/demo', { method: 'POST', body });
+  },
 
   checkProStatus: () => request('/users/pro-status'),
 
@@ -612,7 +615,26 @@ export const api = {
   adminGetTemplates: () => request('/notifications/admin/templates'),
   adminCreateTemplate: (data) => request('/notifications/admin/templates', { method: 'POST', body: data }),
   adminUpdateTemplate: (id, data) => request(`/notifications/admin/templates/${id}`, { method: 'PUT', body: data }),
-  adminDeleteTemplate: (id) => request(`/notifications/admin/templates/${id}`, { method: 'DELETE' })
+  adminDeleteTemplate: (id) => request(`/notifications/admin/templates/${id}`, { method: 'DELETE' }),
+
+  // Voucher Management APIs
+  getAdminVouchers: (params = {}) => {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') {
+        query.append(k, String(v));
+      }
+    });
+    return request('/admin/vouchers?' + query.toString());
+  },
+  getAdminVoucherById: (id) => request(`/admin/vouchers/${id}`),
+  createAdminVoucher: (data) => request('/admin/vouchers', { method: 'POST', body: data }),
+  updateAdminVoucher: (id, data) => request(`/admin/vouchers/${id}`, { method: 'PUT', body: data }),
+  deleteAdminVoucher: (id) => request(`/admin/vouchers/${id}`, { method: 'DELETE' }),
+  enableAdminVoucher: (id) => request(`/admin/vouchers/${id}/enable`, { method: 'PUT' }),
+  disableAdminVoucher: (id) => request(`/admin/vouchers/${id}/disable`, { method: 'PUT' }),
+  validateVoucher: (data) => request('/enrollments/validate-voucher', { method: 'POST', body: data }),
+  reserveVoucher: (data) => request('/enrollments/reserve-voucher', { method: 'POST', body: data })
 };
 
 

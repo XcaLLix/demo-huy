@@ -6440,6 +6440,103 @@
   margin: 0;
 }
 
+/* Transcript AI Ask Button */
+.btn-ask-ai-transcript {
+  opacity: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #6366f1 !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 12px !important;
+  padding: 3px 8px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  cursor: pointer;
+  margin-left: 8px;
+  transition: opacity 0.2s, transform 0.2s, background-color 0.2s;
+  box-shadow: 0 2px 5px rgba(99, 102, 241, 0.3);
+}
+.transcript-line-card:hover .btn-ask-ai-transcript {
+  opacity: 1;
+}
+.btn-ask-ai-transcript:hover {
+  background: #4f46e5 !important;
+  transform: scale(1.05);
+}
+
+/* AI Flashcard Generator Card in Learning Page */
+.ai-flashcard-box {
+  background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%);
+  border: 1.5px dashed #bfdbfe;
+  border-radius: 14px;
+  padding: 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.05);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.ai-flashcard-box:hover {
+  border-color: #6366f1;
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.1);
+}
+.ai-flashcard-box .icon-container {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #dbeafe;
+  color: #2563eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  margin-bottom: 4px;
+}
+.ai-flashcard-box h4 {
+  font-size: 15px;
+  font-weight: 800;
+  margin: 0;
+  color: #1e3a8a;
+}
+.ai-flashcard-box p {
+  font-size: 12.5px;
+  color: #4b5563;
+  margin: 0;
+  max-width: 440px;
+  line-height: 1.5;
+}
+.btn-generate-ai-flashcards {
+  background: linear-gradient(135deg, #6366f1, #4f46e5) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 8px !important;
+  padding: 10px 24px !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.btn-generate-ai-flashcards:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4);
+}
+.btn-generate-ai-flashcards:disabled {
+  background: #cbd5e1 !important;
+  color: #94a3b8 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+
 
 
 

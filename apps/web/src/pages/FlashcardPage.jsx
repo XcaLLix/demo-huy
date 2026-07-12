@@ -550,6 +550,15 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
     }
   };
 
+  const handleExplainCardWithAI = (card) => {
+    if (!card) return;
+    toast('Đang gửi khái niệm sang AI để giải thích chuyên sâu...', 'success');
+    
+    // Automatically switch to chat mode prompt
+    const promptText = `Giải thích cặn kẽ cho mình khái niệm hoặc công thức này: "${card.front}" nghĩa là "${card.back}". Hãy cho mình ví dụ thực tiễn dễ học thuộc lòng nhé.`;
+    handleSendChatMessage(null, promptText);
+  };
+
   // Manual Editing States
   const [isEditingCurrent, setIsEditingCurrent] = useState(false);
   const [isAddingCard, setIsAddingCard] = useState(false);
@@ -1275,13 +1284,14 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
           {activeTab === 'create' ? (
             <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid var(--fc-border-dark)', paddingTop: '16px' }}>
               <div 
-                className={`aitutor-dropzone ${isDraggingFile ? 'aitutor-dropzone--active' : ''}`}
+                className={`aitutor-dropzone ${isDraggingFile ? 'aitutor-dropzone--active' : ''} ocr-scanner-zone`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
                 style={{ padding: '12px 6px', minHeight: '100px' }}
               >
+                {isLoading && <div className="ocr-laser-line" />}
                 <input 
                   type="file" 
                   ref={fileInputRef} 
@@ -1350,6 +1360,32 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Spaced Repetition Dashboard Widget */}
+          {cards.length > 0 && (
+            <div className="srs-dashboard-card animate-in">
+              <div className="srs-stats-row">
+                <span className="srs-stat-title">Trí nhớ Spaced Repetition</span>
+                <span className="srs-stat-value">
+                  {Math.max(15, Math.min(100, Math.round((learnedCards.size / cards.length) * 100 || 0)))}%
+                </span>
+              </div>
+              <div className="srs-progress-bar-bg">
+                <div 
+                  className="srs-progress-bar-fill" 
+                  style={{ width: `${Math.max(15, Math.min(100, Math.round((learnedCards.size / cards.length) * 100 || 0)))}%` }}
+                />
+              </div>
+              <div className="srs-stats-row" style={{ marginTop: '4px' }}>
+                <span style={{ fontSize: '10.5px', color: 'var(--fc-text-secondary)' }}>Chu kỳ ôn tập:</span>
+                <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#fff' }}>3 ngày / lượt</span>
+              </div>
+              <div className="srs-stats-row">
+                <span style={{ fontSize: '10.5px', color: 'var(--fc-text-secondary)' }}>Lịch học kế tiếp:</span>
+                <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--fc-gold)' }}>Ngày mai (Trong 24h)</span>
+              </div>
             </div>
           )}
 
@@ -1655,6 +1691,18 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
                         <div className="flashcard-card-word-title" style={{ fontSize: '22px', fontWeight: '500', padding: '0 12px', lineHeight: '1.6' }}>
                           {activeCards[currentIdx]?.card?.back}
                         </div>
+
+                        <button
+                          type="button"
+                          className="btn-explain-ai"
+                          onClick={(e) => {
+                            e.stopPropagation(); // prevent flipping the card back
+                            handleExplainCardWithAI(activeCards[currentIdx]?.card);
+                          }}
+                          title="Yêu cầu AI giải thích chuyên sâu"
+                        >
+                          <HiSparkles /> 💡 Giải thích bằng AI
+                        </button>
 
                         {activeCards[currentIdx]?.card?.image && (
                           <div className="flashcard-uploaded-img-wrapper">

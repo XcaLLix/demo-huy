@@ -50,7 +50,8 @@ export default function TeacherDashboard({
   addLog,
   activeTab: propActiveTab = 'overview',
   setActiveTab,
-  onUpdateUser
+  onUpdateUser,
+  navigateTo
 }) {
   // --- SUB TAB SYSTEM ---
   const [localTab, setLocalTab] = useState(() => {
@@ -1187,9 +1188,60 @@ export default function TeacherDashboard({
                               }}
                             >
                               <div style={{ fontSize: '18px', marginTop: '2px' }}>{icon}</div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                                 <div style={{ fontWeight: '750', color: '#1e293b', fontSize: '13.5px', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.title || 'Thông báo'}</div>
                                 <p style={{ color: '#64748b', margin: 0, fontSize: '12.5px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{n.text || n.message}</p>
+                                {n.link && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (!isReadNotif) {
+                                        api.markNotificationAsRead(n.id).then(() => {
+                                          setDbStats(prev => {
+                                            if (!prev) return prev;
+                                            return {
+                                              ...prev,
+                                              notifications: prev.notifications.map(item => item.id === n.id ? { ...item, read: true, isRead: true } : item)
+                                            };
+                                          });
+                                        }).catch(console.error);
+                                      }
+                                      setShowNotifDropdown(false);
+                                      if (navigateTo) navigateTo(n.link);
+                                    }}
+                                    style={{
+                                      marginTop: '10px',
+                                      padding: '6px 12px',
+                                      borderRadius: '8px',
+                                      background: borderLeftColor,
+                                      color: '#FFFFFF',
+                                      border: '1.5px solid #000000',
+                                      boxShadow: '1.5px 1.5px 0px #000000',
+                                      fontSize: '11px',
+                                      fontWeight: 'bold',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      transition: 'all 0.1s ease',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.transform = 'translate(-1px, -1px)';
+                                      e.currentTarget.style.boxShadow = '2.5px 2.5px 0px #000000';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.transform = 'none';
+                                      e.currentTarget.style.boxShadow = '1.5px 1.5px 0px #000000';
+                                    }}
+                                  >
+                                    {n.category === 'COURSE' && 'Vào học ngay 🚀'}
+                                    {n.category === 'EXAM' && 'Luyện tập ngay 📝'}
+                                    {n.category === 'PAYMENT' && 'Xem chi tiết 🧾'}
+                                    {n.category === 'TEACHER' && 'Xem lớp học 👨‍🏫'}
+                                    {n.category === 'AI' && 'Khám phá AI 🤖'}
+                                    {!['COURSE', 'EXAM', 'PAYMENT', 'TEACHER', 'AI'].includes(n.category) && 'Xem chi tiết ➔'}
+                                  </button>
+                                )}
                               </div>
                             </div>
                           );
@@ -1404,17 +1456,71 @@ export default function TeacherDashboard({
                 </div>
                 <div className="tdb-notif-list">
                   {dbStats?.notifications && dbStats.notifications.length > 0 ? (
-                    dbStats.notifications.slice(0, 5).map((notif) => (
-                      <div key={notif.id} className="tdb-notif-item animate-in">
-                        <span className="tdb-notif-icon-dot orange">🔔</span>
-                        <div className="tdb-notif-body">
-                          <p className="tdb-notif-text">{notif.message}</p>
-                          <span className="tdb-notif-time">
-                            {new Date(notif.createdAt).toLocaleDateString('vi-VN')}
-                          </span>
+                    dbStats.notifications.slice(0, 5).map((notif) => {
+                      const isReadNotif = notif.read || notif.isRead;
+                      const btnColor = notif.type === 'SUCCESS' ? '#10B981' : notif.type === 'WARNING' ? '#F59E0B' : notif.type === 'ERROR' ? '#EF4444' : '#6c5ce7';
+                      return (
+                        <div key={notif.id} className="tdb-notif-item animate-in" style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                          <span className="tdb-notif-icon-dot orange">🔔</span>
+                          <div className="tdb-notif-body" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                            <p className="tdb-notif-text" style={{ margin: 0 }}>{notif.message}</p>
+                            {notif.link && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (!isReadNotif) {
+                                    api.markNotificationAsRead(notif.id).then(() => {
+                                      setDbStats(prev => {
+                                        if (!prev) return prev;
+                                        return {
+                                          ...prev,
+                                          notifications: prev.notifications.map(item => item.id === notif.id ? { ...item, read: true, isRead: true } : item)
+                                        };
+                                      });
+                                    }).catch(console.error);
+                                  }
+                                  if (navigateTo) navigateTo(notif.link);
+                                }}
+                                style={{
+                                  marginTop: '8px',
+                                  padding: '5px 10px',
+                                  borderRadius: '6px',
+                                  background: btnColor,
+                                  color: '#FFFFFF',
+                                  border: '1.5px solid #000000',
+                                  boxShadow: '1px 1px 0px #000000',
+                                  fontSize: '10.5px',
+                                  fontWeight: 'bold',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  transition: 'all 0.1s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.transform = 'translate(-1px, -1px)';
+                                  e.currentTarget.style.boxShadow = '2px 2px 0px #000000';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.transform = 'none';
+                                  e.currentTarget.style.boxShadow = '1px 1px 0px #000000';
+                                }}
+                              >
+                                {notif.category === 'COURSE' && 'Vào học ngay 🚀'}
+                                {notif.category === 'EXAM' && 'Luyện tập ngay 📝'}
+                                {notif.category === 'PAYMENT' && 'Xem chi tiết 🧾'}
+                                {notif.category === 'TEACHER' && 'Xem lớp học 👨‍🏫'}
+                                {notif.category === 'AI' && 'Khám phá AI 🤖'}
+                                {!['COURSE', 'EXAM', 'PAYMENT', 'TEACHER', 'AI'].includes(notif.category) && 'Xem chi tiết ➔'}
+                              </button>
+                            )}
+                            <span className="tdb-notif-time" style={{ marginTop: '4px' }}>
+                              {new Date(notif.createdAt).toLocaleDateString('vi-VN')}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
                     <>
                       <div className="tdb-notif-item">
@@ -3507,17 +3613,71 @@ export default function TeacherDashboard({
               </h3>
               <div className="tdb-notif-list" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {dbStats?.notifications && dbStats.notifications.length > 0 ? (
-                  dbStats.notifications.map((notif) => (
-                    <div key={notif.id} className="tdb-notif-item animate-in" style={{ padding: '12px 0' }}>
-                      <span className="tdb-notif-icon-dot orange">🔔</span>
-                      <div className="tdb-notif-body">
-                        <p className="tdb-notif-text">{notif.message}</p>
-                        <span className="tdb-notif-time">
-                          {new Date(notif.createdAt).toLocaleString('vi-VN')}
-                        </span>
+                  dbStats.notifications.map((notif) => {
+                    const isReadNotif = notif.read || notif.isRead;
+                    const btnColor = notif.type === 'SUCCESS' ? '#10B981' : notif.type === 'WARNING' ? '#F59E0B' : notif.type === 'ERROR' ? '#EF4444' : '#6c5ce7';
+                    return (
+                      <div key={notif.id} className="tdb-notif-item animate-in" style={{ padding: '12px 0', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                        <span className="tdb-notif-icon-dot orange">🔔</span>
+                        <div className="tdb-notif-body" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                          <p className="tdb-notif-text" style={{ margin: 0 }}>{notif.message}</p>
+                          {notif.link && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!isReadNotif) {
+                                  api.markNotificationAsRead(notif.id).then(() => {
+                                    setDbStats(prev => {
+                                      if (!prev) return prev;
+                                      return {
+                                        ...prev,
+                                        notifications: prev.notifications.map(item => item.id === notif.id ? { ...item, read: true, isRead: true } : item)
+                                      };
+                                    });
+                                  }).catch(console.error);
+                                }
+                                if (navigateTo) navigateTo(notif.link);
+                              }}
+                              style={{
+                                marginTop: '8px',
+                                padding: '5px 10px',
+                                borderRadius: '6px',
+                                background: btnColor,
+                                color: '#FFFFFF',
+                                border: '1.5px solid #000000',
+                                boxShadow: '1px 1px 0px #000000',
+                                fontSize: '10.5px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                transition: 'all 0.1s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = 'translate(-1px, -1px)';
+                                e.currentTarget.style.boxShadow = '2px 2px 0px #000000';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'none';
+                                e.currentTarget.style.boxShadow = '1px 1px 0px #000000';
+                              }}
+                            >
+                              {notif.category === 'COURSE' && 'Vào học ngay 🚀'}
+                              {notif.category === 'EXAM' && 'Luyện tập ngay 📝'}
+                              {notif.category === 'PAYMENT' && 'Xem chi tiết 🧾'}
+                              {notif.category === 'TEACHER' && 'Xem lớp học 👨‍🏫'}
+                              {notif.category === 'AI' && 'Khám phá AI 🤖'}
+                              {!['COURSE', 'EXAM', 'PAYMENT', 'TEACHER', 'AI'].includes(notif.category) && 'Xem chi tiết ➔'}
+                            </button>
+                          )}
+                          <span className="tdb-notif-time" style={{ marginTop: '4px' }}>
+                            {new Date(notif.createdAt).toLocaleString('vi-VN')}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <>
                     <div className="tdb-notif-item" style={{ padding: '12px 0' }}>

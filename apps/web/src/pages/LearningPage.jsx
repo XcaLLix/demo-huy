@@ -53,6 +53,8 @@ export default function LearningPage({
   const [discussions, setDiscussions] = useState([]);
   const [activeTab, setActiveTab] = useState('transcript'); // transcript = Tóm tắt video, exercise = Flashcard ôn tập
   const [loading, setLoading] = useState(true);
+  const [aiQuery, setAiQuery] = useState(null);
+  const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
 
   // Layout panels toggles and resizing
   const [sidebarOpen, setSidebarOpen] = useState(false); // Left list is collapsed/removed
@@ -256,6 +258,82 @@ export default function LearningPage({
     if (videoEl) {
       videoEl.currentTime = secs;
       videoEl.play().catch(() => {});
+    }
+  };
+
+  // Ask AI explanation based on transcript segment click
+  const handleAskAIFromTranscript = (sentence) => {
+    setAiQuery({
+      text: `Giải thích chi tiết câu giảng này trong bài giảng giúp em: "${sentence}"`,
+      timestamp: Date.now()
+    });
+    setRightPanelOpen(true);
+    setRightPanelTab('ai');
+    toast('Đã gửi mốc câu hỏi sang Gia sư AI!', 'success');
+  };
+
+  // Generate AI Flashcards from current lesson content
+  const handleGenerateLessonFlashcards = async () => {
+    if (!currentLesson) return;
+    setIsGeneratingFlashcards(true);
+    toast('Trợ lý AI bắt đầu phân tích và tạo bộ thẻ ghi nhớ...', 'info');
+
+    try {
+      const contentPrompt = `Hãy tạo 5 flashcards kiến thức cốt lõi cho bài học sau:
+Tiêu đề: "${currentLesson.title}"
+Nội dung bài học: "${currentLesson.content || 'Khái niệm và cách giải quyết bài toán nhanh trong thi THPT Quốc Gia.'}"`;
+      
+      const result = await api.generateFlashcards(contentPrompt);
+
+      if (!Array.isArray(result) || result.length === 0) {
+        throw new Error('Hệ thống AI không trả về bộ thẻ hợp lệ.');
+      }
+
+      // Format flashcards list
+      const formatted = result.map((c, index) => ({
+        ...c,
+        image: null,
+        partOfSpeech: index % 2 === 0 ? "Khái niệm" : "Định nghĩa",
+        hashtag: `# ${currentLesson.title.substring(0, 10)}`
+      }));
+
+      // Prepare new deck
+      const deckTitle = `Flashcard: ${currentLesson.title}`;
+      const newDeck = {
+        id: Date.now().toString(),
+        title: deckTitle,
+        cards: formatted,
+        createdAt: new Date().toISOString()
+      };
+
+      // Save to localStorage
+      let existingDecks = [];
+      try {
+        const stored = localStorage.getItem('edupath_saved_flashcard_decks');
+        if (stored) {
+          existingDecks = JSON.parse(stored);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+
+      const updatedDecks = [newDeck, ...existingDecks.filter(d => d.title !== deckTitle)];
+      localStorage.setItem('edupath_saved_flashcard_decks', JSON.stringify(updatedDecks));
+
+      toast(`Đã tạo bộ thẻ "${deckTitle}" với ${formatted.length} thẻ học!`, 'success');
+      
+      setTimeout(() => {
+        toast('Hệ thống đang chuyển bạn sang trang Học Flashcards...', 'info');
+        if (onBackToCourse) {
+          onBackToCourse('/flashcards');
+        }
+      }, 1500);
+
+    } catch (err) {
+      console.error(err);
+      toast(err.message || 'Lỗi khi tạo flashcard từ AI!', 'error');
+    } finally {
+      setIsGeneratingFlashcards(false);
     }
   };
 
@@ -565,75 +643,108 @@ export default function LearningPage({
             <div className="interactive-tabs-content" style={{ padding: '24px' }}>
               {activeTab === 'transcript' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  {/* Summary download card */}
-                  <div style={{
-                    background: '#f8fafc',
-                    border: '1.5px dashed #cbd5e1',
-                    borderRadius: '12px',
-                    padding: '32px 24px',
-                    textAlign: 'center',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '14px'
-                  }}>
-                    <div style={{
-                      width: '48px',
-                      height: '48px',
-                      borderRadius: '50%',
-                      background: '#eef2ff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#3f51b5',
-                      fontSize: '22px'
-                    }}>
-                      <FileIcon />
+                  {/* Split Layout: Transcript Left, Notes & Download Right */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '24px' }} className="transcript-split-layout">
+                    <div style={{ borderRight: '1px solid #e2e8f0', paddingRight: '20px' }} className="transcript-left-pane">
+                      <h4 style={{ fontSize: '14.5px', fontWeight: '800', marginBottom: '16px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>📄</span> Phụ đề & Nội dung bài học đồng bộ
+                      </h4>
+                      <TranscriptTab 
+                        transcript={currentLesson.transcript || mockTranscript} 
+                        videoTime={videoTime} 
+                        onSeek={handleSeek}
+                        onAskAI={handleAskAIFromTranscript}
+                      />
                     </div>
-                    <h4 style={{ fontSize: '15px', fontWeight: '800', margin: 0, color: '#0f172a' }}>Tóm tắt & ghi chú</h4>
-                    <p style={{ fontSize: '12.5px', color: '#64748b', margin: 0, fontWeight: '500', maxWidth: '400px', lineHeight: '1.5' }}>
-                      Nhấn tab Tóm tắt video phía trên để tải nội dung.
-                    </p>
-                    <button
-                      onClick={() => {
-                        toast('Đang khởi tạo tóm tắt thông minh từ AI...', 'info');
-                        setTimeout(() => {
-                          const docText = `Tóm tắt bài học: ${currentLesson.title}\n\n1. Kiến thức cốt lõi:\n- Phân tích chi tiết các dạng lý thuyết trọng tâm.\n- Áp dụng sơ đồ tư duy hệ thống hóa kiến thức.\n\n2. Ghi chú & Công thức:\n- Ghi nhớ công thức đặc biệt được giáo viên nhấn mạnh trong bài giảng.`;
-                          const blob = new Blob([docText], { type: 'text/plain;charset=utf-8' });
-                          const link = document.createElement('a');
-                          link.href = URL.createObjectURL(blob);
-                          link.download = `Tom_tat_${currentLesson.title.replace(/\s+/g, '_')}.txt`;
-                          link.click();
-                          toast('Tải tóm tắt video thành công! 📄', 'success');
-                        }, 1000);
-                      }}
-                      style={{
-                        background: '#3f51b5',
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: '6px',
-                        padding: '8px 24px',
-                        fontWeight: '700',
-                        fontSize: '13px',
-                        cursor: 'pointer',
-                        boxShadow: '0 2px 4px rgba(63, 81, 181, 0.2)'
-                      }}
-                    >
-                      Tải tóm tắt
-                    </button>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }} className="transcript-right-pane">
+                      {/* Summary download card */}
+                      <div style={{
+                        background: '#f8fafc',
+                        border: '1.5px dashed #cbd5e1',
+                        borderRadius: '12px',
+                        padding: '24px 16px',
+                        textAlign: 'center',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '10px'
+                      }}>
+                        <div style={{
+                          width: '42px',
+                          height: '42px',
+                          borderRadius: '50%',
+                          background: '#eef2ff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#3f51b5',
+                          fontSize: '20px'
+                        }}>
+                          <FileIcon />
+                        </div>
+                        <h4 style={{ fontSize: '14px', fontWeight: '800', margin: 0, color: '#0f172a' }}>Tải bản Tóm tắt AI</h4>
+                        <button
+                          onClick={() => {
+                            toast('Đang khởi tạo tóm tắt thông minh từ AI...', 'info');
+                            setTimeout(() => {
+                              const docText = `Tóm tắt bài học: ${currentLesson.title}\n\n1. Kiến thức cốt lõi:\n- Phân tích chi tiết các dạng lý thuyết trọng tâm.\n- Áp dụng sơ đồ tư duy hệ thống hóa kiến thức.\n\n2. Ghi chú & Công thức:\n- Ghi nhớ công thức đặc biệt được giáo viên nhấn mạnh trong bài giảng.`;
+                              const blob = new Blob([docText], { type: 'text/plain;charset=utf-8' });
+                              const link = document.createElement('a');
+                              link.href = URL.createObjectURL(blob);
+                              link.download = `Tom_tat_${currentLesson.title.replace(/\s+/g, '_')}.txt`;
+                              link.click();
+                              toast('Tải tóm tắt video thành công! 📄', 'success');
+                            }, 1000);
+                          }}
+                          style={{
+                            background: '#3f51b5',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '8px 20px',
+                            fontWeight: '700',
+                            fontSize: '12.5px',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 4px rgba(63, 81, 181, 0.2)'
+                          }}
+                        >
+                          Tải tóm tắt
+                        </button>
+                      </div>
+                      
+                      {/* Real timestamped notes form and cards */}
+                      <NotePanel 
+                        lesson={currentLesson} 
+                        videoTime={videoTime} 
+                        onSeek={handleSeek} 
+                      />
+                    </div>
                   </div>
-                  
-                  {/* Real timestamped notes form and cards */}
-                  <NotePanel 
-                    lesson={currentLesson} 
-                    videoTime={videoTime} 
-                    onSeek={handleSeek} 
-                  />
                 </div>
               )}
 
               {activeTab === 'exercise' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  {/* AI Flashcard Generator Card */}
+                  <div className="ai-flashcard-box animate-in">
+                    <div className="icon-container">
+                      <HiSparkles />
+                    </div>
+                    <h4>Trợ lý AI tạo Bộ Thẻ Ôn Tập Cấp Tốc</h4>
+                    <p>
+                      Hệ thống AI sẽ phân tích nội dung bài học <strong>"{currentLesson.title}"</strong> để thiết kế một bộ gồm 5 thẻ ghi nhớ flashcards ôn luyện các khái niệm trọng tâm.
+                    </p>
+                    <button
+                      type="button"
+                      className="btn-generate-ai-flashcards"
+                      onClick={handleGenerateLessonFlashcards}
+                      disabled={isGeneratingFlashcards}
+                    >
+                      {isGeneratingFlashcards ? '⌛ Đang tạo bộ thẻ...' : '⚡ Sinh Flashcards bằng AI'}
+                    </button>
+                  </div>
+
                   {/* Exercises tab */}
                   <ExerciseTab 
                     exercises={mockQuizzes} 
@@ -796,7 +907,7 @@ export default function LearningPage({
                     </div>
                   </div>
                 ) : (
-                  <AITutorPanel lesson={currentLesson} />
+                  <AITutorPanel lesson={currentLesson} initialQuery={aiQuery} />
                 )}
               </div>
             </div>
