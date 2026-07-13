@@ -519,7 +519,7 @@ Nội dung bài học: "${currentLesson.content || 'Khái niệm và cách giả
       <div className="learning-layout-grid">
         
         {/* CENTER COLUMN: VIDEO & INTERACTIVE TABS */}
-        <div className="center-workspace-wrapper" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', padding: '24px', gap: '24px' }}>
+        <div className="center-workspace-wrapper" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'hidden', padding: '24px', gap: '24px' }}>
           {/* Main Video Screen Container */}
           <div className="main-video-screen">
             {isLocked ? (
@@ -789,6 +789,8 @@ Nội dung bài học: "${currentLesson.content || 'Khái niệm và cách giả
             className="right-sidebar-panel" 
             style={{ 
               width: `${rightPanelWidth}px`, 
+              minWidth: `${rightPanelWidth}px`,
+              flexShrink: 0,
               display: 'flex', 
               flexDirection: 'column', 
               height: '100%',

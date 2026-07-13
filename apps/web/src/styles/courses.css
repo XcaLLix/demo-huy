@@ -6173,6 +6173,7 @@
 /* ── MATERIALS TAB WORKSPACE STYLES ── */
 .materials-tab {
   display: flex;
+  flex-wrap: wrap;
   gap: 24px;
   width: 100%;
   margin-top: 10px;

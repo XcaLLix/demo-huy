@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma.js';
 import { incrementBothStats } from '../lib/monthlyStats.js';
 import { logSystemEvent } from '../utils/logger.js';
 import { SystemSettingService } from '../services/systemSetting.service.js';
+import { getRAGContext, generateLocalRAGAnswer } from '../utils/rag.js';
 import fs from 'fs';
 
 // Bộ đếm lượt hỏi AI trong ngày của học sinh (Reset hàng ngày)
@@ -41,18 +42,41 @@ function processLines(buffer: string, res: Response): string {
   return lastLine;
 }
 
-// Server-Sent Events (SSE) AI Streaming Chat
 export async function streamAIChat(req: AuthRequest, res: Response) {
-  const { message } = req.body;
+  const { message, lessonId } = req.body;
   const studentId = req.user?.id;
   const role = req.user?.role?.toUpperCase();
 
-  // Kiểm tra giới hạn câu hỏi AI miễn phí của học sinh
+  // Retrieve lesson context and RAG documents beforehand
+  let lesson = null;
+  let ragContext = '';
+  if (lessonId && !isNaN(Number(lessonId))) {
+    try {
+      lesson = await prisma.lesson.findUnique({
+        where: { id: Number(lessonId) }
+      });
+      if (lesson && lesson.content) {
+        const rawQuery = message && message.includes('Học sinh hỏi: ')
+          ? message.split('Học sinh hỏi: ').pop()
+          : message;
+        ragContext = getRAGContext(lesson.content, rawQuery || '');
+      }
+    } catch (err) {
+      console.error('[streamAIChat] Failed to fetch lesson context:', err);
+    }
+  }
+
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  const model = process.env.OPENROUTER_MODEL || 'openrouter/free';
+
+  // Check free AI question limits for non-PRO student
+  let isFreeLimitReached = false;
+  let maxLimit = 20;
   if (studentId && role === 'STUDENT') {
     const user = await prisma.user.findUnique({ where: { id: studentId } });
     if (user && !user.isPro) {
       const todayStr = new Date().toISOString().split('T')[0];
-      const maxLimit = SystemSettingService.getNumber('FREE_AI_QUESTION_LIMIT') || 20;
+      maxLimit = SystemSettingService.getNumber('FREE_AI_QUESTION_LIMIT') || 20;
 
       const record = dailyQuestionCounter.get(studentId) || { count: 0, date: todayStr };
       if (record.date !== todayStr) {
@@ -61,37 +85,48 @@ export async function streamAIChat(req: AuthRequest, res: Response) {
       }
 
       if (record.count >= maxLimit) {
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-        res.flushHeaders();
-        res.write(`data: ${JSON.stringify({ text: `Bạn đã đạt giới hạn ${maxLimit} câu hỏi AI miễn phí trong ngày hôm nay. Hãy nâng cấp tài khoản Premium để hỏi không giới hạn!` })}\n\n`);
-        res.write('data: [DONE]\n\n');
-        res.end();
-        return;
+        isFreeLimitReached = true;
+      } else {
+        record.count++;
+        dailyQuestionCounter.set(studentId, record);
       }
-
-      record.count++;
-      dailyQuestionCounter.set(studentId, record);
     }
   }
 
+  // Set SSE Headers
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  const model = process.env.OPENROUTER_MODEL || 'openrouter/free';
-
-  if (!apiKey) {
-    res.write(`data: ${JSON.stringify({ text: "Hệ thống AI Gia sư đang bảo trì (thiếu cấu hình API Key)." })}\n\n`);
-    res.write('data: [DONE]\n\n');
-    res.end();
-    return;
+  // Handle limits and missing keys with local RAG fallback
+  if (isFreeLimitReached || !apiKey) {
+    if (ragContext) {
+      const localAnswer = generateLocalRAGAnswer(ragContext, message || '');
+      res.write(`data: ${JSON.stringify({ text: localAnswer })}\n\n`);
+      res.write('data: [DONE]\n\n');
+      res.end();
+      return;
+    } else {
+      if (isFreeLimitReached) {
+        res.write(`data: ${JSON.stringify({ text: `Bạn đã đạt giới hạn ${maxLimit} câu hỏi AI miễn phí trong ngày hôm nay. Hãy nâng cấp tài khoản Premium để hỏi không giới hạn!` })}\n\n`);
+      } else {
+        res.write(`data: ${JSON.stringify({ text: "Hệ thống AI Gia sư đang bảo trì (thiếu cấu hình API Key)." })}\n\n`);
+      }
+      res.write('data: [DONE]\n\n');
+      res.end();
+      return;
+    }
   }
 
-  const systemPrompt = {
+  const systemPrompt = ragContext ? {
+    role: 'system',
+    content: `Bạn là Gia sư AI EduPath. Hãy trả lời câu hỏi của học sinh ngắn gọn, dễ hiểu dựa trên tài liệu bài học "${lesson?.title || 'bài học'}":
+    """
+    ${ragContext}
+    """
+    Tập trung trả lời đúng trọng tâm tài liệu bằng tiếng Việt.`
+  } : {
     role: 'system',
     content: 'Bạn là EduBot. Trả lời cực ngắn gọn (dưới 10 từ) bằng tiếng Việt.'
   };
@@ -102,7 +137,7 @@ export async function streamAIChat(req: AuthRequest, res: Response) {
     res.end();
   });
 
-  const slicedMessage = message ? String(message).substring(0, 60) : '';
+  const slicedMessage = message ? String(message).substring(0, lessonId ? 250 : 60) : '';
 
   try {
     let response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -121,7 +156,7 @@ export async function streamAIChat(req: AuthRequest, res: Response) {
         ],
         stream: true,
         temperature: 0.7,
-        max_tokens: 40
+        max_tokens: ragContext ? 250 : 40
       }),
       signal: abortController.signal
     });

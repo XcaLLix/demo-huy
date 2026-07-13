@@ -25,7 +25,8 @@ export const aiService = {
         method: 'POST',
         headers: headers,
         body: JSON.stringify({ 
-          message: `${lessonContext}Học sinh hỏi: ${content}` 
+          message: `${lessonContext}Học sinh hỏi: ${content}`,
+          lessonId: lesson?.id || null
         })
       });
 

@@ -2602,7 +2602,7 @@ export default function App() {
       >
         <main 
           className="main-content" 
-          style={(effectiveRole === 'guest' || effectiveRole === 'student' || effectiveRole === 'admin' || effectiveRole === 'teacher' || parsedRoute.route !== 'dashboard' || isEffectiveFullscreen) ? { maxWidth: '100%', padding: 0 } : { maxWidth: '100%' }}
+          style={(effectiveRole === 'guest' || effectiveRole === 'student' || effectiveRole === 'admin' || effectiveRole === 'teacher' || parsedRoute.route !== 'dashboard' || isEffectiveFullscreen) ? { width: '100%', maxWidth: '100%', padding: 0, overflow: 'hidden' } : { maxWidth: '100%' }}
         >
 
           {currentUser && parsedRoute.route.startsWith('mock-') && parsedRoute.route !== 'mock-exam-taking' && (

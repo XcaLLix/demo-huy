@@ -2,6 +2,8 @@ import type { Response } from 'express';
 import type { AuthRequest } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
 import { getSubjectGroupForSubject, getSubjectsForSubjectGroup } from '../utils/subjectClassifier.js';
+import { extractTextFromFile } from '../utils/rag.js';
+import path from 'path';
 
 export async function getCourses(req: AuthRequest, res: Response) {
   const { subject, subjectGroup, price, grade, teacherId } = req.query;
@@ -209,18 +211,67 @@ export async function deleteCourse(req: AuthRequest, res: Response) {
   }
 }
 
+async function syncLessonDocumentAndRAG(lessonId: number, content: string, teacherId: number) {
+  if (!content) return content;
+
+  // Check if content is an uploaded document URL
+  if (content.includes('/uploads/')) {
+    try {
+      const filename = content.substring(content.lastIndexOf('/') + 1);
+      const resolvedUploadsDir = path.resolve(process.cwd(), 'uploads');
+      const localFilePath = path.join(resolvedUploadsDir, filename);
+      const ext = filename.split('.').pop()?.toLowerCase() || '';
+
+      console.log(`[RAG Sync] Detected document file: ${filename}. Extracting text content...`);
+      const extractedText = await extractTextFromFile(localFilePath, ext);
+
+      if (extractedText) {
+        // Sync document to database if not already linked
+        const existingDoc = await prisma.document.findFirst({
+          where: { lessonId, fileUrl: content }
+        });
+
+        if (!existingDoc) {
+          await prisma.document.create({
+            data: {
+              title: filename,
+              fileUrl: content,
+              fileType: ext.toUpperCase(),
+              lessonId,
+              uploadedBy: teacherId
+            }
+          });
+          console.log(`[RAG Sync] Document ${filename} linked to Lesson ${lessonId}`);
+        }
+
+        // Return extracted text as new content value to store as context in Lesson
+        return extractedText;
+      }
+    } catch (err: any) {
+      console.error('[RAG Sync Error] Failed to sync and parse file:', err.message);
+    }
+  }
+  return content;
+}
+
 export async function updateLesson(req: AuthRequest, res: Response) {
   const lessonId = Number(req.params.id);
   const { title, order, videoUrl, content, duration } = req.body;
+  const teacherId = req.user?.id || 0;
 
   try {
+    let finalContent = content;
+    if (content !== undefined) {
+      finalContent = await syncLessonDocumentAndRAG(lessonId, content, teacherId);
+    }
+
     const updated = await prisma.lesson.update({
       where: { id: lessonId },
       data: {
         ...(title ? { title } : {}),
         ...(order !== undefined ? { order: Number(order) } : {}),
         ...(videoUrl !== undefined ? { videoUrl } : {}),
-        ...(content !== undefined ? { content } : {}),
+        ...(content !== undefined ? { content: finalContent } : {}),
         ...(duration !== undefined ? { duration } : {})
       }
     });
@@ -247,16 +298,29 @@ export async function deleteLesson(req: AuthRequest, res: Response) {
 
 export async function createLesson(req: AuthRequest, res: Response) {
   const { courseId, title, order, videoUrl, content, duration } = req.body;
+  const teacherId = req.user?.id || 0;
 
   try {
-    const newLesson = await prisma.lesson.create({
+    let tempLesson = await prisma.lesson.create({
       data: {
         courseId: Number(courseId),
         title,
         order: Number(order),
         videoUrl: videoUrl || null,
-        content: content || null,
+        content: '', // temporary
         duration: duration || '15m'
+      }
+    });
+
+    let finalContent = content;
+    if (content) {
+      finalContent = await syncLessonDocumentAndRAG(tempLesson.id, content, teacherId);
+    }
+
+    const newLesson = await prisma.lesson.update({
+      where: { id: tempLesson.id },
+      data: {
+        content: finalContent || null
       }
     });
 

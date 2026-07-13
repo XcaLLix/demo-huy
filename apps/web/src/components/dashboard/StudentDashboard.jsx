@@ -616,7 +616,7 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
           {/* HỌC TẬP CỦA TÔI */}
           <div className="sdb-menu-category-title">Học tập của tôi</div>
           <button 
-            className={`sdb-menu-item ${currentTab === 'my-courses' ? 'active' : ''}`}
+            className={`sdb-menu-item ${currentTab === 'my-courses' || currentTab === 'courses' ? 'active' : ''}`}
             onClick={() => navigateTo('/user/my-courses')}
           >
             <span className="sdb-menu-icon"><HiBookOpen /></span>
@@ -1023,92 +1023,7 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
               onSelectCourse={(course) => navigateTo(`/learn/${course.id}`)}
             />
 
-            {coursesToRender.length > 0 ? (
-              <div style={{ marginTop: '24px' }}>
-                <h4 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '16px', textAlign: 'left' }}>
-                  Danh sách khóa học của tôi
-                </h4>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
-                  {coursesToRender.map((course) => (
-                    <div 
-                      key={course.id} 
-                      style={{
-                        background: '#ffffff',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '20px',
-                        padding: '24px',
-                        boxShadow: '0 10px 15px -3px rgba(148, 163, 184, 0.05)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-between',
-                        position: 'relative',
-                        minHeight: '220px',
-                        transition: 'all 0.25s'
-                      }}
-                      className="sdb-my-course-card-item"
-                    >
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                          <span style={{
-                            background: course.subject === 'Toán' || course.subject === 'Toán học' ? '#f3e8ff' : course.subject === 'Vật lý' ? '#ccfbf1' : course.subject === 'Hóa học' ? '#dbeafe' : '#ffedd5',
-                            color: course.subject === 'Toán' || course.subject === 'Toán học' ? '#7c3aed' : course.subject === 'Vật lý' ? '#0d9488' : course.subject === 'Hóa học' ? '#2563eb' : '#ea580c',
-                            padding: '4px 10px',
-                            borderRadius: '20px',
-                            fontSize: '11px',
-                            fontWeight: '600'
-                          }}>
-                            {course.subject}
-                          </span>
-                          <span style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>
-                            {course.lessons?.length || 10} bài học
-                          </span>
-                        </div>
-                        
-                        <h4 style={{ fontSize: '16px', fontWeight: '700', color: '#0f172a', margin: '0 0 8px 0', textAlign: 'left', lineHeight: '1.4' }}>
-                          {course.title}
-                        </h4>
-                        <p style={{ fontSize: '12.5px', color: '#64748b', margin: '0 0 16px 0', textAlign: 'left', fontWeight: '500', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                          {course.description || 'Khóa học ôn thi THPT Quốc Gia toàn diện thiết kế theo phương pháp AI adaptive.'}
-                        </p>
-                      </div>
-
-                      <div>
-                        {/* Progress section */}
-                        <div style={{ marginBottom: '16px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: '12px', fontWeight: '600' }}>
-                            <span style={{ color: '#475569' }}>Tiến độ hoàn thành:</span>
-                            <span style={{ color: '#6366f1', fontWeight: '700' }}>{course.progress}%</span>
-                          </div>
-                          <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
-                            <div style={{ width: `${course.progress}%`, height: '100%', background: 'linear-gradient(90deg, #6366f1, #4f46e5)' }}></div>
-                          </div>
-                        </div>
-
-                        {/* Action buttons */}
-                        <button
-                          onClick={() => navigateTo(`/learn/${course.id}`)}
-                          style={{
-                            width: '100%',
-                            background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '10px',
-                            padding: '10px',
-                            fontWeight: '700',
-                            fontSize: '13px',
-                            cursor: 'pointer',
-                            boxShadow: '0 4px 10px rgba(99, 102, 241, 0.2)',
-                            transition: 'all 0.2s ease'
-                          }}
-                        >
-                          Vào học ngay 🚀
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
+            {coursesToRender.length === 0 && (
               <div style={{
                 background: '#fff',
                 border: '1px solid #e2e8f0',

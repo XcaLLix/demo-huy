@@ -280,16 +280,29 @@ export default function CoursesPage({ courses = [], currentUser, onSelectCourse,
             ) : currentCourses.length > 0 ? (
               <>
                 <div className="cp-list">
-                  {currentCourses.map(course => (
-                    <CourseCard
-                      key={course.id}
-                      course={course}
-                      isOwned={currentUser?.unlockedCourses?.includes(Number(course.id)) || currentUser?.unlockedCourses?.includes(course.id)}
-                      onSelect={onSelectCourse}
-                      onPurchase={onCheckoutCourse}
-                      layout="list"
-                    />
-                  ))}
+                  {currentCourses.map(course => {
+                    const isOwned = currentUser?.unlockedCourses?.includes(Number(course.id)) || currentUser?.unlockedCourses?.includes(course.id?.toString());
+                    return (
+                      <CourseCard
+                        key={course.id}
+                        course={course}
+                        isOwned={isOwned}
+                        onSelect={(c) => {
+                          if (isOwned) {
+                            if (navigateTo) {
+                              navigateTo(`/learn/${c.id}`);
+                            } else {
+                              onSelectCourse(c);
+                            }
+                          } else {
+                            onSelectCourse(c);
+                          }
+                        }}
+                        onPurchase={onCheckoutCourse}
+                        layout="list"
+                      />
+                    );
+                  })}
                 </div>
 
                 {/* Neo-brutalist Pagination Controls */}
