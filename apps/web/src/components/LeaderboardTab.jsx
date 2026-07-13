@@ -8,7 +8,134 @@ const skeletonKeyframes = `
     50% { opacity: 0.3; }
     100% { opacity: 0.6; }
   }
+  @keyframes float-sparkle {
+    0% { transform: translateY(0px) translateX(0px) scale(0.6) rotate(0deg); opacity: 0; }
+    30% { opacity: 0.8; }
+    70% { opacity: 0.8; }
+    100% { transform: translateY(-80px) translateX(15px) scale(1.1) rotate(180deg); opacity: 0; }
+  }
+  @keyframes aura-glow-gold {
+    0% { box-shadow: 0 0 15px rgba(245, 196, 83, 0.2); }
+    50% { box-shadow: 0 0 35px rgba(245, 196, 83, 0.6); }
+    100% { box-shadow: 0 0 15px rgba(245, 196, 83, 0.2); }
+  }
+  @keyframes aura-glow-silver {
+    0% { box-shadow: 0 0 15px rgba(191, 219, 254, 0.25); }
+    50% { box-shadow: 0 0 35px rgba(191, 219, 254, 0.65); }
+    100% { box-shadow: 0 0 15px rgba(191, 219, 254, 0.25); }
+  }
+  @keyframes aura-glow-bronze {
+    0% { box-shadow: 0 0 15px rgba(254, 215, 170, 0.25); }
+    50% { box-shadow: 0 0 35px rgba(254, 215, 170, 0.65); }
+    100% { box-shadow: 0 0 15px rgba(254, 215, 170, 0.25); }
+  }
+  .leaderboard-row-animated {
+    opacity: 0;
+    transform: translateX(50px);
+    transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .leaderboard-row-animated.is-visible {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  .leaderboard-top1-card {
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  .leaderboard-top1-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 20px 45px rgba(245, 196, 83, 0.45) !important;
+  }
+  .leaderboard-top2-card {
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  .leaderboard-top2-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 20px 45px rgba(191, 219, 254, 0.5) !important;
+  }
+  .leaderboard-top3-card {
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  .leaderboard-top3-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 20px 45px rgba(254, 215, 170, 0.5) !important;
+  }
 `;
+
+function useIntersectionObserver() {
+  const [isVisible, setIsVisible] = React.useState(false);
+  const ref = React.useRef(null);
+
+  React.useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsVisible(entry.isIntersecting);
+      },
+      { threshold: 0.05, rootMargin: '0px 0px -20px 0px' }
+    );
+
+    if (ref.current) {
+      observer.observe(ref.current);
+    }
+
+    return () => {
+      if (ref.current) observer.unobserve(ref.current);
+    };
+  }, []);
+
+  return [ref, isVisible];
+}
+
+function ScrollAnimatedRow({ children, className, style, delay = 0, duration = '0.6s' }) {
+  const [ref, isVisible] = useIntersectionObserver();
+
+  return (
+    <div
+      ref={ref}
+      className={`${className} leaderboard-row-animated ${isVisible ? 'is-visible' : ''}`}
+      style={{
+        ...style,
+        transitionDuration: duration,
+        transitionDelay: `${delay}s`
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function FairyDust({ active }) {
+  if (!active) return null;
+  const particles = [
+    { top: '15%', left: '10%', delay: '0s', size: '12px' },
+    { top: '35%', left: '85%', delay: '1.2s', size: '14px' },
+    { top: '55%', left: '8%', delay: '0.6s', size: '10px' },
+    { top: '75%', left: '80%', delay: '2s', size: '13px' },
+    { top: '80%', left: '20%', delay: '0.9s', size: '11px' },
+    { top: '25%', left: '50%', delay: '0.4s', size: '15px' },
+  ];
+
+  return (
+    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none', overflow: 'hidden', zIndex: 5 }}>
+      {particles.map((p, idx) => (
+        <span
+          key={idx}
+          style={{
+            position: 'absolute',
+            top: p.top,
+            left: p.left,
+            fontSize: p.size,
+            animation: 'float-sparkle 3.2s ease-in-out infinite',
+            animationDelay: p.delay,
+            opacity: 0,
+            color: idx % 2 === 0 ? '#F5C453' : '#a29bfe'
+          }}
+        >
+          {idx % 3 === 0 ? '✨' : (idx % 3 === 1 ? '⭐' : '🌸')}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 const renderTop3Skeleton = () => (
   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px', marginBottom: '24px' }}>
@@ -236,7 +363,6 @@ export default function LeaderboardTab({ currentUser }) {
           position: 'relative',
           overflow: 'hidden'
         }}>
-          {/* Flame element */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -325,7 +451,7 @@ export default function LeaderboardTab({ currentUser }) {
         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
         borderRadius: '16px',
         padding: '20px',
-        background: '#FFFFFF',
+        background: '#FCF9F2',
         display: 'flex',
         flexWrap: 'wrap',
         gap: '12px',
@@ -344,7 +470,7 @@ export default function LeaderboardTab({ currentUser }) {
               padding: '10px 14px',
               borderRadius: '8px',
               fontSize: '13px',
-              background: '#F8FAFC',
+              background: '#FFFFFF',
               color: '#1E293B',
               outline: 'none'
             }}
@@ -364,7 +490,7 @@ export default function LeaderboardTab({ currentUser }) {
               padding: '10px 14px',
               borderRadius: '8px',
               fontSize: '13px',
-              background: '#F8FAFC',
+              background: '#FFFFFF',
               color: '#1E293B',
               outline: 'none'
             }}
@@ -382,7 +508,7 @@ export default function LeaderboardTab({ currentUser }) {
               borderRadius: '8px',
               fontSize: '13px',
               fontWeight: 'bold',
-              background: '#F8FAFC',
+              background: '#FFFFFF',
               color: '#1E293B',
               cursor: 'pointer',
               outline: 'none'
@@ -406,7 +532,7 @@ export default function LeaderboardTab({ currentUser }) {
               borderRadius: '8px',
               fontSize: '13px',
               fontWeight: 'bold',
-              background: '#F8FAFC',
+              background: '#FFFFFF',
               color: '#1E293B',
               cursor: 'pointer',
               outline: 'none'
@@ -432,7 +558,7 @@ export default function LeaderboardTab({ currentUser }) {
               fontWeight: 'bold',
               cursor: 'pointer',
               border: '1px solid ' + (sortBy === 'streak' ? '#6c5ce7' : '#E2E8F0'),
-              background: sortBy === 'streak' ? '#6c5ce7' : '#F1F5F9',
+              background: sortBy === 'streak' ? '#6c5ce7' : '#FFFFFF',
               color: sortBy === 'streak' ? '#FFFFFF' : '#475569',
               boxShadow: sortBy === 'streak' ? '0 4px 12px rgba(108, 92, 231, 0.15)' : 'none',
               transition: 'all 0.2s'
@@ -449,7 +575,7 @@ export default function LeaderboardTab({ currentUser }) {
               fontWeight: 'bold',
               cursor: 'pointer',
               border: '1px solid ' + (sortBy === 'xp' ? '#6c5ce7' : '#E2E8F0'),
-              background: sortBy === 'xp' ? '#6c5ce7' : '#F1F5F9',
+              background: sortBy === 'xp' ? '#6c5ce7' : '#FFFFFF',
               color: sortBy === 'xp' ? '#FFFFFF' : '#475569',
               boxShadow: sortBy === 'xp' ? '0 4px 12px rgba(108, 92, 231, 0.15)' : 'none',
               transition: 'all 0.2s'
@@ -490,56 +616,63 @@ export default function LeaderboardTab({ currentUser }) {
                 return podiumSpots.map(({ student, index }) => {
                   const configs = [
                     { 
-                      bg: 'linear-gradient(135deg, #FFFDF5 0%, #FEF3C7 100%)', 
+                      bg: '#FED7AA', 
                       border: '2.5px solid #F5C453', 
                       medal: '👑', 
-                      label: 'Thủ Khoa', 
+                      label: 'CHIẾN THẦN TOÀN NĂNG', 
                       textColor: '#B45309',
-                      height: '310px',
+                      height: '350px',
                       podiumHeight: '80px',
                       podiumBg: 'linear-gradient(180deg, #F5C453 0%, #D97706 100%)',
                       shadow: '0 12px 30px rgba(245, 196, 83, 0.25)',
-                      glowClass: 'leaderboard-top1-card animate-slide-up'
+                      glowClass: 'leaderboard-top1-card',
+                      glowStyle: { animation: 'aura-glow-gold 4s ease-in-out infinite' }
                     },
                     { 
-                      bg: 'linear-gradient(135deg, #F8FAFC 0%, #E2E8F0 100%)', 
+                      bg: '#FED7AA', 
                       border: '2.5px solid #94A3B8', 
                       medal: '🥈', 
-                      label: 'Á Khoa', 
+                      label: 'TINH ANH HỌC THUẬT', 
                       textColor: '#475569',
-                      height: '270px',
+                      height: '310px',
                       podiumHeight: '60px',
                       podiumBg: 'linear-gradient(180deg, #94A3B8 0%, #64748B 100%)',
                       shadow: '0 8px 20px rgba(148, 163, 184, 0.15)',
-                      glowClass: 'leaderboard-top-card animate-slide-up'
+                      glowClass: 'leaderboard-top2-card',
+                      glowStyle: { animation: 'aura-glow-silver 4s ease-in-out infinite' }
                     },
                     { 
-                      bg: 'linear-gradient(135deg, #FFF7ED 0%, #FFDDBC 100%)', 
+                      bg: '#FED7AA', 
                       border: '2.5px solid #F97316', 
                       medal: '🥉', 
-                      label: 'Tam Khoa', 
+                      label: 'CAO THỦ ẨN DANH', 
                       textColor: '#C2410C',
-                      height: '240px',
+                      height: '280px',
                       podiumHeight: '40px',
                       podiumBg: 'linear-gradient(180deg, #F97316 0%, #C2410C 100%)',
                       shadow: '0 6px 15px rgba(249, 115, 22, 0.12)',
-                      glowClass: 'leaderboard-top-card animate-slide-up'
+                      glowClass: 'leaderboard-top3-card',
+                      glowStyle: { animation: 'aura-glow-bronze 4s ease-in-out infinite' }
                     }
-                  ][index] || { bg: '#FFFFFF', border: '1px solid #E2E8F0', medal: '⭐', label: 'Vinh danh', textColor: '#64748B', height: '240px', podiumHeight: '30px', podiumBg: '#E2E8F0', shadow: 'none', glowClass: '' };
+                  ][index] || { bg: '#FED7AA', border: '1px solid #E2E8F0', medal: '⭐', label: 'Vinh danh', textColor: '#64748B', height: '240px', podiumHeight: '30px', podiumBg: '#E2E8F0', shadow: 'none', glowClass: '', glowStyle: {} };
 
                   return (
-                    <div
+                    <ScrollAnimatedRow
                       key={student.userId}
                       className={configs.glowClass}
+                      delay={index * 0.15}
+                      duration="1.5s"
                       style={{
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         width: '280px',
                         position: 'relative',
-                        zIndex: index === 0 ? 10 : 1
+                        zIndex: index === 0 ? 10 : 1,
+                        ...configs.glowStyle
                       }}
                     >
+                      <FairyDust active={index === 0} />
                       {/* Interactive Card */}
                       <div
                         style={{
@@ -639,30 +772,29 @@ export default function LeaderboardTab({ currentUser }) {
                           fontSize: '24px',
                           textShadow: '0 2px 4px rgba(0,0,0,0.3)',
                           border: '1.5px solid rgba(0,0,0,0.15)',
-                          borderBottom: 'none',
-                          boxSizing: 'border-box'
+                          borderBottom: 'none'
                         }}
                       >
                         {student.rank}
                       </div>
-                    </div>
+                    </ScrollAnimatedRow>
                   );
                 });
               })()}
             </div>
           )}
 
-          {/* Table rankings */}
+          {/* Table rankings - Showing starting from top 4 onwards in pastel theme */}
           <div className="card animate-slide-up" style={{
             border: '1px solid #E2E8F0',
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
             borderRadius: '16px',
             padding: '24px',
-            background: '#FFFFFF'
+            background: '#A7F3D0'
           }}>
-            {rankings.length === 0 ? (
+            {rest.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '20px 0', fontSize: '14px', color: '#64748B' }}>
-                Không tìm thấy học sinh nào phù hợp với bộ lọc hiện tại. 🔍
+                Không tìm thấy học sinh nào phù hợp từ vị trí thứ 4 trở đi. 🔍
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', minWidth: '800px' }}>
@@ -672,11 +804,12 @@ export default function LeaderboardTab({ currentUser }) {
                   gridTemplateColumns: '80px 2fr 1fr 1.2fr 1.5fr 1.2fr',
                   alignItems: 'center',
                   padding: '12px 24px',
-                  borderBottom: '2px solid #E2E8F0',
-                  color: '#1E293B',
-                  fontWeight: '950',
-                  fontSize: '13px',
-                  textTransform: 'uppercase'
+                  borderBottom: '2.5px solid rgba(0,0,0,0.05)',
+                  color: '#475569',
+                  fontWeight: '900',
+                  fontSize: '12.5px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em'
                 }}>
                   <div>Hạng</div>
                   <div>Học sinh</div>
@@ -688,49 +821,26 @@ export default function LeaderboardTab({ currentUser }) {
 
                 {/* Custom Grid Rows */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {rankings.map((student) => (
-                    <div
+                  {rest.map((student, idx) => (
+                    <ScrollAnimatedRow
                       key={student.userId}
-                      className={`leaderboard-row animate-slide-up ${student.rank === 1 ? 'top-1' : student.rank === 2 ? 'top-2' : student.rank === 3 ? 'top-3' : ''}`}
+                      className="leaderboard-row"
+                      delay={idx * 0.05}
                       style={{
                         display: 'grid',
                         gridTemplateColumns: '80px 2fr 1fr 1.2fr 1.5fr 1.2fr',
                         alignItems: 'center',
                         padding: '16px 24px',
-                        background: student.userId === currentUser?.id ? 'rgba(108, 92, 231, 0.06)' : 'var(--bg-card, #FFFFFF)',
+                        background: student.userId === currentUser?.id 
+                          ? '#EEF2FF' 
+                          : '#FFFFFF',
                         fontWeight: student.userId === currentUser?.id ? 'bold' : 'normal',
                         color: '#1E293B',
-                        borderRadius: '18px',
-                        border: '2.5px solid #000000',
-                        boxShadow: student.rank === 1 
-                          ? '5px 5px 0px #FFD234' 
-                          : student.rank === 2 
-                          ? '5px 5px 0px #CBD5E1' 
-                          : student.rank === 3 
-                          ? '5px 5px 0px #F0A36D' 
-                          : '4px 4px 0px #000000',
-                        transition: 'all 0.2s ease',
+                        borderRadius: '16px',
+                        border: '1.5px solid rgba(0,0,0,0.03)',
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.015)',
+                        transition: 'all 0.25s ease',
                         cursor: 'pointer'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translate(-2px, -2px)';
-                        e.currentTarget.style.boxShadow = student.rank === 1 
-                          ? '7px 7px 0px #FFD234' 
-                          : student.rank === 2 
-                          ? '7px 7px 0px #CBD5E1' 
-                          : student.rank === 3 
-                          ? '7px 7px 0px #F0A36D' 
-                          : '7px 7px 0px #000000';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'none';
-                        e.currentTarget.style.boxShadow = student.rank === 1 
-                          ? '5px 5px 0px #FFD234' 
-                          : student.rank === 2 
-                          ? '5px 5px 0px #CBD5E1' 
-                          : student.rank === 3 
-                          ? '5px 5px 0px #F0A36D' 
-                          : '4px 4px 0px #000000';
                       }}
                     >
                       {/* Rank Column */}
@@ -744,10 +854,9 @@ export default function LeaderboardTab({ currentUser }) {
                           width: '28px',
                           height: '28px',
                           borderRadius: '50%',
-                          border: student.rank <= 3 ? 'none' : '1px solid #E2E8F0',
-                          background: student.rank === 1 ? '#fef08a' : (student.rank === 2 ? '#e2e8f0' : (student.rank === 3 ? '#fed7aa' : 'transparent')),
-                          color: student.rank <= 3 ? '#854d0e' : '#475569',
-                          boxShadow: student.rank <= 3 ? 'var(--shadow-sm)' : 'none'
+                          border: '1px solid #E2E8F0',
+                          background: 'transparent',
+                          color: '#475569'
                         }}>
                           {student.rank}
                         </span>
@@ -767,25 +876,25 @@ export default function LeaderboardTab({ currentUser }) {
                       </div>
 
                       {/* Grade Column */}
-                      <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#475569' }}>
+                      <div style={{ fontSize: '13px', fontWeight: '800', color: '#475569' }}>
                         Khối {student.grade || 'Chưa cập nhật'}
                       </div>
 
                       {/* Province Column */}
-                      <div style={{ color: '#64748B', fontSize: '13.5px' }}>
+                      <div style={{ color: '#64748B', fontSize: '13px' }}>
                         📍 {student.province || 'Chưa rõ'}
                       </div>
 
                       {/* Streak Column */}
-                      <div style={{ fontWeight: '800', color: '#ff9f43', fontSize: '13.5px' }}>
+                      <div style={{ fontWeight: '800', color: '#ff9f43', fontSize: '13px' }}>
                         {getStreakDisplay(student)}
                       </div>
 
-                      {/* XP Column */}
-                      <div style={{ textAlign: 'right', fontWeight: '955', fontSize: '15px', color: '#1E293B' }}>
+                      {/* Score Column */}
+                      <div style={{ textAlign: 'right', fontWeight: '900', fontSize: '14.5px', color: '#1E293B' }}>
                         {sortBy === 'xp' ? `${student.testScore ?? 0} điểm` : `${student.xp.toLocaleString()} XP`}
                       </div>
-                    </div>
+                    </ScrollAnimatedRow>
                   ))}
                 </div>
               </div>
@@ -798,8 +907,8 @@ export default function LeaderboardTab({ currentUser }) {
                   disabled={page === 1}
                   onClick={() => setPage(page - 1)}
                   style={{
-                    border: '1px solid #CBD5E1',
-                    background: page === 1 ? '#F1F5F9' : '#FFFFFF',
+                    border: '1px solid rgba(0,0,0,0.05)',
+                    background: page === 1 ? 'rgba(0,0,0,0.03)' : '#FFFFFF',
                     color: page === 1 ? '#94A3B8' : '#1E293B',
                     fontWeight: '800',
                     padding: '8px 16px',
@@ -819,8 +928,8 @@ export default function LeaderboardTab({ currentUser }) {
                   disabled={page === totalPages}
                   onClick={() => setPage(page + 1)}
                   style={{
-                    border: '1px solid #CBD5E1',
-                    background: page === totalPages ? '#F1F5F9' : '#FFFFFF',
+                    border: '1px solid rgba(0,0,0,0.05)',
+                    background: page === totalPages ? 'rgba(0,0,0,0.03)' : '#FFFFFF',
                     color: page === totalPages ? '#94A3B8' : '#1E293B',
                     fontWeight: '800',
                     padding: '8px 16px',
