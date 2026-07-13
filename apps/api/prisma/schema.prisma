@@ -1330,6 +1330,33 @@ model VoucherReservation {
   @@map("voucher_reservations")
 }
 
+model Announcement {
+  id                Int      @id @default(autoincrement())
+  title             String
+  type              String   // EVENT, VOUCHER, PROMOTION, MAINTENANCE, NEWS
+  content           String   @db.Text // Rich Text HTML
+  bannerUrl         String?  // Optional Banner Image
+  voucherCode       String?  // Optional Voucher code
+  showCopyButton    Boolean  @default(true)
+  buttonText        String?  // Action Button Text
+  buttonUrl         String?  // Action Button Link
+  buttonTarget      String   @default("_blank") // _self or _blank
+  targetRoles       String[] // e.g. ["GUEST", "STUDENT", "TEACHER", "ADMIN"] or ["EVERYONE"]
+  targetPages       String[] // e.g. ["Home", "Courses", "Practice", "Exam", "AI Coach", "Profile", "Dashboard"] or ["All Pages"]
+  allowHide         Boolean  @default(true)
+  hideDurationHours Int      @default(24)
+  priority          Int      @default(0)
+  animation         String   @default("fade") // fade, zoom, slide, bounce
+  status            String   @default("DRAFT") // DRAFT, SCHEDULED, ACTIVE, PAUSED, EXPIRED
+  startAt           DateTime
+  endAt             DateTime
+  createdBy         Int
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("announcements")
+}
+
 
 
 

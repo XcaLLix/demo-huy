@@ -15,6 +15,7 @@ import AuthPage from './components/AuthPage';
 import AITutorChat from './components/AITutorChat';
 import CheckoutModal from './components/CheckoutModal';
 import UpgradeModal from './components/UpgradeModal';
+import AnnouncementPopup from './components/AnnouncementPopup';
 import CourseDetails from './components/CourseDetails';
 import TestSimulator from './components/TestSimulator';
 import TeacherDashboard from './components/TeacherDashboard';
@@ -1123,6 +1124,112 @@ export default function App() {
 
   // Custom SPA Router State
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
+
+  // Announcement popup states
+  const [activeAnnouncements, setActiveAnnouncements] = useState([]);
+  const [currentAnnouncement, setCurrentAnnouncement] = useState(null);
+  const [sessionDismissedAnnouncements, setSessionDismissedAnnouncements] = useState([]);
+
+  // Page mapper helper for targetPages matching
+  const getCurrentPageName = (route) => {
+    if (!route) return 'Home';
+    if (route.route === 'landing') return 'Home';
+    if (route.route === 'public-courses' || route.route === 'public-course-detail' || route.route === 'learn') {
+      return 'Courses';
+    }
+    if (route.route === 'dashboard' && route.tab === 'courses') {
+      return 'Courses';
+    }
+    if (
+      route.route === 'public-mock-exams' || 
+      route.route === 'public-mock-exam-detail' || 
+      route.route === 'public-mock-exam-taking' || 
+      route.route === 'public-mock-exam-result'
+    ) {
+      return 'Practice';
+    }
+    if (route.route === 'dashboard' && route.tab === 'tests') {
+      return 'Practice';
+    }
+    if (route.route === 'public-exam-bank') return 'Exam';
+    if (route.route === 'dashboard' && route.tab === 'library') {
+      return 'Exam';
+    }
+    if (route.route === 'public-ai-tutor' || route.route === 'public-flashcards') return 'AI Coach';
+    if (route.route === 'dashboard' && ['ai-qa', 'path', 'ai-chat'].includes(route.tab)) {
+      return 'AI Coach';
+    }
+    if (route.route === 'dashboard' && route.tab === 'settings') return 'Profile';
+    if (route.route === 'dashboard' && route.tab === 'home') return 'Dashboard';
+    return 'Home';
+  };
+
+  // Fetch active announcements
+  useEffect(() => {
+    const fetchActiveAnnouncements = async () => {
+      try {
+        const uRole = currentUser?.role ? currentUser.role.toUpperCase() : 'GUEST';
+        const res = await api.getActiveAnnouncement(uRole);
+        if (res && Array.isArray(res)) {
+          setActiveAnnouncements(res);
+        } else if (res && res.data) {
+          setActiveAnnouncements(res.data);
+        }
+      } catch (err) {
+        console.error('[Fetch Active Announcements Error]:', err);
+      }
+    };
+    fetchActiveAnnouncements();
+  }, [currentUser]);
+
+  // Determine popup display matching priority, role, page path, hide_until
+  useEffect(() => {
+    if (!activeAnnouncements || activeAnnouncements.length === 0) {
+      setCurrentAnnouncement(null);
+      return;
+    }
+
+    const pageName = getCurrentPageName(parsedRoute);
+    const uRole = currentUser?.role ? currentUser.role.toUpperCase() : 'GUEST';
+
+    const eligible = activeAnnouncements.filter(ann => {
+      // 1. Session dismissed
+      if (sessionDismissedAnnouncements.includes(ann.id)) {
+        return false;
+      }
+
+      // 2. Local storage hide_until
+      const hideUntilStr = localStorage.getItem(`announcement_${ann.id}_hide_until`);
+      if (hideUntilStr) {
+        const hideUntil = Number(hideUntilStr);
+        if (Date.now() < hideUntil) {
+          return false;
+        }
+      }
+
+      // 3. Target roles check
+      const roleMatch = ann.targetRoles.includes('EVERYONE') || ann.targetRoles.includes(uRole);
+      if (!roleMatch) return false;
+
+      // 4. Check target pages
+      const pageMatch = ann.targetPages.includes('All Pages') || ann.targetPages.includes(pageName);
+      if (!pageMatch) return false;
+
+      return true;
+    });
+
+    if (eligible.length > 0) {
+      eligible.sort((a, b) => {
+        if (b.priority !== a.priority) {
+          return b.priority - a.priority;
+        }
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      });
+      setCurrentAnnouncement(eligible[0]);
+    } else {
+      setCurrentAnnouncement(null);
+    }
+  }, [activeAnnouncements, currentPath, currentUser, sessionDismissedAnnouncements]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -4176,6 +4283,18 @@ export default function App() {
           onClose={() => setShowUpgradePRO(false)}
           onUpgradeSuccess={handleUpgradeSuccess}
           addLog={addLog}
+        />
+      )}
+
+      {/* Announcement Popup Overlay */}
+      {currentAnnouncement && (
+        <AnnouncementPopup
+          announcement={currentAnnouncement}
+          onClose={() => {
+            // Dismiss it for the session
+            setSessionDismissedAnnouncements(prev => [...prev, currentAnnouncement.id]);
+            setCurrentAnnouncement(null);
+          }}
         />
       )}
 

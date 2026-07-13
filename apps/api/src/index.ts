@@ -44,6 +44,7 @@ import { NotificationTemplateService } from './services/notificationTemplate.ser
 import { seedSystemSettings } from './seedSettings.js';
 import voucherRoutes from './routes/voucher.routes.js';
 import { VoucherService } from './services/voucher.service.js';
+import announcementRoutes from './routes/announcement.routes.js';
 
 import {
   getLeaderboardRankings,
@@ -213,6 +214,36 @@ app.post('/upload', authenticateJWT, upload.single('file'), (req, res) => {
       mimetype: req.file.mimetype
     }
   });
+});
+
+
+// File Delete Route
+app.post('/upload/delete', authenticateJWT, (req, res) => {
+  const { url } = req.body;
+  if (!url) {
+    return res.status(400).json({ success: false, error: 'Thiếu đường dẫn tệp cần xóa!' });
+  }
+
+  try {
+    const parsedUrl = new URL(url, `${req.protocol}://${req.get('host')}`);
+    const pathname = parsedUrl.pathname;
+    
+    if (pathname.startsWith('/uploads/')) {
+      const filename = pathname.substring(9);
+      if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+        return res.status(400).json({ success: false, error: 'Tên tệp không hợp lệ!' });
+      }
+
+      const filePath = path.join(resolvedUploadsDir, filename);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        return res.status(200).json({ success: true, message: 'Xóa tệp tin thành công!' });
+      }
+    }
+    return res.status(404).json({ success: false, error: 'Không tìm thấy tệp tin hoặc tệp không được lưu cục bộ!' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // Role Change Routes
@@ -433,6 +464,9 @@ app.use('/notifications', notificationRoutes);
 
 // Voucher Management Router
 app.use('/', voucherRoutes);
+
+// Announcement Popup Router
+app.use('/', announcementRoutes);
 
 // =========================================================================
 // AFFILIATE SYSTEM ROUTING

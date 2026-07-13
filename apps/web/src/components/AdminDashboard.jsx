@@ -27,6 +27,7 @@ import { mockExamService } from '../services/mockExamService';
 import Header from './Header';
 import AdminExamManager from './AdminExamManager';
 import AdminVoucherManager from './AdminVoucherManager';
+import AdminAnnouncementManager from './AdminAnnouncementManager';
 
 // Custom Neo-Brutalist Select component with rounded corners and theme support
 const NeoSelect = ({ value, onChange, options, placeholder = 'Chọn...' }) => {
@@ -2605,11 +2606,18 @@ export default function AdminDashboard({
           >
             <HiCurrencyDollar style={{ fontSize: '18px' }} /> Doanh thu & Chi trả
           </button>
+          <div style={{ padding: '8px 16px 4px 16px', fontSize: '11px', fontWeight: '800', color: '#8C9985', textTransform: 'uppercase', letterSpacing: '1px' }}>Marketing</div>
           <button 
             className={`admin-menu-item ${activeTab === 'vouchers' ? 'active' : ''}`}
             onClick={() => setActiveTab('vouchers')}
           >
             <HiTag style={{ fontSize: '18px' }} /> Quản lý Voucher
+          </button>
+          <button 
+            className={`admin-menu-item ${activeTab === 'marketing-announcements' ? 'active' : ''}`}
+            onClick={() => setActiveTab('marketing-announcements')}
+          >
+            <span style={{ fontSize: '18px' }}>📢</span> Announcement Popup
           </button>
           <button 
             className={`admin-menu-item ${activeTab === 'system-logs' ? 'active' : ''}`}
@@ -5699,6 +5707,13 @@ export default function AdminDashboard({
 
           {activeTab === 'vouchers' && (
             <AdminVoucherManager
+              currentUser={currentUser}
+              addLog={addLog}
+            />
+          )}
+
+          {activeTab === 'marketing-announcements' && (
+            <AdminAnnouncementManager
               currentUser={currentUser}
               addLog={addLog}
             />

@@ -102,6 +102,10 @@ export const api = {
     return request('/upload', { method: 'POST', body: formData });
   },
 
+  deleteUploadedFile: (url) => {
+    return request('/upload/delete', { method: 'POST', body: { url } });
+  },
+
   login: (email, password) =>
     request('/login', { method: 'POST', body: { email, password } }),
 
@@ -634,7 +638,30 @@ export const api = {
   enableAdminVoucher: (id) => request(`/admin/vouchers/${id}/enable`, { method: 'PUT' }),
   disableAdminVoucher: (id) => request(`/admin/vouchers/${id}/disable`, { method: 'PUT' }),
   validateVoucher: (data) => request('/enrollments/validate-voucher', { method: 'POST', body: data }),
-  reserveVoucher: (data) => request('/enrollments/reserve-voucher', { method: 'POST', body: data })
+  reserveVoucher: (data) => request('/enrollments/reserve-voucher', { method: 'POST', body: data }),
+
+  // Announcement Popup APIs
+  getAdminAnnouncements: (params = {}) => {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') {
+        query.append(k, String(v));
+      }
+    });
+    return request('/admin/announcements?' + query.toString());
+  },
+  getAdminAnnouncementById: (id) => request(`/admin/announcements/${id}`),
+  createAdminAnnouncement: (data) => request('/admin/announcements', { method: 'POST', body: data }),
+  updateAdminAnnouncement: (id, data) => request(`/admin/announcements/${id}`, { method: 'PUT', body: data }),
+  deleteAdminAnnouncement: (id) => request(`/admin/announcements/${id}`, { method: 'DELETE' }),
+  updateAdminAnnouncementStatus: (id, status) => request(`/admin/announcements/${id}/status`, { method: 'PATCH', body: { status } }),
+  getActiveAnnouncement: (role = '', page = '') => {
+    const query = new URLSearchParams();
+    if (role) query.append('role', role);
+    if (page) query.append('page', page);
+    const qStr = query.toString();
+    return request('/announcements/active' + (qStr ? `?${qStr}` : ''));
+  }
 };
 
 
