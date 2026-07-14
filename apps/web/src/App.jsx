@@ -794,7 +794,7 @@ function InlineLeaderboardTab({ currentUser }) {
             border: `${borderSize}px solid #000`,
             objectFit: 'cover',
             display: 'inline-block',
-            margin: size > 40 ? '14px 0' : '0',
+            margin: size > 40 ? '8px 0' : '0',
             boxShadow: '1.5px 1.5px 0px #000'
           }}
           onError={(e) => {
@@ -817,7 +817,7 @@ function InlineLeaderboardTab({ currentUser }) {
         fontWeight: 'bold',
         fontSize: size > 40 ? '18px' : '11px',
         border: `${borderSize}px solid #000`,
-        margin: size > 40 ? '14px 0' : '0',
+        margin: size > 40 ? '8px 0' : '0',
         boxShadow: '1.5px 1.5px 0px #000',
         textTransform: 'uppercase'
       }}>
@@ -936,7 +936,7 @@ function InlineLeaderboardTab({ currentUser }) {
                       medal: '👑', 
                       label: 'CHIẾN THẦN TOÀN NĂNG', 
                       textColor: '#B45309',
-                      height: '350px',
+                      height: '380px',
                       podiumHeight: '80px',
                       podiumBg: 'linear-gradient(180deg, #F5C453 0%, #D97706 100%)',
                       shadow: '0 12px 30px rgba(245, 196, 83, 0.25)',
@@ -949,7 +949,7 @@ function InlineLeaderboardTab({ currentUser }) {
                       medal: '🥈', 
                       label: 'TINH ANH HỌC THUẬT', 
                       textColor: '#475569',
-                      height: '310px',
+                      height: '340px',
                       podiumHeight: '60px',
                       podiumBg: 'linear-gradient(180deg, #94A3B8 0%, #64748B 100%)',
                       shadow: '0 8px 20px rgba(148, 163, 184, 0.15)',
@@ -962,7 +962,7 @@ function InlineLeaderboardTab({ currentUser }) {
                       medal: '🥉', 
                       label: 'CAO THỦ ẨN DANH', 
                       textColor: '#C2410C',
-                      height: '280px',
+                      height: '310px',
                       podiumHeight: '40px',
                       podiumBg: 'linear-gradient(180deg, #F97316 0%, #C2410C 100%)',
                       shadow: '0 6px 15px rgba(249, 115, 22, 0.12)',

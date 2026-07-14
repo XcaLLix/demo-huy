@@ -312,7 +312,7 @@ export default function LeaderboardTab({ currentUser }) {
             border: `${borderSize}px solid #F5C453`,
             objectFit: 'cover',
             display: 'inline-block',
-            margin: size > 40 ? '14px 0' : '0',
+            margin: size > 40 ? '8px 0' : '0',
             boxShadow: 'var(--shadow-sm)'
           }}
           onError={(e) => {
@@ -335,7 +335,7 @@ export default function LeaderboardTab({ currentUser }) {
         fontWeight: 'bold',
         fontSize: size > 40 ? '18px' : '11px',
         border: `${borderSize}px solid #F5C453`,
-        margin: size > 40 ? '14px 0' : '0',
+        margin: size > 40 ? '8px 0' : '0',
         boxShadow: 'var(--shadow-sm)',
         textTransform: 'uppercase'
       }}>
@@ -621,7 +621,7 @@ export default function LeaderboardTab({ currentUser }) {
                       medal: '👑', 
                       label: 'CHIẾN THẦN TOÀN NĂNG', 
                       textColor: '#B45309',
-                      height: '350px',
+                      height: '380px',
                       podiumHeight: '80px',
                       podiumBg: 'linear-gradient(180deg, #F5C453 0%, #D97706 100%)',
                       shadow: '0 12px 30px rgba(245, 196, 83, 0.25)',
@@ -634,7 +634,7 @@ export default function LeaderboardTab({ currentUser }) {
                       medal: '🥈', 
                       label: 'TINH ANH HỌC THUẬT', 
                       textColor: '#475569',
-                      height: '310px',
+                      height: '340px',
                       podiumHeight: '60px',
                       podiumBg: 'linear-gradient(180deg, #94A3B8 0%, #64748B 100%)',
                       shadow: '0 8px 20px rgba(148, 163, 184, 0.15)',
@@ -647,7 +647,7 @@ export default function LeaderboardTab({ currentUser }) {
                       medal: '🥉', 
                       label: 'CAO THỦ ẨN DANH', 
                       textColor: '#C2410C',
-                      height: '280px',
+                      height: '310px',
                       podiumHeight: '40px',
                       podiumBg: 'linear-gradient(180deg, #F97316 0%, #C2410C 100%)',
                       shadow: '0 6px 15px rgba(249, 115, 22, 0.12)',
@@ -784,16 +784,15 @@ export default function LeaderboardTab({ currentUser }) {
             </div>
           )}
 
-          {/* Table rankings - Showing starting from top 4 onwards in pastel theme */}
           <div className="card animate-slide-up" style={{
-            border: '1px solid #E2E8F0',
+            border: '1px solid rgba(255,255,255,0.1)',
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
             borderRadius: '16px',
             padding: '24px',
-            background: '#A7F3D0'
+            background: '#5A7C54'
           }}>
             {rest.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '20px 0', fontSize: '14px', color: '#64748B' }}>
+              <div style={{ textAlign: 'center', padding: '20px 0', fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>
                 Không tìm thấy học sinh nào phù hợp từ vị trí thứ 4 trở đi. 🔍
               </div>
             ) : (
@@ -804,8 +803,8 @@ export default function LeaderboardTab({ currentUser }) {
                   gridTemplateColumns: '80px 2fr 1fr 1.2fr 1.5fr 1.2fr',
                   alignItems: 'center',
                   padding: '12px 24px',
-                  borderBottom: '2.5px solid rgba(0,0,0,0.05)',
-                  color: '#475569',
+                  borderBottom: '2.5px solid rgba(255,255,255,0.15)',
+                  color: '#FFFFFF',
                   fontWeight: '900',
                   fontSize: '12.5px',
                   textTransform: 'uppercase',
