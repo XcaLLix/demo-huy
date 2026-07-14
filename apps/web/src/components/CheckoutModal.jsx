@@ -34,7 +34,7 @@ export default function CheckoutModal({ courses = [], onClose, onPaymentSuccess,
     return 0;
   };
 
-  const originalAmount = courses.reduce((sum, c) => sum + parsePrice(c.priceSale || c.price || c.priceOriginal), 0);
+  const originalAmount = courses.reduce((sum, c) => sum + parsePrice(c.priceSale ?? c.price ?? c.priceOriginal), 0);
   const discountAmount = discountVal;
   const finalAmount = Math.max(0, originalAmount - discountAmount);
 
@@ -289,7 +289,7 @@ export default function CheckoutModal({ courses = [], onClose, onPaymentSuccess,
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {courses.map((c) => {
-                    const price = parsePrice(c.priceSale || c.price || c.priceOriginal);
+                    const price = parsePrice(c.priceSale ?? c.price ?? c.priceOriginal);
                     return (
                       <div 
                         key={c.id} 

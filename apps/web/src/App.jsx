@@ -2374,7 +2374,7 @@ export default function App() {
         try {
           const targetCourse = courses.find(c => c.id.toString() === id);
           const priceNum = targetCourse 
-            ? parseFloat(String(targetCourse.priceSale || targetCourse.price || targetCourse.priceOriginal).replace(/\D/g, '')) 
+            ? parseFloat(String(targetCourse.priceSale ?? targetCourse.price ?? targetCourse.priceOriginal).replace(/\D/g, '')) 
             : 499000;
           await enrollmentService.enrollCourse(currentUser.id, id, priceNum);
           
