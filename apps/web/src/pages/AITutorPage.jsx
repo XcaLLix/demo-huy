@@ -1090,7 +1090,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
                 dominantBaseline="central"
                 fontSize="12"
                 fontWeight="900"
-                fill="#ffffff"
+                fill="#1e293b"
                 y="0.5"
                 style={{ userSelect: 'none' }}
               >
@@ -2293,7 +2293,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
                     </button>
                     <button 
                       onClick={handleCollapseAllOutline}
-                      style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#ffffff', borderRadius: '6px', padding: '4px 10px', fontSize: '11px', cursor: 'pointer', fontWeight: '700', transition: 'all 0.2s' }}
+                      style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', borderRadius: '6px', padding: '4px 10px', fontSize: '11px', cursor: 'pointer', fontWeight: '700', transition: 'all 0.2s' }}
                       title="Thu gọn các cấp độ nhánh con"
                     >
                       📁 Thu gọn hết
@@ -2537,80 +2537,7 @@ export default function AITutorPage({ currentUser, navigateTo, addLog, hideHeade
                 </div>
               </div>
 
-              {/* Practice & Progress stats and quiz trigger */}
-              <div className="drawer-section" style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', marginBottom: '16px' }}>
-                <h4 className="drawer-chat-title" style={{ marginBottom: '10px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  🎯 Luyện tập trắc nghiệm
-                </h4>
-                
-                {/* Stats cards grid */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '8px',
-                  marginBottom: '12px'
-                }}>
-                  <div style={{
-                    background: 'rgba(255,255,255,0.02)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    padding: '8px',
-                    textAlign: 'center'
-                  }}>
-                    <div style={{ fontSize: '10px', color: '#ffffff' }}>Độ thành thạo</div>
-                    <div style={{
-                      fontSize: '14px',
-                      fontWeight: 'bold',
-                      color: nodeProgressMap[selectedNode.id]?.mastery !== undefined
-                        ? (nodeProgressMap[selectedNode.id].mastery >= 0.9 ? '#10B981' : nodeProgressMap[selectedNode.id].mastery >= 0.8 ? '#3B82F6' : nodeProgressMap[selectedNode.id].mastery >= 0.6 ? '#EAB308' : nodeProgressMap[selectedNode.id].mastery >= 0.4 ? '#F97316' : '#EF4444')
-                        : '#ffffff'
-                    }}>
-                      {nodeProgressMap[selectedNode.id]?.mastery !== undefined
-                        ? `${Math.round(nodeProgressMap[selectedNode.id].mastery * 100)}%`
-                        : 'Chưa học'
-                      }
-                    </div>
-                  </div>
-                  <div style={{
-                    background: 'rgba(255,255,255,0.02)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    padding: '8px',
-                    textAlign: 'center'
-                  }}>
-                    <div style={{ fontSize: '10px', color: '#ffffff' }}>Điểm cao nhất</div>
-                    <div style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--fc-gold)' }}>
-                      {nodeProgressMap[selectedNode.id]?.bestScore !== undefined
-                        ? `${nodeProgressMap[selectedNode.id].bestScore}/10`
-                        : '- / 10'
-                      }
-                    </div>
-                  </div>
-                </div>
 
-                <button 
-                  className="aitutor-action-btn" 
-                  onClick={handleStartNodeQuiz}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    fontSize: '12.5px',
-                    background: 'linear-gradient(135deg, #F97316, #FFE259)',
-                    boxShadow: '0 4px 12px rgba(249, 115, 22, 0.25)',
-                    border: 'none',
-                    borderRadius: '10px',
-                    fontWeight: '800',
-                    color: '#12120e',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <HiSparkles /> Bắt đầu Quiz 10 câu
-                </button>
-              </div>
 
               {/* Add Child Node Form */}
               <div className="drawer-section" style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px', marginBottom: '16px' }}>

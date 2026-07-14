@@ -22,7 +22,13 @@ import {
   HiFolderOpen,
   HiClipboardList,
   HiLogout,
-  HiUserGroup
+  HiUserGroup,
+  HiLockClosed,
+  HiEye,
+  HiEyeOff,
+  HiExclamationCircle,
+  HiCheckCircle,
+  HiX
 } from 'react-icons/hi';
 import { HiTrophy } from 'react-icons/hi2';
 import { api } from '../../api';
@@ -52,6 +58,18 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
   const [onboardingCompleted, setOnboardingCompleted] = useState(() => {
     return localStorage.getItem('student_onboarding_completed') === 'true';
   });
+
+  // Change Password Modal States
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
 
   // Calendar study slots check-ins
   const [calendarSlots, setCalendarSlots] = useState(() => {
@@ -357,6 +375,40 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
       toast('Cập nhật thông tin cá nhân thành công!', 'success');
     } else {
       toast('Không tìm thấy hàm cập nhật thông tin. Vui lòng liên hệ quản trị viên!', 'warning');
+    }
+  };
+
+  const handleChangePasswordSubmit = async (e) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    if (newPassword.length < 6) {
+      setPasswordError('Mật khẩu mới phải có tối thiểu 6 ký tự!');
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setPasswordError('Mật khẩu mới nhập lại không khớp!');
+      return;
+    }
+
+    setPasswordLoading(true);
+    try {
+      await api.changePassword(oldPassword, newPassword);
+      setPasswordSuccess('Đổi mật khẩu thành công! 🎉');
+      toast('Đổi mật khẩu thành công!', 'success');
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+      setTimeout(() => {
+        setIsChangePasswordOpen(false);
+        setPasswordSuccess('');
+      }, 1500);
+    } catch (err) {
+      setPasswordError(err.message || 'Đổi mật khẩu thất bại!');
+    } finally {
+      setPasswordLoading(false);
     }
   };
 
@@ -1271,9 +1323,47 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
                 </div>
               </div>
 
-              <button type="submit" className="sdb-form-submit-btn">
-                💾 Lưu thông tin & Cập nhật lộ trình AI
-              </button>
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '10px' }}>
+                <button type="submit" className="sdb-form-submit-btn" style={{ marginTop: 0 }}>
+                  💾 Lưu thông tin & Cập nhật lộ trình AI
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOldPassword('');
+                    setNewPassword('');
+                    setConfirmNewPassword('');
+                    setPasswordError('');
+                    setPasswordSuccess('');
+                    setIsChangePasswordOpen(true);
+                  }}
+                  style={{
+                    padding: '14px 24px',
+                    background: '#ffffff',
+                    color: '#000000',
+                    border: '2.5px solid #000000',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    boxShadow: '3px 3px 0px #000000',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translate(-1px, -1px)';
+                    e.currentTarget.style.boxShadow = '4px 4px 0px #000000';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'none';
+                    e.currentTarget.style.boxShadow = '3px 3px 0px #000000';
+                  }}
+                >
+                  🔒 Đổi mật khẩu
+                </button>
+              </div>
             </form>
           </div>
         )}
@@ -2078,6 +2168,154 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
                 style={{ width: '100%', padding: '12px', fontSize: '14px', borderRadius: '12px', fontWeight: '700', background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: '#ffffff', border: 'none', marginTop: '10px', boxShadow: '0 4px 10px rgba(99, 102, 241, 0.2)', cursor: 'pointer', transition: 'all 0.2s ease' }}
               >
                 🏁 Hoàn tất thiết lập & Khởi tạo lộ trình AI
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* ==========================================================================
+         CHANGE PASSWORD POPUP MODAL
+         ========================================================================== */}
+      {isChangePasswordOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.6)',
+          zIndex: 5000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '16px'
+        }}>
+          <div className="lp-modal-neo" style={{
+            maxWidth: '460px',
+            width: '100%',
+            position: 'relative'
+          }}>
+            {/* Close Button */}
+            <button 
+              onClick={() => setIsChangePasswordOpen(false)}
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                border: '2.5px solid #000000',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                background: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                boxShadow: '2px 2px 0px #000000',
+                transition: 'all 0.15s ease',
+                zIndex: 10
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translate(-1px, -1px)';
+                e.currentTarget.style.boxShadow = '3px 3px 0px #000000';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'none';
+                e.currentTarget.style.boxShadow = '2px 2px 0px #000000';
+              }}
+            >
+              <HiX style={{ fontSize: '16px' }} />
+            </button>
+
+            {/* Title / Subheading */}
+            <div className="auth-form-header" style={{ marginBottom: '24px', textAlign: 'center' }}>
+              <h2 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '22px', fontWeight: '800' }}>
+                Đổi mật khẩu tài khoản 🔑
+              </h2>
+              <p style={{ margin: '6px 0 0 0', fontSize: '13px', color: '#475569', fontWeight: '500' }}>
+                Vui lòng nhập mật khẩu cũ và thiết lập mật khẩu mới của bạn.
+              </p>
+            </div>
+
+            {/* Error & Success Alerts */}
+            {passwordError && (
+              <div className="auth-alert error" style={{ marginBottom: '16px', borderRadius: '12px' }}>
+                <HiExclamationCircle className="auth-alert-icon" />
+                {passwordError}
+              </div>
+            )}
+            {passwordSuccess && (
+              <div className="auth-alert success" style={{ marginBottom: '16px', borderRadius: '12px' }}>
+                <HiCheckCircle className="auth-alert-icon" />
+                {passwordSuccess}
+              </div>
+            )}
+
+            {/* Change Password Form */}
+            <form onSubmit={handleChangePasswordSubmit} className="auth-premium-form" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              
+              {/* Old Password */}
+              <div className="auth-input-group">
+                <label>MẬT KHẨU CŨ</label>
+                <div className="auth-input-wrap">
+                  <HiLockClosed className="auth-input-icon" />
+                  <input
+                    type={showOldPassword ? 'text' : 'password'}
+                    placeholder="Nhập mật khẩu cũ của bạn"
+                    value={oldPassword}
+                    onChange={(e) => setOldPassword(e.target.value)}
+                    required
+                    style={{ paddingRight: '48px' }}
+                  />
+                  <button type="button" className="auth-eye-btn" onClick={() => setShowOldPassword(!showOldPassword)} tabIndex={-1}>
+                    {showOldPassword ? <HiEyeOff /> : <HiEye />}
+                  </button>
+                </div>
+              </div>
+
+              {/* New Password */}
+              <div className="auth-input-group">
+                <label>MẬT KHẨU MỚI</label>
+                <div className="auth-input-wrap">
+                  <HiLockClosed className="auth-input-icon" />
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    placeholder="Tối thiểu 6 ký tự"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    style={{ paddingRight: '48px' }}
+                  />
+                  <button type="button" className="auth-eye-btn" onClick={() => setShowNewPassword(!showNewPassword)} tabIndex={-1}>
+                    {showNewPassword ? <HiEyeOff /> : <HiEye />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Confirm New Password */}
+              <div className="auth-input-group" style={{ marginBottom: '8px' }}>
+                <label>XÁC NHẬN MẬT KHẨU MỚI</label>
+                <div className="auth-input-wrap">
+                  <HiLockClosed className="auth-input-icon" />
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    placeholder="Nhập lại mật khẩu mới"
+                    value={confirmNewPassword}
+                    onChange={(e) => setConfirmNewPassword(e.target.value)}
+                    required
+                    style={{ paddingRight: '48px' }}
+                  />
+                  <button type="button" className="auth-eye-btn" onClick={() => setShowConfirmPassword(!showConfirmPassword)} tabIndex={-1}>
+                    {showConfirmPassword ? <HiEyeOff /> : <HiEye />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <button 
+                type="submit" 
+                className="auth-submit-btn-premium" 
+                disabled={passwordLoading}
+                style={{ margin: 0, width: '100%' }}
+              >
+                {passwordLoading ? 'ĐANG XỬ LÝ...' : 'CẬP NHẬT MẬT KHẨU MỚI →'}
               </button>
             </form>
           </div>
