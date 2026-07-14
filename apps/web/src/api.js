@@ -151,16 +151,7 @@ export const api = {
     return request(`/courses?${params}`);
   },
 
-  aiSearchCourses: (query) =>
-    request('/courses/ai-search', { method: 'POST', body: { query } }),
-
   getCourseById: (id) => request(`/courses/${id}`),
-
-  createCourseReview: (id, rating, comment) =>
-    request(`/courses/${id}/reviews`, {
-      method: 'POST',
-      body: { rating, comment }
-    }),
 
   createCourse: (payload) => request('/courses', { method: 'POST', body: payload }),
   updateCourse: (id, payload) => request(`/courses/${id}`, { method: 'PUT', body: payload }),
@@ -377,18 +368,6 @@ export const api = {
       method: 'POST',
       body: { text },
     }),
-
-  generateFlashcardMnemonic: (front, back) =>
-    request('/ai/flashcards/mnemonic', {
-      method: 'POST',
-      body: { front, back },
-    }),
-
-  generateFlashcardsOCR: (file) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return request('/ai/flashcards/ocr', { method: 'POST', body: formData });
-  },
 
   saveMindmap: (title, content, id = null) =>
     request('/mindmaps', {

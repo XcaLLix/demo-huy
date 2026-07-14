@@ -1,8 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { Difficulty } from '@prisma/client';
-import { prisma } from '../lib/prisma.js';
+import { PrismaClient, Difficulty } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 // Helper to get __dirname in ES Modules
 const __filename = fileURLToPath(import.meta.url);

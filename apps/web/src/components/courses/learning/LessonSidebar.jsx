@@ -99,7 +99,7 @@ export default function LessonSidebar({
                   {filteredLessons.map((lesson) => {
                     const isCurrent = currentLessonId?.toString() === lesson.id.toString();
                     const isCompleted = completedLessons.includes(Number(lesson.id)) || completedLessons.includes(lesson.id.toString());
-                    const isLocked = false; // Always unlocked for testing and seamless navigation
+                    const isLocked = !isOwned && !lesson.isPreview;
 
                     return (
                       <div

@@ -8671,18 +8671,8 @@ body {
 }
 
 .leaderboard-row:hover {
-  background: #4D7C0F !important;
+  background: rgba(108, 92, 231, 0.05) !important;
   transform: translateX(4px);
-}
-.leaderboard-row:hover .leaderboard-row-rank {
-  color: #ffffff !important;
-  border-color: rgba(255, 255, 255, 0.4) !important;
-}
-.leaderboard-row:hover .leaderboard-row-name,
-.leaderboard-row:hover .leaderboard-row-grade,
-.leaderboard-row:hover .leaderboard-row-province,
-.leaderboard-row:hover .leaderboard-row-score {
-  color: #ffffff !important;
 }
 
 .animate-slide-up {

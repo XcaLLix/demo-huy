@@ -8,7 +8,7 @@ import {
   updateAnnouncement,
   deleteAnnouncement,
   updateAnnouncementStatus
-} from '../controllers/announcement.js';
+} from '../controllers/announcement.ts';
 
 const router = Router();
 

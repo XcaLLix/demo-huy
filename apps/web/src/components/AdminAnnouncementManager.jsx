@@ -954,16 +954,6 @@ export default function AdminAnnouncementManager({ currentUser, addLog }) {
     setForm(prev => ({ ...prev, targetPages: pages }));
   };
 
-  // Helper: lấy giờ địa phương đúng cho input datetime-local
-  const localDT = (date = new Date()) =>
-    new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().substring(0, 16);
-  const defaultEndAt = () => {
-    const d = new Date();
-    d.setDate(d.getDate() + 7);
-    d.setHours(23, 59, 0, 0);
-    return localDT(d);
-  };
-
   // Open creation modal
   const handleOpenCreate = () => {
     setFormMode('create');
@@ -985,8 +975,8 @@ export default function AdminAnnouncementManager({ currentUser, addLog }) {
       priority: 0,
       animation: 'fade',
       status: 'DRAFT',
-      startAt: localDT(),
-      endAt: defaultEndAt()
+      startAt: new Date().toISOString().substring(0, 16),
+      endAt: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString().substring(0, 16)
     });
     setShowModal(true);
   };
@@ -1039,8 +1029,8 @@ export default function AdminAnnouncementManager({ currentUser, addLog }) {
       priority: ann.priority,
       animation: ann.animation,
       status: 'DRAFT', // Duplicate starts as draft
-      startAt: localDT(),
-      endAt: defaultEndAt()
+      startAt: new Date().toISOString().substring(0, 16),
+      endAt: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString().substring(0, 16)
     });
     setShowModal(true);
   };
@@ -1399,7 +1389,7 @@ export default function AdminAnnouncementManager({ currentUser, addLog }) {
       {/* CRUD Form Modal */}
       {showModal && (
         <div className="admin-modal-backdrop" onClick={() => setShowModal(false)}>
-          <div className="admin-modal" style={{ maxWidth: '1300px', width: '95%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+          <div className="admin-modal" style={{ maxWidth: '850px', width: '90%' }} onClick={e => e.stopPropagation()}>
             <header className="admin-modal-header">
               <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {formMode === 'create' && '🆕 Tạo Mới Thông Báo Popup'}
@@ -1414,10 +1404,8 @@ export default function AdminAnnouncementManager({ currentUser, addLog }) {
               </button>
             </header>
 
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-              {/* LEFT: Form Fields + Footer */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-              <div className="admin-modal-body" style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <form onSubmit={handleSubmit}>
+              <div className="admin-modal-body" style={{ maxHeight: '72vh', overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 
                 {/* Tiêu đề & Loại */}
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
@@ -1528,7 +1516,7 @@ export default function AdminAnnouncementManager({ currentUser, addLog }) {
                               zIndex: 5
                             }}
                           >
-                            ✏️ Chỉnh sửa
+                            ✂️ Cắt lại ảnh
                           </button>
                         </>
                       ) : (
@@ -1775,9 +1763,9 @@ export default function AdminAnnouncementManager({ currentUser, addLog }) {
                   </div>
                 </div>
 
-              </div> {/* end admin-modal-body */}
+              </div>
 
-              <footer className="admin-modal-footer" style={{ borderTop: '2px solid #2D3229', background: '#F0EDEB', flexShrink: 0, justifyContent: 'flex-end' }}>
+              <footer className="admin-modal-footer" style={{ borderTop: '2px solid #2D3229', background: '#F0EDEB' }}>
                 <button 
                   type="button" 
                   className="admin-back-btn" 
@@ -1796,174 +1784,6 @@ export default function AdminAnnouncementManager({ currentUser, addLog }) {
                   {formMode === 'duplicate' && 'Tạo bản sao mới 👯'}
                 </button>
               </footer>
-              </div> {/* end left column */}
-
-              {/* RIGHT: Live Preview Panel */}
-              <div style={{
-                width: '390px',
-                flexShrink: 0,
-                borderLeft: '2px solid #E2E8F0',
-                background: '#F8FAFC',
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden'
-              }}>
-                {/* Preview Header */}
-                <div style={{
-                  padding: '12px 18px',
-                  background: '#1C2B17',
-                  borderBottom: '2px solid #2D3229',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexShrink: 0
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{
-                      width: '8px', height: '8px', borderRadius: '50%',
-                      background: '#4ade80', display: 'inline-block',
-                      boxShadow: '0 0 8px #4ade80'
-                    }} />
-                    <span style={{ fontSize: '12px', fontWeight: '900', color: '#FFFFFF', letterSpacing: '2px', textTransform: 'uppercase' }}>
-                      Xem trước
-                    </span>
-                  </div>
-                  <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', fontWeight: '600', letterSpacing: '0.5px' }}>Live Preview</span>
-                </div>
-
-                {/* Preview Body - dot-grid canvas */}
-                <div style={{
-                  flex: 1, overflowY: 'auto', padding: '20px 16px',
-                  display: 'flex', flexDirection: 'column', gap: '0',
-                  background: '#F1F5F9',
-                  backgroundImage: 'radial-gradient(circle, #CBD5E1 1px, transparent 1px)',
-                  backgroundSize: '18px 18px'
-                }}>
-
-                  {/* The popup card - mirrors AnnouncementPopup */}
-                  <div style={{
-                    width: '100%',
-                    backgroundColor: '#FCFBFA',
-                    border: '2.5px solid #2D3229',
-                    borderRadius: '16px',
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.13), 5px 5px 0px #2D3229',
-                    overflow: 'hidden',
-                    fontFamily: "'Outfit', 'Inter', sans-serif",
-                    position: 'relative'
-                  }}>
-                    {/* Close button (decorative) */}
-                    <div style={{
-                      position: 'absolute', top: '8px', right: '8px',
-                      width: '26px', height: '26px', borderRadius: '50%',
-                      background: '#FFF', border: '2px solid #2D3229',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      zIndex: 10, boxShadow: '2px 2px 0px #2D3229',
-                      fontSize: '16px', color: '#2D3229', fontWeight: 'bold', lineHeight: 1,
-                      userSelect: 'none'
-                    }}>×</div>
-
-                    {/* Banner */}
-                    {form.bannerUrl && (
-                      <div style={{ width: '100%', aspectRatio: '16/9', overflow: 'hidden', borderBottom: '2.5px solid #2D3229' }}>
-                        <img
-                          src={form.bannerUrl}
-                          alt="banner preview"
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          onError={(e) => { e.target.style.display = 'none'; }}
-                        />
-                      </div>
-                    )}
-
-                    {/* Body */}
-                    <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {/* Type badge */}
-                      <span style={{
-                        display: 'inline-block', padding: '2px 8px', borderRadius: '5px',
-                        border: '1.5px solid #2D3229', fontSize: '9.5px', fontWeight: '900',
-                        backgroundColor: getTypeColor(form.type), alignSelf: 'flex-start'
-                      }}>
-                        {getTypeLabel(form.type)}
-                      </span>
-
-                      {/* Title */}
-                      <div style={{ fontSize: '15px', fontWeight: '950', color: '#1C2B17', lineHeight: '1.3' }}>
-                        {form.title
-                          ? form.title
-                          : <span style={{ color: '#9CA3AF', fontStyle: 'italic', fontWeight: '700' }}>Chưa có tiêu đề...</span>
-                        }
-                      </div>
-
-                      {/* Content */}
-                      {form.content && form.content.replace(/<[^>]*>/g, '').trim() !== '' && (
-                        <div
-                          className="announcement-rich-content"
-                          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(form.content) }}
-                          style={{ fontSize: '11.5px', color: '#334155', lineHeight: '1.6', fontWeight: '600' }}
-                        />
-                      )}
-
-                      {/* Voucher */}
-                      {form.voucherCode && (
-                        <div style={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          background: '#FFFDF0', border: '2px dashed #D97706',
-                          borderRadius: '10px', padding: '10px 12px', gap: '8px'
-                        }}>
-                          <div>
-                            <span style={{ fontSize: '9px', color: '#B45309', fontWeight: '800', display: 'block', textTransform: 'uppercase' }}>
-                              Mã giảm giá độc quyền:
-                            </span>
-                            <strong style={{ fontSize: '13px', color: '#D97706', fontFamily: 'monospace', letterSpacing: '1px' }}>
-                              {form.voucherCode}
-                            </strong>
-                          </div>
-                          {form.showCopyButton && (
-                            <div style={{
-                              background: '#FFF', border: '1.5px solid #2D3229', borderRadius: '6px',
-                              padding: '4px 8px', fontSize: '10px', fontWeight: '800',
-                              boxShadow: '1.5px 1.5px 0px #2D3229', display: 'flex', alignItems: 'center', gap: '3px'
-                            }}>
-                              📋 Sao chép
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Action Button */}
-                      {form.buttonUrl && form.buttonText && (
-                        <div style={{
-                          padding: '9px', background: '#FFE259', color: '#2D3229',
-                          border: '2px solid #2D3229', borderRadius: '8px',
-                          fontSize: '12px', fontWeight: '900', textAlign: 'center',
-                          boxShadow: '2.5px 2.5px 0px #2D3229'
-                        }}>
-                          {form.buttonText}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Popup Footer */}
-                    <div style={{
-                      borderTop: '2px solid #E2E8F0', padding: '10px 16px',
-                      background: '#F8FAFC', display: 'flex',
-                      justifyContent: 'space-between', alignItems: 'center', gap: '8px'
-                    }}>
-                      {form.allowHide ? (
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '10px', color: '#475569', fontWeight: '700', cursor: 'default' }}>
-                          <input type="checkbox" disabled style={{ width: '12px', height: '12px' }} />
-                          Không hiện lại trong {form.hideDurationHours}h
-                        </label>
-                      ) : <div />}
-                      <div style={{
-                        padding: '5px 12px', background: '#FFF', border: '1.5px solid #2D3229',
-                        borderRadius: '6px', fontSize: '10.5px', fontWeight: '800',
-                        boxShadow: '1.5px 1.5px 0px #2D3229'
-                      }}>Đóng</div>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
             </form>
           </div>
         </div>

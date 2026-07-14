@@ -134,12 +134,6 @@ export default function HeroVideoPlayer({ videoUrl, courseTitle, instructorName 
       ref={containerRef}
       onMouseMove={handleMouseMove}
       onMouseLeave={() => isPlaying && setShowControls(false)}
-      style={{
-        border: '3px solid #000000',
-        boxShadow: '8px 8px 0px #000000',
-        borderRadius: '24px',
-        overflow: 'hidden'
-      }}
     >
       <video
         ref={videoRef}

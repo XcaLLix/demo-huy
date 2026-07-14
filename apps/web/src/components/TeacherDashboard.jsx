@@ -2027,22 +2027,12 @@ export default function TeacherDashboard({
                                     <label style={{ fontSize: '11.5px', fontWeight: 'bold', color: '#0f172a' }}>Video bài giảng học tập:</label>
                                     <div style={{ 
                                       border: '2px dashed #000000', borderRadius: '12px', background: '#ffffff', padding: '12px', 
-                                      display: 'flex', flexDirection: 'column', gap: '8px'
+                                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                      minHeight: '100px'
                                     }}>
                                       {lVideoUrl ? (
                                         <div style={{ position: 'relative', width: '100%' }}>
-                                          {lVideoUrl.includes('youtube.com') || lVideoUrl.includes('youtu.be') ? (
-                                            <div style={{ borderRadius: '8px', overflow: 'hidden', border: '1.5px solid #000', background: '#000', paddingBottom: '56.25%', position: 'relative', height: 0 }}>
-                                              <iframe 
-                                                src={`https://www.youtube.com/embed/${lVideoUrl.includes('watch?v=') ? lVideoUrl.split('watch?v=')[1].split('&')[0] : lVideoUrl.split('/').pop()}`}
-                                                frameBorder="0" 
-                                                allowFullScreen 
-                                                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
-                                              />
-                                            </div>
-                                          ) : (
-                                            <video src={lVideoUrl} controls style={{ width: '100%', maxHeight: '120px', borderRadius: '8px', border: '1.5px solid #000000', background: '#000' }} />
-                                          )}
+                                          <video src={lVideoUrl} controls style={{ width: '100%', maxHeight: '120px', borderRadius: '8px', border: '1.5px solid #000000', background: '#000' }} />
                                           <button 
                                             type="button" 
                                             onClick={() => setLVideoUrl('')}
@@ -2052,45 +2042,25 @@ export default function TeacherDashboard({
                                           </button>
                                         </div>
                                       ) : (
-                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', gap: '8px' }}>
-                                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                            <span style={{ fontSize: '24px' }}>🎥</span>
-                                            <span style={{ fontSize: '10px', color: '#64748b', fontWeight: '600', margin: '2px 0 6px 0' }}>Tải lên tệp video MP4, MOV (Tối đa 50MB)</span>
-                                            <button 
-                                              type="button" 
-                                              disabled={lVideoUploading}
-                                              onClick={() => document.getElementById('course-trailer-upload-inline').click()}
-                                              className="tdb-upgrade-btn"
-                                              style={{ width: 'auto', background: '#fff', color: '#000', border: '2px solid #000', padding: '4px 10px', fontSize: '11px', boxShadow: 'none' }}
-                                            >
-                                              {lVideoUploading ? '⏳ Đang tải...' : 'Tải video từ máy'}
-                                            </button>
-                                            <input 
-                                              type="file" 
-                                              id="course-trailer-upload-inline" 
-                                              accept="video/mp4,video/quicktime" 
-                                              onChange={handleLessonVideoChange} 
-                                              style={{ display: 'none' }} 
-                                            />
-                                          </div>
-                                          
-                                          <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', margin: '8px 0' }}>
-                                            <div style={{ flex: 1, height: '1px', background: '#cbd5e1' }} />
-                                            <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold' }}>HOẶC</span>
-                                            <div style={{ flex: 1, height: '1px', background: '#cbd5e1' }} />
-                                          </div>
-
-                                          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '4px', textAlign: 'left' }}>
-                                            <span style={{ fontSize: '11px', fontWeight: 'bold' }}>Đường dẫn Video Youtube:</span>
-                                            <input 
-                                              type="text" 
-                                              className="tdb-search-input" 
-                                              style={{ width: '100%', borderRadius: '8px', border: '1.5px solid #000', padding: '6px', boxSizing: 'border-box' }} 
-                                              placeholder="Ví dụ: https://www.youtube.com/watch?v=..."
-                                              value={lVideoUrl}
-                                              onChange={e => setLVideoUrl(e.target.value)}
-                                            />
-                                          </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                          <span style={{ fontSize: '24px' }}>🎥</span>
+                                          <span style={{ fontSize: '10px', color: '#64748b', fontWeight: '600', margin: '2px 0 6px 0' }}>Hỗ trợ MP4, MOV (Tối đa 50MB)</span>
+                                          <button 
+                                            type="button" 
+                                            disabled={lVideoUploading}
+                                            onClick={() => document.getElementById('course-trailer-upload-inline').click()}
+                                            className="tdb-upgrade-btn"
+                                            style={{ width: 'auto', background: '#fff', color: '#000', border: '2px solid #000', padding: '4px 10px', fontSize: '11px', boxShadow: 'none' }}
+                                          >
+                                            {lVideoUploading ? '⏳ Đang tải...' : 'Tải video từ máy'}
+                                          </button>
+                                          <input 
+                                            type="file" 
+                                            id="course-trailer-upload-inline" 
+                                            accept="video/mp4,video/quicktime" 
+                                            onChange={handleLessonVideoChange} 
+                                            style={{ display: 'none' }} 
+                                          />
                                         </div>
                                       )}
                                     </div>
@@ -2158,37 +2128,15 @@ export default function TeacherDashboard({
                                       display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                                     }}
                                   >
-                                    <div style={{ textAlign: 'left', flex: 1, marginRight: '16px' }}>
+                                    <div style={{ textAlign: 'left' }}>
                                       <span style={{ fontSize: '12.5px', fontWeight: '800', color: '#0f172a', display: 'block' }}>
                                         {idx + 1}. {lesson.name || lesson.title}
                                       </span>
-                                      <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600', display: 'block', marginBottom: '4px' }}>
-                                        Thời lượng: {lesson.duration || '15m'}
+                                      <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>
+                                        Thời lượng: {lesson.duration || '15m'} 
+                                        {lesson.videoUrl && ' • 🎥 Có video'}
+                                        {lesson.content && ' • 📄 Có tài liệu'}
                                       </span>
-                                      
-                                      {/* Full lesson content details for teacher review */}
-                                      <div style={{ background: '#f8fafc', padding: '6px 10px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '10.5px', color: '#334155', marginTop: '6px' }}>
-                                        {lesson.videoUrl ? (
-                                          <div style={{ marginBottom: '4px' }}>
-                                            <strong>🎥 Video Link: </strong>
-                                            <a href={lesson.videoUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#0284c7', textDecoration: 'underline', wordBreak: 'break-all' }}>
-                                              {lesson.videoUrl}
-                                            </a>
-                                          </div>
-                                        ) : (
-                                          <div style={{ color: '#94a3b8', marginBottom: '4px' }}>🎥 Không có video</div>
-                                        )}
-                                        {lesson.content ? (
-                                          <div>
-                                            <strong>📄 Tài liệu / Nội dung bài giảng: </strong>
-                                            <div style={{ maxHeight: '80px', overflowY: 'auto', whiteSpace: 'pre-wrap', background: '#fff', padding: '4px 6px', borderRadius: '4px', border: '1px solid #cbd5e1', marginTop: '2px' }}>
-                                              {lesson.content}
-                                            </div>
-                                          </div>
-                                        ) : (
-                                          <div style={{ color: '#94a3b8' }}>📄 Không có tài liệu đính kèm</div>
-                                        )}
-                                      </div>
                                     </div>
                                     <div style={{ display: 'flex', gap: '4px' }}>
                                       <button 

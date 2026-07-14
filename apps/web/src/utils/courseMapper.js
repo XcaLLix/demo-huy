@@ -145,7 +145,6 @@ export function mapDbCourseToMockFormat(c) {
     isApproved: c.isApproved,
     isPublished: c.isPublished,
     rejectedReason: c.rejectedReason,
-    lessons: c.lessons || [],
     curriculum: curriculumVal.map(c => ({
       ...c,
       title: c.title

@@ -8,6 +8,10 @@ export const aiService = {
    * @returns {Promise<string>} Response from AI Tutor
    */
   async sendAiMessage(content, lesson = null) {
+    const lessonContext = lesson 
+      ? `Ngữ cảnh bài học: "${lesson.title}". Nội dung bài học: "${lesson.content || ''}". `
+      : '';
+    
     const token = localStorage.getItem('access_token');
     const headers = {
       'Content-Type': 'application/json'
@@ -21,7 +25,7 @@ export const aiService = {
         method: 'POST',
         headers: headers,
         body: JSON.stringify({ 
-          message: content,
+          message: `${lessonContext}Học sinh hỏi: ${content}`,
           lessonId: lesson?.id || null
         })
       });
