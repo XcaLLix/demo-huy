@@ -2372,6 +2372,10 @@ export default function App() {
     if (currentUser) {
       for (const id of ids) {
         try {
+          const isDoc = cartCourses.some(c => c.id.toString() === id && (c.type === 'DOCUMENT' || c.driveUrl));
+          if (isDoc) {
+            continue;
+          }
           const targetCourse = courses.find(c => c.id.toString() === id);
           const priceNum = targetCourse 
             ? parseFloat(String(targetCourse.priceSale || targetCourse.price || targetCourse.priceOriginal).replace(/\D/g, '')) 
@@ -2385,6 +2389,9 @@ export default function App() {
         }
       }
     }
+
+    // Trigger custom event for documents purchase status sync
+    window.dispatchEvent(new CustomEvent('document-purchased', { detail: { documentIds: ids.map(Number) } }));
 
     // Add to student's list in users database
     const currentList = Array.isArray(usersList) ? usersList : [];
@@ -3010,6 +3017,11 @@ export default function App() {
                   navigateTo={navigateTo}
                   cartCourses={cartCourses}
                   onAddToCart={handleAddToCart}
+                  onRemoveCourse={(courseId) => {
+                    const updated = cartCourses.filter(c => c.id !== courseId);
+                    setCartCourses(updated);
+                    localStorage.setItem('app_cart_courses', JSON.stringify(updated));
+                  }}
                 />
               )}
             </div>
@@ -3178,6 +3190,20 @@ export default function App() {
               <ExamBankPage
                 currentUser={currentUser}
                 navigateTo={navigateTo}
+                cartDocs={cartCourses}
+                onAddToCart={(doc) => {
+                  const docItem = { ...doc, type: 'DOCUMENT' };
+                  handleAddToCart(docItem);
+                }}
+                onCheckoutDoc={(doc) => {
+                  const docItem = { ...doc, type: 'DOCUMENT' };
+                  handleCheckoutCourse(docItem);
+                }}
+                onRemoveDoc={(docId) => {
+                  const updated = cartCourses.filter(c => c.id !== docId);
+                  setCartCourses(updated);
+                  localStorage.setItem('app_cart_courses', JSON.stringify(updated));
+                }}
               />
             </div>
           )}

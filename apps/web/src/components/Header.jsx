@@ -292,7 +292,7 @@ export default function Header({
             if (cartCourses && cartCourses.length > 0) {
               onCheckoutCourse(cartCourses[0]);
             } else {
-              toast('Giỏ hàng trống! Hãy chọn một khóa học để thêm vào giỏ.', 'warning');
+              toast('Giỏ hàng trống! Hãy chọn khóa học hoặc tài liệu học tập để thêm vào giỏ.', 'warning');
             }
           }}
           title="Giỏ hàng"

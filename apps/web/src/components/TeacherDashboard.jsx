@@ -488,6 +488,7 @@ export default function TeacherDashboard({
   const [formPrice, setFormPrice] = useState('0');
   const [formIsPublic, setFormIsPublic] = useState(true);
   const [uploadingMaterial, setUploadingMaterial] = useState(false);
+  const [editingMaterial, setEditingMaterial] = useState(null);
   const materialFileInputRef = useRef(null);
 
   const loadTeacherMaterials = async () => {
@@ -617,55 +618,95 @@ export default function TeacherDashboard({
     toast(`Tạo lớp học ${newClassName} (${newClassId.toUpperCase()}) thành công!`, 'success');
   };
 
-  const handleUploadMaterialReal = async (e) => {
-    e.preventDefault();
-    const file = materialFileInputRef.current?.files?.[0];
-    if (!file) {
-      toast('Vui lòng chọn tệp tài liệu để tải lên!', 'warning');
-      return;
-    }
-
-    try {
-      setUploadingMaterial(true);
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('title', formTitle);
-      formData.append('description', formDescription);
-      formData.append('subject', formSubject);
-      formData.append('grade', formGrade);
-      formData.append('price', formPrice);
-      formData.append('isPublic', formIsPublic ? 'true' : 'false');
-
-      await api.createTeacherMaterial(formData);
-      toast('Tải lên tài liệu thành công!', 'success');
-      
-      // Reset form
-      setFormTitle('');
-      setFormDescription('');
-      setFormPrice('0');
-      if (materialFileInputRef.current) {
-        materialFileInputRef.current.value = '';
-      }
-
-      // Reload materials
-      await loadTeacherMaterials();
-      await loadTeacherStats();
-    } catch (err) {
-      console.error('[Upload Material Error]', err);
-      toast(err.message || 'Tải lên tài liệu thất bại!', 'error');
-    } finally {
-      setUploadingMaterial(false);
+  const resetMaterialForm = () => {
+    setEditingMaterial(null);
+    setFormTitle('');
+    setFormDescription('');
+    setFormPrice('0');
+    setFormIsPublic(true);
+    if (materialFileInputRef.current) {
+      materialFileInputRef.current.value = '';
     }
   };
 
-  const handleToggleMaterialPublic = async (id, isPublic) => {
+  const handleUploadMaterialReal = async (e) => {
+    e.preventDefault();
+
+    if (!editingMaterial) {
+      // Create mode
+      const file = materialFileInputRef.current?.files?.[0];
+      if (!file) {
+        toast('Vui lòng chọn tệp tài liệu để tải lên!', 'warning');
+        return;
+      }
+
+      // Kiểm tra phần mở rộng tệp tin
+      const allowedExtensions = ['.pdf', '.doc', '.docx'];
+      const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+      if (!allowedExtensions.includes(fileExt)) {
+        toast('Định dạng tệp không hợp lệ! Chỉ chấp nhận các định dạng PDF, DOC, DOCX.', 'error');
+        return;
+      }
+
+      try {
+        setUploadingMaterial(true);
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('title', formTitle);
+        formData.append('description', formDescription);
+        formData.append('subject', formSubject);
+        formData.append('grade', formGrade);
+        formData.append('price', formPrice);
+        formData.append('status', formIsPublic ? 'PENDING_REVIEW' : 'DRAFT');
+
+        await api.createTeacherMaterial(formData);
+        toast('Tải lên tài liệu thành công!', 'success');
+        
+        resetMaterialForm();
+        await loadTeacherMaterials();
+        await loadTeacherStats();
+      } catch (err) {
+        console.error('[Upload Material Error]', err);
+        toast(err.message || 'Tải lên tài liệu thất bại!', 'error');
+      } finally {
+        setUploadingMaterial(false);
+      }
+    } else {
+      // Edit mode
+      try {
+        setUploadingMaterial(true);
+        const payload = {
+          title: formTitle,
+          description: formDescription,
+          subject: formSubject,
+          grade: formGrade,
+          price: Number(formPrice),
+          status: formIsPublic ? 'PENDING_REVIEW' : 'DRAFT'
+        };
+
+        await api.updateTeacherMaterial(editingMaterial.id, payload);
+        toast('Cập nhật thông tin tài liệu thành công!', 'success');
+        
+        resetMaterialForm();
+        await loadTeacherMaterials();
+        await loadTeacherStats();
+      } catch (err) {
+        console.error('[Update Material Error]', err);
+        toast(err.message || 'Cập nhật tài liệu thất bại!', 'error');
+      } finally {
+        setUploadingMaterial(false);
+      }
+    }
+  };
+
+  const handleSendForReview = async (id) => {
     try {
-      await api.updateTeacherMaterial(id, { isPublic });
-      toast(isPublic ? 'Đã công khai tài liệu!' : 'Đã chuyển tài liệu sang chế độ nháp!', 'success');
+      await api.submitTeacherMaterial(id);
+      toast('Đã gửi yêu cầu phê duyệt tài liệu!', 'success');
       await loadTeacherMaterials();
     } catch (err) {
-      console.error('[Toggle Public Error]', err);
-      toast('Không thể thay đổi trạng thái tài liệu!', 'error');
+      console.error('[Send Review Error]', err);
+      toast('Không thể gửi yêu cầu phê duyệt!', 'error');
     }
   };
 
@@ -679,6 +720,61 @@ export default function TeacherDashboard({
     } catch (err) {
       console.error('[Delete Material Error]', err);
       toast('Không thể xóa tài liệu!', 'error');
+    }
+  };
+
+  const [expandedReviewsId, setExpandedReviewsId] = useState(null);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [materialReviews, setMaterialReviews] = useState([]);
+
+  const handleToggleReviews = async (material) => {
+    if (expandedReviewsId === material.id) {
+      setExpandedReviewsId(null);
+      setMaterialReviews([]);
+      return;
+    }
+
+    if (!material.documentResourceId) {
+      toast('Tài liệu chưa được duyệt hoặc chưa được đồng bộ để xem đánh giá!', 'warning');
+      return;
+    }
+
+    try {
+      setReviewsLoading(true);
+      setExpandedReviewsId(material.id);
+      const res = await api.getDocumentRatings(material.documentResourceId);
+      if (res && res.ratings) {
+        setMaterialReviews(res.ratings);
+      }
+    } catch (err) {
+      console.error('[Load Reviews Error]', err);
+      toast('Không thể tải danh sách đánh giá!', 'error');
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
+  const handleHideReview = async (reviewId, currentHidden) => {
+    try {
+      const reason = currentHidden ? '' : prompt('Nhập lý do ẩn nhận xét này:');
+      if (!currentHidden && reason === null) return; // User cancelled
+      
+      await api.hideDocumentRating(reviewId, reason || 'Ẩn bởi giáo viên', !currentHidden);
+      toast(currentHidden ? 'Đã hiển thị lại nhận xét!' : 'Đã ẩn nhận xét thành công!', 'success');
+      
+      // Refresh reviews list
+      if (expandedReviewsId) {
+        const material = teacherMaterials.find(m => m.id === expandedReviewsId);
+        if (material) {
+          const res = await api.getDocumentRatings(material.documentResourceId);
+          if (res && res.ratings) {
+            setMaterialReviews(res.ratings);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[Hide Review Error]', err);
+      toast(err.message || 'Thao tác thất bại!', 'error');
     }
   };
 
@@ -951,7 +1047,11 @@ export default function TeacherDashboard({
     <div className="teacher-dashboard-layout">
       {/* LEFT SIDEBAR */}
       <aside className="tdb-left-sidebar">
-        <div className="tdb-logo-section" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div 
+          className="tdb-logo-section" 
+          style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
+          onClick={() => navigateTo('/')}
+        >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <img src={sunLogoImg} alt="EduPath AI" style={{ width: '36px', height: '36px', objectFit: 'contain' }} />
           </div>
@@ -3286,6 +3386,11 @@ export default function TeacherDashboard({
                                 <span className="tdb-material-meta" style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>
                                   Môn: {m.subject} • Lớp: {m.grade} • {size}
                                 </span>
+                                {m.status === 'REJECTED' && m.rejectionReason && (
+                                  <div style={{ marginTop: '6px', color: '#991b1b', fontSize: '11.5px', background: '#fff5f5', padding: '4px 8px', borderRadius: '6px', border: '1px solid #fecaca' }}>
+                                    <strong>Lý do từ chối:</strong> {m.rejectionReason}
+                                  </div>
+                                )}
                               </div>
                             </div>
                             
@@ -3296,11 +3401,24 @@ export default function TeacherDashboard({
                                 padding: '4px 10px', 
                                 borderRadius: '20px',
                                 border: '2px solid #000',
-                                backgroundColor: m.isPublic ? (m.isApproved ? '#d1fae5' : '#fef3c7') : '#f1f5f9',
-                                color: m.isPublic ? (m.isApproved ? '#065f46' : '#b45309') : '#475569'
+                                backgroundColor: 
+                                  m.status === 'APPROVED' ? '#d1fae5' :
+                                  m.status === 'PENDING_REVIEW' ? '#fef3c7' :
+                                  m.status === 'REJECTED' ? '#fee2e2' :
+                                  m.status === 'HIDDEN' ? '#dbeafe' : '#f1f5f9',
+                                color: 
+                                  m.status === 'APPROVED' ? '#065f46' :
+                                  m.status === 'PENDING_REVIEW' ? '#b45309' :
+                                  m.status === 'REJECTED' ? '#991b1b' :
+                                  m.status === 'HIDDEN' ? '#1e3a8a' : '#475569'
                               }}
                             >
-                              {m.isPublic ? (m.isApproved ? '✓ ĐÃ PHÁT HÀNH' : '⏱ CHỜ PHÊ DUYỆT') : '🔒 LƯU NHÁP'}
+                              {
+                                m.status === 'APPROVED' ? '✓ ĐÃ PHÁT HÀNH' :
+                                m.status === 'PENDING_REVIEW' ? '⏱ CHỜ DUYỆT' :
+                                m.status === 'REJECTED' ? '✕ BỊ TỪ CHỐI' :
+                                m.status === 'HIDDEN' ? '👁 ĐÃ ẨN' : '🔒 LƯU NHÁP'
+                              }
                             </span>
                           </div>
 
@@ -3314,15 +3432,67 @@ export default function TeacherDashboard({
                               fontSize: '12.5px' 
                             }}
                           >
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 'bold', color: '#1e293b' }}>
-                              <input 
-                                type="checkbox" 
-                                checked={m.isPublic}
-                                onChange={(e) => handleToggleMaterialPublic(m.id, e.target.checked)}
-                                style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                              />
-                              Công khai trên thư viện
-                            </label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              {(m.status === 'DRAFT' || m.status === 'REJECTED') && (
+                                <button
+                                  onClick={() => handleSendForReview(m.id)}
+                                  className="tdb-upgrade-btn"
+                                  style={{
+                                    padding: '4px 10px',
+                                    fontSize: '11px',
+                                    background: '#059669',
+                                    color: '#fff',
+                                    border: '1.5px solid #000',
+                                    boxShadow: '1.5px 1.5px 0px #000',
+                                    margin: 0
+                                  }}
+                                >
+                                  🚀 Gửi duyệt
+                                </button>
+                              )}
+                              {m.status === 'PENDING_REVIEW' && (
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      await api.updateTeacherMaterial(m.id, { status: 'DRAFT' });
+                                      toast('Đã rút tài liệu về bản nháp!', 'success');
+                                      await loadTeacherMaterials();
+                                    } catch (err) {
+                                      toast(err.message || 'Thất bại!', 'error');
+                                    }
+                                  }}
+                                  className="tdb-upgrade-btn"
+                                  style={{
+                                    padding: '4px 10px',
+                                    fontSize: '11px',
+                                    background: '#f3f4f6',
+                                    color: '#1f2937',
+                                    border: '1.5px solid #000',
+                                    boxShadow: '1.5px 1.5px 0px #000',
+                                    margin: 0
+                                  }}
+                                >
+                                  🔒 Rút về nháp
+                                </button>
+                              )}
+                              {m.documentResourceId && (
+                                <button
+                                  onClick={() => handleToggleReviews(m)}
+                                  className="tdb-upgrade-btn"
+                                  style={{
+                                    padding: '4px 10px',
+                                    fontSize: '11px',
+                                    background: '#e0f2fe',
+                                    color: '#0369a1',
+                                    border: '1.5px solid #000',
+                                    boxShadow: '1.5px 1.5px 0px #000',
+                                    margin: 0
+                                  }}
+                                >
+                                  ⭐ Xem đánh giá
+                                </button>
+                              )}
+                            </div>
 
                             <div style={{ display: 'flex', gap: '8px' }}>
                               {m.fileUrl && (
@@ -3331,7 +3501,7 @@ export default function TeacherDashboard({
                                   target="_blank" 
                                   rel="noopener noreferrer"
                                   className="tdb-action-icon-btn" 
-                                  title="Tải xuống / Xem thử"
+                                  title="Tải xuống"
                                   style={{ 
                                     display: 'inline-flex', 
                                     alignItems: 'center', 
@@ -3350,6 +3520,29 @@ export default function TeacherDashboard({
                               )}
                               <button 
                                 className="tdb-action-icon-btn" 
+                                onClick={() => {
+                                  setEditingMaterial(m);
+                                  setFormTitle(m.title);
+                                  setFormDescription(m.description || '');
+                                  setFormSubject(m.subject);
+                                  setFormGrade(m.grade || '12');
+                                  setFormPrice(String(m.price || 0));
+                                  setFormIsPublic(m.status === 'PENDING_REVIEW');
+                                }}
+                                title="Chỉnh sửa thông tin" 
+                                style={{ 
+                                  width: '32px', 
+                                  height: '32px', 
+                                  border: '2px solid #000',
+                                  borderRadius: '8px',
+                                  backgroundColor: '#e0f2fe',
+                                  color: '#0284c7' 
+                                }}
+                              >
+                                <HiPencil />
+                              </button>
+                              <button 
+                                className="tdb-action-icon-btn" 
                                 onClick={() => handleDeleteMaterial(m.id)}
                                 title="Xóa tài liệu" 
                                 style={{ 
@@ -3365,6 +3558,57 @@ export default function TeacherDashboard({
                               </button>
                             </div>
                           </div>
+
+                          {expandedReviewsId === m.id && (
+                            <div style={{ marginTop: '14px', borderTop: '2px solid #000', paddingTop: '12px', background: '#f8fafc', padding: '12px', borderRadius: '8px' }}>
+                              <h6 style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: 'bold' }}>⭐ ĐÁNH GIÁ TỪ HỌC SINH</h6>
+                              {reviewsLoading ? (
+                                <div style={{ fontSize: '12px', color: '#64748b' }}>Đang tải đánh giá...</div>
+                              ) : materialReviews.length === 0 ? (
+                                <div style={{ fontSize: '12px', color: '#64748b' }}>Chưa có đánh giá nào cho tài liệu này.</div>
+                              ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                  {materialReviews.map(r => (
+                                    <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', background: '#fff', padding: '10px', borderRadius: '8px', border: '1.5px solid #000' }}>
+                                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                        <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#6366f1', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold' }}>
+                                          {r.student.avatarUrl || r.student.fullName?.substring(0, 2).toUpperCase()}
+                                        </div>
+                                        <div>
+                                          <div style={{ fontSize: '12px', fontWeight: 'bold' }}>{r.student.fullName}</div>
+                                          <div style={{ color: '#f59e0b', fontSize: '11px' }}>
+                                            {'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}
+                                          </div>
+                                          <div style={{ fontSize: '12px', color: '#334155', marginTop: '2px' }}>{r.comment || '(Không có bình luận)'}</div>
+                                          {r.isHidden && (
+                                            <div style={{ fontSize: '10.5px', color: '#b91c1c', fontWeight: 'bold', marginTop: '4px', background: '#fee2e2', padding: '2px 6px', borderRadius: '4px', display: 'inline-block' }}>
+                                              👁️ Bị ẩn: {r.hiddenReason}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleHideReview(r.id, r.isHidden)}
+                                        style={{
+                                          padding: '4px 8px',
+                                          fontSize: '11px',
+                                          border: '1.5px solid #000',
+                                          borderRadius: '6px',
+                                          background: r.isHidden ? '#d1fae5' : '#fee2e2',
+                                          color: r.isHidden ? '#065f46' : '#b91c1c',
+                                          fontWeight: 'bold',
+                                          cursor: 'pointer'
+                                        }}
+                                      >
+                                        {r.isHidden ? 'Hiện nhận xét' : 'Ẩn nhận xét'}
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -3375,7 +3619,7 @@ export default function TeacherDashboard({
             {/* RIGHT COLUMN: UPLOAD FORM */}
             <div className="tdb-card" style={{ background: '#fffbeb', border: '3px solid #000', boxShadow: '6px 6px 0px #000' }}>
               <h3 className="tdb-card-title" style={{ borderBottom: '2px solid #000', paddingBottom: '14px', marginBottom: '14px' }}>
-                ➕ Tải lên tài liệu mới
+                {editingMaterial ? '✏️ Chỉnh sửa thông tin tài liệu' : '➕ Tải lên tài liệu mới'}
               </h3>
 
               <form onSubmit={handleUploadMaterialReal} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -3463,43 +3707,70 @@ export default function TeacherDashboard({
                       onChange={e => setFormIsPublic(e.target.checked)}
                       style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                     />
-                    Công khai ngay
+                    Gửi duyệt ngay
                   </label>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
-                  <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Chọn tệp từ máy tính:</label>
-                  <input 
-                    type="file" 
-                    ref={materialFileInputRef}
-                    required 
-                    style={{ 
-                      fontSize: '12.5px', 
-                      background: '#fff', 
-                      padding: '8px', 
-                      borderRadius: '8px', 
-                      border: '2px dashed #000', 
-                      width: '100%',
-                      boxSizing: 'border-box'
-                    }} 
-                  />
-                </div>
+                {!editingMaterial ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Chọn tệp từ máy tính:</label>
+                    <input 
+                      type="file" 
+                      ref={materialFileInputRef}
+                      required 
+                      accept=".pdf,.doc,.docx"
+                      style={{ 
+                        fontSize: '12.5px', 
+                        background: '#fff', 
+                        padding: '8px', 
+                        borderRadius: '8px', 
+                        border: '2px dashed #000', 
+                        width: '100%',
+                        boxSizing: 'border-box'
+                      }} 
+                    />
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '11px', color: '#64748b', background: '#f8fafc', padding: '8px', borderRadius: '6px', border: '1.5px solid #e2e8f0' }}>
+                    ℹ️ Chế độ sửa thông tin không hỗ trợ đổi tệp tin. Nếu muốn đổi tệp tin, vui lòng xóa và tạo mới tài liệu.
+                  </div>
+                )}
 
-                <button 
-                  type="submit" 
-                  disabled={uploadingMaterial}
-                  className="tdb-upgrade-btn" 
-                  style={{ 
-                    background: '#6366f1', 
-                    color: '#fff', 
-                    border: '2px solid #000', 
-                    boxShadow: uploadingMaterial ? 'none' : '4px 4px 0px #000',
-                    marginTop: '10px',
-                    cursor: uploadingMaterial ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  {uploadingMaterial ? '⏳ Đang tải tài liệu lên...' : '🚀 Bắt đầu tải lên'}
-                </button>
+                <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                  <button 
+                    type="submit" 
+                    disabled={uploadingMaterial}
+                    className="tdb-upgrade-btn" 
+                    style={{ 
+                      flex: 2, 
+                      margin: 0,
+                      background: '#6366f1', 
+                      color: '#fff', 
+                      border: '2px solid #000', 
+                      boxShadow: uploadingMaterial ? 'none' : '4px 4px 0px #000',
+                      cursor: uploadingMaterial ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {uploadingMaterial ? '⏳ Đang lưu...' : (editingMaterial ? '💾 Lưu thay đổi' : '🚀 Bắt đầu tải lên')}
+                  </button>
+                  {editingMaterial && (
+                    <button 
+                      type="button" 
+                      onClick={resetMaterialForm}
+                      className="tdb-upgrade-btn" 
+                      style={{ 
+                        flex: 1, 
+                        margin: 0, 
+                        background: '#fff', 
+                        color: '#000', 
+                        border: '2px solid #000',
+                        boxShadow: '4px 4px 0px #000'
+                      }}
+                    >
+                      Hủy
+                    </button>
+                  )}
+                </div>
               </form>
             </div>
             
