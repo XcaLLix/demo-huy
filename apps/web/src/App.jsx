@@ -1091,14 +1091,14 @@ function InlineLeaderboardTab({ currentUser }) {
 
           {/* Table rankings - Showing starting from top 4 onwards in pastel theme */}
           <div className="card animate-slide-up" style={{
-            border: '1px solid #F1F5F9',
+            border: '1px solid rgba(255,255,255,0.1)',
             boxShadow: '0 10px 30px rgba(0, 0, 0, 0.02)',
             borderRadius: '20px',
             padding: '24px',
-            background: '#A7F3D0'
+            background: '#5A7C54'
           }}>
             {rest.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '20px 0', fontSize: '14px', color: '#64748B' }}>
+              <div style={{ textAlign: 'center', padding: '20px 0', fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>
                 Không tìm thấy học sinh nào phù hợp từ vị trí thứ 4 trở đi. 🔍
               </div>
             ) : (
@@ -1109,8 +1109,8 @@ function InlineLeaderboardTab({ currentUser }) {
                   gridTemplateColumns: '80px 2fr 1fr 1.2fr 1.5fr 1.2fr',
                   alignItems: 'center',
                   padding: '12px 24px',
-                  borderBottom: '2.5px solid #F1F5F9',
-                  color: '#475569',
+                  borderBottom: '2.5px solid rgba(255,255,255,0.15)',
+                  color: '#FFFFFF',
                   fontWeight: '900',
                   fontSize: '12.5px',
                   textTransform: 'uppercase',
@@ -1150,19 +1150,22 @@ function InlineLeaderboardTab({ currentUser }) {
                       >
                         {/* Rank Column */}
                         <div>
-                          <span style={{
-                            fontWeight: '900',
-                            fontSize: '13px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: '28px',
-                            height: '28px',
-                            borderRadius: '50%',
-                            border: '1px solid #E2E8F0',
-                            background: 'transparent',
-                            color: '#475569'
-                          }}>
+                          <span 
+                            className="leaderboard-row-rank"
+                            style={{
+                              fontWeight: '900',
+                              fontSize: '13px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '28px',
+                              height: '28px',
+                              borderRadius: '50%',
+                              border: '1px solid #E2E8F0',
+                              background: 'transparent',
+                              color: '#475569'
+                            }}
+                          >
                             {student.rank}
                           </span>
                         </div>
@@ -1172,7 +1175,7 @@ function InlineLeaderboardTab({ currentUser }) {
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             {renderAvatar(student.avatar, student.name, 36, 1.5)}
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                              <div style={{ fontWeight: '900', fontSize: '14px', color: '#1E293B', whiteSpace: 'nowrap' }}>{student.name}</div>
+                              <div className="leaderboard-row-name" style={{ fontWeight: '900', fontSize: '14px', color: '#1E293B', whiteSpace: 'nowrap' }}>{student.name}</div>
                               {student.userId === currentUser?.id && (
                                 <span style={{ fontSize: '10px', background: '#00b894', color: '#fff', padding: '1px 6px', borderRadius: '4px', fontWeight: '900', marginTop: '2px', display: 'inline-block' }}>BẠN</span>
                               )}
@@ -1181,12 +1184,12 @@ function InlineLeaderboardTab({ currentUser }) {
                         </div>
 
                         {/* Grade Column */}
-                        <div style={{ fontSize: '13px', fontWeight: '800', color: '#475569' }}>
+                        <div className="leaderboard-row-grade" style={{ fontSize: '13px', fontWeight: '800', color: '#475569' }}>
                           Khối {student.grade || 'Chưa cập nhật'}
                         </div>
 
                         {/* Province Column */}
-                        <div style={{ color: '#64748B', fontSize: '13px' }}>
+                        <div className="leaderboard-row-province" style={{ color: '#64748B', fontSize: '13px' }}>
                           📍 {student.province || 'Chưa rõ'}
                         </div>
 
@@ -1196,7 +1199,7 @@ function InlineLeaderboardTab({ currentUser }) {
                         </div>
 
                         {/* XP Column */}
-                        <div style={{ textAlign: 'right', fontWeight: '900', fontSize: '14.5px', color: '#1E293B' }}>
+                        <div className="leaderboard-row-score" style={{ textAlign: 'right', fontWeight: '900', fontSize: '14.5px', color: '#1E293B' }}>
                           {student.xp.toLocaleString()} XP
                         </div>
                       </ScrollAnimatedRowInline>

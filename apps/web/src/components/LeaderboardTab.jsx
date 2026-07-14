@@ -844,19 +844,22 @@ export default function LeaderboardTab({ currentUser }) {
                     >
                       {/* Rank Column */}
                       <div>
-                        <span style={{
-                          fontWeight: '900',
-                          fontSize: '13px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: '28px',
-                          height: '28px',
-                          borderRadius: '50%',
-                          border: '1px solid #E2E8F0',
-                          background: 'transparent',
-                          color: '#475569'
-                        }}>
+                        <span 
+                          className="leaderboard-row-rank"
+                          style={{
+                            fontWeight: '900',
+                            fontSize: '13px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '50%',
+                            border: '1px solid #E2E8F0',
+                            background: 'transparent',
+                            color: '#475569'
+                          }}
+                        >
                           {student.rank}
                         </span>
                       </div>
@@ -866,7 +869,7 @@ export default function LeaderboardTab({ currentUser }) {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           {renderAvatar(student.avatar, student.name, 36, 1.5)}
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                            <div style={{ fontWeight: '900', fontSize: '14px', color: '#1E293B', whiteSpace: 'nowrap' }}>{student.name}</div>
+                            <div className="leaderboard-row-name" style={{ fontWeight: '900', fontSize: '14px', color: '#1E293B', whiteSpace: 'nowrap' }}>{student.name}</div>
                             {student.userId === currentUser?.id && (
                               <span style={{ fontSize: '10px', background: '#00b894', color: '#fff', padding: '1px 6px', borderRadius: '4px', fontWeight: '900', marginTop: '2px', display: 'inline-block' }}>BẠN</span>
                             )}
@@ -875,12 +878,12 @@ export default function LeaderboardTab({ currentUser }) {
                       </div>
 
                       {/* Grade Column */}
-                      <div style={{ fontSize: '13px', fontWeight: '800', color: '#475569' }}>
+                      <div className="leaderboard-row-grade" style={{ fontSize: '13px', fontWeight: '800', color: '#475569' }}>
                         Khối {student.grade || 'Chưa cập nhật'}
                       </div>
 
                       {/* Province Column */}
-                      <div style={{ color: '#64748B', fontSize: '13px' }}>
+                      <div className="leaderboard-row-province" style={{ color: '#64748B', fontSize: '13px' }}>
                         📍 {student.province || 'Chưa rõ'}
                       </div>
 
@@ -890,7 +893,7 @@ export default function LeaderboardTab({ currentUser }) {
                       </div>
 
                       {/* Score Column */}
-                      <div style={{ textAlign: 'right', fontWeight: '900', fontSize: '14.5px', color: '#1E293B' }}>
+                      <div className="leaderboard-row-score" style={{ textAlign: 'right', fontWeight: '900', fontSize: '14.5px', color: '#1E293B' }}>
                         {sortBy === 'xp' ? `${student.testScore ?? 0} điểm` : `${student.xp.toLocaleString()} XP`}
                       </div>
                     </ScrollAnimatedRow>
