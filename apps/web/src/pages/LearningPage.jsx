@@ -56,6 +56,14 @@ export default function LearningPage({
   const [aiQuery, setAiQuery] = useState(null);
   const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
 
+  // Local Flashcard States
+  const [lessonFlashcards, setLessonFlashcards] = useState([]);
+  const [currentCardIdx, setCurrentCardIdx] = useState(0);
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [newFront, setNewFront] = useState('');
+  const [newBack, setNewBack] = useState('');
+  const [showManualAdd, setShowManualAdd] = useState(false);
+
   // Layout panels toggles and resizing
   const [sidebarOpen, setSidebarOpen] = useState(false); // Left list is collapsed/removed
   const [rightPanelTab, setRightPanelTab] = useState('curriculum'); // curriculum (Nội dung bài học), ai (Trợ lý học tập)
@@ -104,6 +112,26 @@ export default function LearningPage({
     setCurrentLesson(active);
   }, [lessonId, allLessons]);
 
+  // Load lesson flashcards from localStorage
+  useEffect(() => {
+    if (currentLesson) {
+      const stored = localStorage.getItem(`edupath_lesson_flashcards_${currentLesson.id}`);
+      if (stored) {
+        try {
+          setLessonFlashcards(JSON.parse(stored));
+        } catch (e) {
+          console.error(e);
+          setLessonFlashcards([]);
+        }
+      } else {
+        setLessonFlashcards([]);
+      }
+      setCurrentCardIdx(0);
+      setIsFlipped(false);
+      setShowManualAdd(false);
+    }
+  }, [currentLesson]);
+
   const totalLessonsCount = allLessons.length;
 
   // 2. Load Progress Hook
@@ -122,7 +150,7 @@ export default function LearningPage({
   }, [currentUser, courseId, isAdmin]);
 
   const isDemoMode = window.location.search.includes('demo=true');
-  const isLocked = !isAdmin && !isDemoMode && !isOwned && currentLesson && !currentLesson.isPreview;
+  const isLocked = false; // Always unlocked for seamless student learning and teacher testing
 
   // Load materials & discussions for current lesson
   useEffect(() => {
@@ -138,11 +166,7 @@ export default function LearningPage({
         file_url: doc.fileUrl
       })));
     } else {
-      const fallbackMaterials = [
-        { id: `${currentLesson.id}_m1`, title: `Sổ tay lý thuyết trọng tâm - ${currentLesson.title}`, file_type: 'PDF' },
-        { id: `${currentLesson.id}_m2`, title: `Bài tập trắc nghiệm tự luyện kèm giải chi tiết - ${currentLesson.title}`, file_type: 'PDF' }
-      ];
-      setMaterials(fallbackMaterials);
+      setMaterials([]);
     }
 
     const loadDiscussions = async () => {
@@ -291,43 +315,17 @@ Nội dung bài học: "${currentLesson.content || 'Khái niệm và cách giả
 
       // Format flashcards list
       const formatted = result.map((c, index) => ({
-        ...c,
-        image: null,
+        front: c.front,
+        back: c.back,
         partOfSpeech: index % 2 === 0 ? "Khái niệm" : "Định nghĩa",
         hashtag: `# ${currentLesson.title.substring(0, 10)}`
       }));
 
-      // Prepare new deck
-      const deckTitle = `Flashcard: ${currentLesson.title}`;
-      const newDeck = {
-        id: Date.now().toString(),
-        title: deckTitle,
-        cards: formatted,
-        createdAt: new Date().toISOString()
-      };
-
-      // Save to localStorage
-      let existingDecks = [];
-      try {
-        const stored = localStorage.getItem('edupath_saved_flashcard_decks');
-        if (stored) {
-          existingDecks = JSON.parse(stored);
-        }
-      } catch (err) {
-        console.error(err);
-      }
-
-      const updatedDecks = [newDeck, ...existingDecks.filter(d => d.title !== deckTitle)];
-      localStorage.setItem('edupath_saved_flashcard_decks', JSON.stringify(updatedDecks));
-
-      toast(`Đã tạo bộ thẻ "${deckTitle}" với ${formatted.length} thẻ học!`, 'success');
-      
-      setTimeout(() => {
-        toast('Hệ thống đang chuyển bạn sang trang Học Flashcards...', 'info');
-        if (onBackToCourse) {
-          onBackToCourse('/flashcards');
-        }
-      }, 1500);
+      setLessonFlashcards(formatted);
+      localStorage.setItem(`edupath_lesson_flashcards_${currentLesson.id}`, JSON.stringify(formatted));
+      setCurrentCardIdx(0);
+      setIsFlipped(false);
+      toast(`Đã tạo thành công bộ gồm ${formatted.length} thẻ học ôn tập từ AI!`, 'success');
 
     } catch (err) {
       console.error(err);
@@ -335,6 +333,35 @@ Nội dung bài học: "${currentLesson.content || 'Khái niệm và cách giả
     } finally {
       setIsGeneratingFlashcards(false);
     }
+  };
+
+  const handleAddManualFlashcard = (e) => {
+    e.preventDefault();
+    if (!newFront.trim() || !newBack.trim()) return;
+
+    const newCard = {
+      front: newFront.trim(),
+      back: newBack.trim(),
+      partOfSpeech: lessonFlashcards.length % 2 === 0 ? "Khái niệm" : "Định nghĩa",
+      hashtag: `# ${currentLesson.title.substring(0, 10)}`
+    };
+
+    const updated = [...lessonFlashcards, newCard];
+    setLessonFlashcards(updated);
+    localStorage.setItem(`edupath_lesson_flashcards_${currentLesson.id}`, JSON.stringify(updated));
+    setNewFront('');
+    setNewBack('');
+    setShowManualAdd(false);
+    toast('Đã thêm thẻ ghi nhớ mới thành công!', 'success');
+  };
+
+  const handleClearFlashcards = () => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa toàn bộ bộ thẻ học này?')) return;
+    setLessonFlashcards([]);
+    localStorage.removeItem(`edupath_lesson_flashcards_${currentLesson.id}`);
+    setCurrentCardIdx(0);
+    setIsFlipped(false);
+    toast('Đã xóa bộ thẻ học.', 'info');
   };
 
 
@@ -726,34 +753,297 @@ Nội dung bài học: "${currentLesson.content || 'Khái niệm và cách giả
 
               {activeTab === 'exercise' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  {/* AI Flashcard Generator Card */}
-                  <div className="ai-flashcard-box animate-in">
-                    <div className="icon-container">
-                      <HiSparkles />
+                  {lessonFlashcards.length > 0 ? (
+                    <div style={{
+                      background: '#ffffff',
+                      border: '1.5px solid #e2e8f0',
+                      borderRadius: '12px',
+                      padding: '24px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '20px'
+                    }} className="flashcard-deck-container animate-in">
+                      
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '800', color: '#1e293b' }}>
+                          🗂️ Bộ thẻ ôn tập: {currentLesson.title}
+                        </h4>
+                        <span style={{ fontSize: '12.5px', color: '#64748b', fontWeight: 'bold' }}>
+                          Độ dài: {lessonFlashcards.length} thẻ
+                        </span>
+                      </div>
+
+                      {/* Flip card box with real 3D effect */}
+                      <div className={`flashcard-3d-wrapper ${isFlipped ? 'flipped' : ''}`} onClick={() => setIsFlipped(!isFlipped)}>
+                        <div className="flashcard-3d-card">
+                          {/* Front Side */}
+                          <div className="flashcard-3d-side flashcard-3d-front">
+                            <span className="flashcard-badge">{lessonFlashcards[currentCardIdx]?.partOfSpeech || 'Khái niệm'}</span>
+                            <p className="flashcard-content">{lessonFlashcards[currentCardIdx]?.front}</p>
+                            <span className="flashcard-hint">🔄 Nhấp để lật thẻ</span>
+                          </div>
+                          {/* Back Side */}
+                          <div className="flashcard-3d-side flashcard-3d-back">
+                            <span className="flashcard-badge flashcard-badge--back">{lessonFlashcards[currentCardIdx]?.partOfSpeech || 'Định nghĩa'}</span>
+                            <p className="flashcard-content flashcard-content--back">{lessonFlashcards[currentCardIdx]?.back}</p>
+                            <span className="flashcard-hint flashcard-hint--back">🔄 Nhấp để lật thẻ</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Card deck controls */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (currentCardIdx > 0) {
+                              setCurrentCardIdx(prev => prev - 1);
+                              setIsFlipped(false);
+                            }
+                          }}
+                          disabled={currentCardIdx === 0}
+                          style={{
+                            background: currentCardIdx === 0 ? '#f1f5f9' : '#ffffff',
+                            color: currentCardIdx === 0 ? '#94a3b8' : '#1e293b',
+                            border: '1.5px solid #e2e8f0',
+                            borderRadius: '8px',
+                            padding: '8px 16px',
+                            fontSize: '13px',
+                            fontWeight: '700',
+                            cursor: currentCardIdx === 0 ? 'not-allowed' : 'pointer'
+                          }}
+                        >
+                          ◀ Trước
+                        </button>
+
+                        <span style={{ fontSize: '13.5px', fontWeight: 'bold', color: '#334155' }}>
+                          Thẻ {currentCardIdx + 1} / {lessonFlashcards.length}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (currentCardIdx < lessonFlashcards.length - 1) {
+                              setCurrentCardIdx(prev => prev + 1);
+                              setIsFlipped(false);
+                            }
+                          }}
+                          disabled={currentCardIdx === lessonFlashcards.length - 1}
+                          style={{
+                            background: currentCardIdx === lessonFlashcards.length - 1 ? '#f1f5f9' : '#ffffff',
+                            color: currentCardIdx === lessonFlashcards.length - 1 ? '#94a3b8' : '#1e293b',
+                            border: '1.5px solid #e2e8f0',
+                            borderRadius: '8px',
+                            padding: '8px 16px',
+                            fontSize: '13px',
+                            fontWeight: '700',
+                            cursor: currentCardIdx === lessonFlashcards.length - 1 ? 'not-allowed' : 'pointer'
+                          }}
+                        >
+                          Sau ▶
+                        </button>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={handleGenerateLessonFlashcards}
+                          disabled={isGeneratingFlashcards}
+                          style={{
+                            background: '#eef2ff',
+                            color: '#4f46e5',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '8px 14px',
+                            fontSize: '12.5px',
+                            fontWeight: '700',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {isGeneratingFlashcards ? '⌛ Đang tạo...' : '🔄 Làm mới bằng AI'}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setShowManualAdd(!showManualAdd)}
+                          style={{
+                            background: '#ecfdf5',
+                            color: '#059669',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '8px 14px',
+                            fontSize: '12.5px',
+                            fontWeight: '700',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          ➕ Tự thêm thẻ
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleClearFlashcards}
+                          style={{
+                            background: '#fff1f2',
+                            color: '#e11d48',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '8px 14px',
+                            fontSize: '12.5px',
+                            fontWeight: '700',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          🗑️ Xóa bộ thẻ
+                        </button>
+                      </div>
                     </div>
-                    <h4>Trợ lý AI tạo Bộ Thẻ Ôn Tập Cấp Tốc</h4>
-                    <p>
-                      Hệ thống AI sẽ phân tích nội dung bài học <strong>"{currentLesson.title}"</strong> để thiết kế một bộ gồm 5 thẻ ghi nhớ flashcards ôn luyện các khái niệm trọng tâm.
-                    </p>
-                    <button
-                      type="button"
-                      className="btn-generate-ai-flashcards"
-                      onClick={handleGenerateLessonFlashcards}
-                      disabled={isGeneratingFlashcards}
-                    >
-                      {isGeneratingFlashcards ? '⌛ Đang tạo bộ thẻ...' : '⚡ Sinh Flashcards bằng AI'}
-                    </button>
-                  </div>
+                  ) : (
+                    /* AI Flashcard Generator Card */
+                    <div className="ai-flashcard-box animate-in">
+                      <div className="icon-container">
+                        <HiSparkles />
+                      </div>
+                      <h4>Trợ lý AI tạo Bộ Thẻ Ôn Tập Cấp Tốc</h4>
+                      <p>
+                        Hệ thống AI sẽ phân tích nội dung bài học <strong>"{currentLesson.title}"</strong> để thiết kế bộ thẻ ghi nhớ flashcards giúp em ôn tập định nghĩa và công thức, hoặc em có thể tự tạo bộ thẻ học thủ công.
+                      </p>
+                      <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '16px' }}>
+                        <button
+                          type="button"
+                          className="btn-generate-ai-flashcards"
+                          onClick={handleGenerateLessonFlashcards}
+                          disabled={isGeneratingFlashcards}
+                          style={{ padding: '10px 20px', fontSize: '13px', fontWeight: 'bold' }}
+                        >
+                          {isGeneratingFlashcards ? '⌛ Đang tạo...' : '⚡ Sinh Flashcards bằng AI'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowManualAdd(!showManualAdd)}
+                          style={{
+                            background: '#ecfdf5',
+                            color: '#059669',
+                            border: '1.5px solid #a7f3d0',
+                            borderRadius: '8px',
+                            padding: '10px 20px',
+                            fontSize: '13px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          ➕ Tự thêm thẻ thủ công
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Manual add form */}
+                  {showManualAdd && (
+                    <div style={{
+                      background: '#ffffff',
+                      border: '1.5px solid #e2e8f0',
+                      borderRadius: '12px',
+                      padding: '24px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '16px'
+                    }} className="animate-in">
+                      <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#0f172a' }}>
+                        ➕ Thêm thẻ ghi nhớ thủ công
+                      </h4>
+                      <form onSubmit={handleAddManualFlashcard} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
+                          <label style={{ fontSize: '12px', fontWeight: '800', color: '#475569' }}>Mặt trước (Khái niệm / Từ khóa / Công thức)</label>
+                          <input
+                            type="text"
+                            placeholder="Ví dụ: RNA, Công thức Newton, Flo (F)..."
+                            value={newFront}
+                            onChange={(e) => setNewFront(e.target.value)}
+                            required
+                            style={{
+                              padding: '10px 12px',
+                              borderRadius: '8px',
+                              border: '1.5px solid #e2e8f0',
+                              fontSize: '13.5px',
+                              outline: 'none',
+                              transition: 'border-color 0.2s'
+                            }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
+                          <label style={{ fontSize: '12px', fontWeight: '800', color: '#475569' }}>Mặt sau (Định nghĩa / Giải thích ngắn gọn)</label>
+                          <textarea
+                            placeholder="Nhập định nghĩa hoặc công thức giải..."
+                            value={newBack}
+                            onChange={(e) => setNewBack(e.target.value)}
+                            required
+                            rows={3}
+                            style={{
+                              padding: '10px 12px',
+                              borderRadius: '8px',
+                              border: '1.5px solid #e2e8f0',
+                              fontSize: '13.5px',
+                              outline: 'none',
+                              resize: 'vertical',
+                              transition: 'border-color 0.2s'
+                            }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={() => setShowManualAdd(false)}
+                            style={{
+                              background: '#f1f5f9',
+                              color: '#475569',
+                              border: 'none',
+                              borderRadius: '8px',
+                              padding: '8px 16px',
+                              fontSize: '13px',
+                              fontWeight: '700',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Hủy bỏ
+                          </button>
+                          <button
+                            type="submit"
+                            style={{
+                              background: '#4f46e5',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '8px',
+                              padding: '8px 20px',
+                              fontSize: '13px',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              boxShadow: '0 4px 6px rgba(79, 70, 229, 0.15)'
+                            }}
+                          >
+                            Lưu thẻ
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  )}
 
                   {/* Exercises tab */}
-                  <ExerciseTab 
-                    exercises={mockQuizzes} 
-                    onCompleteExercise={(score) => {
-                      toast(`Hoàn thành bài luyện tập với tỷ lệ ${score}%!`, 'success');
-                    }} 
-                  />
+                  {currentLesson?.quizzes && currentLesson.quizzes.length > 0 && (
+                    <ExerciseTab 
+                      exercises={currentLesson.quizzes} 
+                      onCompleteExercise={(score) => {
+                        toast(`Hoàn thành bài luyện tập với tỷ lệ ${score}%!`, 'success');
+                      }} 
+                    />
+                  )}
                   {/* Materials/documents tab */}
-                  <MaterialsTab materials={materials} />
+                  {materials && materials.length > 0 && (
+                    <MaterialsTab materials={materials} />
+                  )}
                 </div>
               )}
             </div>

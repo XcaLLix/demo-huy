@@ -559,6 +559,35 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
     handleSendChatMessage(null, promptText);
   };
 
+  const [isGeneratingMnemonic, setIsGeneratingMnemonic] = useState(false);
+
+  const handleGenerateMnemonic = async (card) => {
+    if (!card) return;
+    try {
+      setIsGeneratingMnemonic(true);
+      toast('Đang khởi tạo mẹo ghi nhớ bằng AI...', 'info');
+      const response = await api.generateFlashcardMnemonic(card.front, card.back);
+      if (response && response.success) {
+        const nextCards = cards.map(c => {
+          if (c.front === card.front && c.back === card.back) {
+            return { ...c, mnemonic: response.mnemonic };
+          }
+          return c;
+        });
+        setCards(nextCards);
+        saveActiveDeckChanges(nextCards);
+        toast('Đã tạo mẹo ghi nhớ thành công!', 'success');
+      } else {
+        throw new Error(response?.error || 'Lỗi không xác định.');
+      }
+    } catch (err) {
+      console.error(err);
+      toast('Tạo mẹo ghi nhớ thất bại. Hãy thử lại!', 'error');
+    } finally {
+      setIsGeneratingMnemonic(false);
+    }
+  };
+
   // Manual Editing States
   const [isEditingCurrent, setIsEditingCurrent] = useState(false);
   const [isAddingCard, setIsAddingCard] = useState(false);
@@ -831,6 +860,165 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
     } finally {
       setIsLoading(false);
       setLoadingStep('');
+    }
+  };
+
+  const parseTextToCards = (text) => {
+    const cards = [];
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    
+    let hasSeparator = false;
+    for (let line of lines) {
+      for (const sep of [':', '=', '-', '—', '–', '|', '\t', '  ']) {
+        if (line.includes(sep)) {
+          hasSeparator = true;
+          break;
+        }
+      }
+    }
+
+    if (hasSeparator) {
+      for (let line of lines) {
+        let separator = null;
+        for (const sep of [':', '=', '-', '—', '–', '|', '\t', '  ']) {
+          if (line.includes(sep)) {
+            separator = sep;
+            break;
+          }
+        }
+        
+        if (separator) {
+          const parts = line.split(separator);
+          const front = parts[0].trim().replace(/\*\*/g, '').replace(/__/g, '');
+          const back = parts.slice(1).join(separator).trim().replace(/\*\*/g, '').replace(/__/g, '');
+          if (front && back) {
+            cards.push({ front, back });
+          }
+        }
+      }
+    } else {
+      // Pair up even and odd lines
+      for (let i = 0; i < lines.length - 1; i += 2) {
+        const front = lines[i].replace(/\*\*/g, '').replace(/__/g, '');
+        const back = lines[i+1].replace(/\*\*/g, '').replace(/__/g, '');
+        if (front && back) {
+          cards.push({ front, back });
+        }
+      }
+    }
+    return cards;
+  };
+
+  const handleGenerateOCRNoAI = async () => {
+    // If client OCR is still loading, wait
+    if (selectedFile && selectedFile.type.startsWith('image/') && isLoading) {
+      toast('Hệ thống đang nhận diện chữ trong ảnh, vui lòng đợi giây lát...', 'info');
+      return;
+    }
+
+    const isDocFile = selectedFile && (
+      selectedFile.name.endsWith('.pdf') || 
+      selectedFile.name.endsWith('.docx') || 
+      selectedFile.name.endsWith('.doc')
+    );
+
+    const content = inputText.trim();
+    if (content && !isDocFile) {
+      const parsed = parseTextToCards(content);
+      if (parsed.length > 0) {
+        const formatted = parsed.map((c, index) => ({
+          front: c.front,
+          back: c.back,
+          image: null,
+          partOfSpeech: index % 2 === 0 ? "Khái niệm" : "Định nghĩa",
+          hashtag: "# Học tập"
+        }));
+
+        const extractedTitle = selectedFile ? selectedFile.name.split('.')[0] : ('Bộ thẻ tự tạo - ' + new Date().toLocaleDateString('vi-VN'));
+        const newId = Date.now().toString();
+        const newDeck = {
+          id: newId,
+          title: extractedTitle,
+          cards: formatted,
+          createdAt: new Date().toISOString()
+        };
+
+        const nextDecks = [newDeck, ...savedDecks];
+        setSavedDecks(nextDecks);
+        localStorage.setItem('edupath_saved_flashcard_decks', JSON.stringify(nextDecks));
+
+        setCards(formatted);
+        setDeckTitle(extractedTitle);
+        setActiveDeckId(newId);
+        setCurrentIdx(0);
+        setIsFlipped(false);
+        setIsFinished(false);
+        setIsEditingCurrent(false);
+        setLearnedCards(new Set());
+        setReviewCards(new Set());
+        setCurrentView('study');
+
+        toast(`Phân tách bộ thẻ thành công từ dữ liệu chữ đã nhận diện!`, 'success');
+        return;
+      }
+    }
+
+    // 2. Call backend document extractor for PDF, DOC, DOCX and text documents
+    if (selectedFile) {
+      if (selectedFile.type.startsWith('image/')) {
+        toast('Không thể phân tách văn bản trong hình ảnh. Vui lòng kiểm tra lại cấu trúc chữ nhận diện được.', 'warning');
+        return;
+      }
+
+      setIsLoading(true);
+      setLoadingStep('Đang tải tài liệu lên và trích xuất cấu trúc...');
+      try {
+        const response = await api.generateFlashcardsOCR(selectedFile);
+        if (response && response.success && response.data && response.data.length > 0) {
+          const formatted = response.data.map((c, index) => ({
+            front: c.front,
+            back: c.back,
+            image: null,
+            partOfSpeech: index % 2 === 0 ? "Khái niệm" : "Định nghĩa",
+            hashtag: "# Học tập"
+          }));
+
+          const extractedTitle = selectedFile.name.split('.')[0] || 'Flashcard OCR';
+          const newId = Date.now().toString();
+          const newDeck = {
+            id: newId,
+            title: extractedTitle,
+            cards: formatted,
+            createdAt: new Date().toISOString()
+          };
+
+          const nextDecks = [newDeck, ...savedDecks];
+          setSavedDecks(nextDecks);
+          localStorage.setItem('edupath_saved_flashcard_decks', JSON.stringify(nextDecks));
+
+          setCards(formatted);
+          setDeckTitle(extractedTitle);
+          setActiveDeckId(newId);
+          setCurrentIdx(0);
+          setIsFlipped(false);
+          setIsFinished(false);
+          setIsEditingCurrent(false);
+          setLearnedCards(new Set());
+          setReviewCards(new Set());
+          setCurrentView('study');
+
+          toast(`Đã tạo thành công bộ thẻ "${extractedTitle}" với ${formatted.length} thẻ!`, 'success');
+        } else {
+          throw new Error(response?.error || 'Không tìm thấy cấu trúc thẻ học hợp lệ trong tệp.');
+        }
+      } catch (err) {
+        toast(err.message || 'Lỗi xử lý tệp bằng Python!', 'error');
+      } finally {
+        setIsLoading(false);
+        setLoadingStep('');
+      }
+    } else {
+      toast('Vui lòng chọn 1 tệp hoặc nhập văn bản trước khi tạo bộ thẻ!', 'warning');
     }
   };
 
@@ -1296,7 +1484,7 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
                   type="file" 
                   ref={fileInputRef} 
                   onChange={handleFileChange}
-                  accept="image/*,text/plain,.txt,.md"
+                  accept="image/*,text/plain,.txt,.md,.pdf,.docx,.doc"
                   style={{ display: 'none' }} 
                 />
                 <HiUpload style={{ fontSize: '18px', color: '#9CA3AF' }} />
@@ -1326,6 +1514,22 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
                 style={{ padding: '8px' }}
               >
                 {isLoading ? <span className="spinner" /> : <><HiSparkles /> Tạo bộ thẻ AI</>}
+              </button>
+
+              <button
+                className="aitutor-action-btn btn-ocr-noai"
+                onClick={handleGenerateOCRNoAI}
+                disabled={isLoading || (!selectedFile && !inputText.trim())}
+                style={{ 
+                  padding: '8px', 
+                  background: 'transparent', 
+                  border: '1.5px solid var(--fc-gold)', 
+                  color: 'var(--fc-gold)',
+                  marginTop: '4px',
+                  boxShadow: 'none'
+                }}
+              >
+                {isLoading ? <span className="spinner" /> : <>⚡ Tạo từ File (OCR không AI)</>}
               </button>
 
               {isLoading && loadingStep && (
@@ -1692,17 +1896,7 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
                           {activeCards[currentIdx]?.card?.back}
                         </div>
 
-                        <button
-                          type="button"
-                          className="btn-explain-ai"
-                          onClick={(e) => {
-                            e.stopPropagation(); // prevent flipping the card back
-                            handleExplainCardWithAI(activeCards[currentIdx]?.card);
-                          }}
-                          title="Yêu cầu AI giải thích chuyên sâu"
-                        >
-                          <HiSparkles /> 💡 Giải thích bằng AI
-                        </button>
+
 
                         {activeCards[currentIdx]?.card?.image && (
                           <div className="flashcard-uploaded-img-wrapper">

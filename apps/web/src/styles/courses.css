@@ -6537,6 +6537,121 @@
   transform: none !important;
 }
 
+/* ==========================================================================
+   3D FLASHCARD FLIPPING EFFECT (AESTHETIC UPGRADES)
+   ========================================================================== */
+.flashcard-3d-wrapper {
+  perspective: 1200px;
+  width: 100%;
+  min-height: 250px;
+  cursor: pointer;
+  margin-bottom: 24px;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.flashcard-3d-wrapper:hover {
+  transform: translateY(-3px);
+}
+
+.flashcard-3d-card {
+  width: 100%;
+  height: 100%;
+  min-height: 250px;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.05), 0 8px 16px -6px rgba(15, 23, 42, 0.05);
+  border-radius: 16px;
+}
+
+.flashcard-3d-wrapper.flipped .flashcard-3d-card {
+  transform: rotateX(180deg);
+}
+
+.flashcard-3d-side {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 250px;
+  backface-visibility: hidden;
+  border-radius: 16px;
+  padding: 36px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.flashcard-3d-front {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  color: #0f172a;
+  border: 1.5px solid #e2e8f0;
+}
+
+.flashcard-3d-back {
+  background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
+  color: #ffffff;
+  transform: rotateX(180deg);
+  border: 1.5px solid #334155;
+}
+
+.flashcard-badge {
+  position: absolute;
+  top: 16px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  background: #f1f5f9;
+  color: #475569;
+  padding: 4px 12px;
+  border-radius: 99px;
+  border: 1px solid #e2e8f0;
+}
+
+.flashcard-badge--back {
+  background: rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.flashcard-content {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.6;
+  margin: 20px 0;
+  word-break: break-word;
+  max-width: 90%;
+  color: #1e293b;
+  font-family: 'Outfit', sans-serif;
+}
+
+.flashcard-content--back {
+  font-weight: 600;
+  font-size: 17px;
+  color: #f1f5f9;
+}
+
+.flashcard-hint {
+  position: absolute;
+  bottom: 16px;
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.flashcard-hint--back {
+  color: rgba(241, 245, 249, 0.7);
+}
+
 
 
 
