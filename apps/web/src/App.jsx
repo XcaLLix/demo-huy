@@ -3222,6 +3222,7 @@ export default function App() {
                   else if (tab === 'forum') navigateTo('/user/forum');
                   else if (tab === 'documents') navigateTo('/user/documents');
                   else if (tab === 'streak') navigateTo('/user/streak');
+                  else if (tab === 'exam-history') navigateTo('/user/exam-history');
                   else if (tab === 'leaderboard') navigateTo('/user/leaderboard');
                   else if (tab === 'settings') navigateTo('/user/settings');
                   else if (tab === 'notifications') navigateTo('/user/notifications');
