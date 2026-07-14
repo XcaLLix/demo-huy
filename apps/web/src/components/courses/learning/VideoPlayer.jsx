@@ -16,8 +16,25 @@ const getYouTubeEmbedUrl = (url) => {
   return videoId ? `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1` : url;
 };
 
+const getYouTubeVideoId = (url) => {
+  if (!url) return '';
+  let videoId = '';
+  if (url.includes('youtube.com/watch')) {
+    const params = new URLSearchParams(url.split('?')[1]);
+    videoId = params.get('v');
+  } else if (url.includes('youtu.be/')) {
+    videoId = url.split('youtu.be/')[1]?.split('?')[0];
+  } else if (url.includes('/embed/')) {
+    videoId = url.split('/embed/')[1]?.split('?')[0];
+  }
+  return videoId;
+};
+
 const VideoPlayer = forwardRef(({ videoUrl, title, onEnded, onTimeUpdate, lessonId, nextLessonName, chapters = [] }, ref) => {
   const videoRef = useRef(null);
+  const iframeRef = useRef(null);
+  const ytPlayerRef = useRef(null);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -32,25 +49,147 @@ const VideoPlayer = forwardRef(({ videoUrl, title, onEnded, onTimeUpdate, lesson
   const [showUpNext, setShowUpNext] = useState(false);
   const controlsTimeoutRef = useRef(null);
 
-  // Expose video element to parent
-  useImperativeHandle(ref, () => videoRef.current);
-
   const isYouTube = videoUrl && (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be') || videoUrl.includes('/embed/'));
 
-  // Load last position
+  // Expose a custom handle that mimics the HTML5 Video Element properties & methods
+  useImperativeHandle(ref, () => ({
+    get currentTime() {
+      if (isYouTube && ytPlayerRef.current) {
+        return ytPlayerRef.current.getCurrentTime();
+      }
+      return videoRef.current ? videoRef.current.currentTime : 0;
+    },
+    set currentTime(val) {
+      if (isYouTube && ytPlayerRef.current) {
+        ytPlayerRef.current.seekTo(val, true);
+      } else if (videoRef.current) {
+        videoRef.current.currentTime = val;
+      }
+    },
+    play() {
+      if (isYouTube && ytPlayerRef.current) {
+        ytPlayerRef.current.playVideo();
+        return Promise.resolve();
+      }
+      return videoRef.current ? videoRef.current.play() : Promise.resolve();
+    },
+    pause() {
+      if (isYouTube && ytPlayerRef.current) {
+        ytPlayerRef.current.pauseVideo();
+      } else if (videoRef.current) {
+        videoRef.current.pause();
+      }
+    }
+  }));
+
+  // Load YouTube IFrame API script
   useEffect(() => {
-    if (isYouTube) {
-      setLoading(false);
+    if (!isYouTube) return;
+    if (!window.YT) {
+      const tag = document.createElement('script');
+      tag.src = "https://www.youtube.com/iframe_api";
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+    }
+  }, [isYouTube]);
+
+  // Load last position and initialize YouTube Player API
+  useEffect(() => {
+    if (!isYouTube) {
+      if (!videoRef.current || !lessonId) return;
+      const key = `lesson_pos_${lessonId}`;
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        videoRef.current.currentTime = Number(saved);
+      }
+      setLoading(true);
+      setShowUpNext(false);
       return;
     }
-    if (!videoRef.current || !lessonId) return;
-    const key = `lesson_pos_${lessonId}`;
-    const saved = localStorage.getItem(key);
-    if (saved) {
-      videoRef.current.currentTime = Number(saved);
-    }
+
     setLoading(true);
-    setShowUpNext(false);
+    let player;
+    let intervalId;
+
+    const initPlayer = () => {
+      const videoId = getYouTubeVideoId(videoUrl);
+      if (!videoId || !iframeRef.current) return;
+
+      player = new window.YT.Player(iframeRef.current, {
+        videoId: videoId,
+        playerVars: {
+          autoplay: 1,
+          enablejsapi: 1,
+          rel: 0,
+          controls: 1
+        },
+        events: {
+          onReady: (event) => {
+            ytPlayerRef.current = event.target;
+            setDuration(event.target.getDuration());
+            setLoading(false);
+
+            // Restore last position
+            const key = `lesson_pos_${lessonId}`;
+            const saved = localStorage.getItem(key);
+            if (saved) {
+              event.target.seekTo(Number(saved), true);
+            }
+          },
+          onStateChange: (event) => {
+            if (event.data === window.YT.PlayerState.PLAYING) {
+              setIsPlaying(true);
+              intervalId = setInterval(() => {
+                const time = event.target.getCurrentTime();
+                setCurrentTime(time);
+                if (onTimeUpdate) {
+                  onTimeUpdate(time);
+                }
+                if (lessonId) {
+                  localStorage.setItem(`lesson_pos_${lessonId}`, Math.floor(time).toString());
+                }
+              }, 250);
+            } else {
+              setIsPlaying(false);
+              if (intervalId) clearInterval(intervalId);
+            }
+
+            if (event.data === window.YT.PlayerState.ENDED) {
+              handleVideoEnded();
+            }
+          }
+        }
+      });
+    };
+
+    const checkAndInit = () => {
+      if (window.YT && window.YT.Player) {
+        initPlayer();
+      } else {
+        const oldReady = window.onYouTubeIframeAPIReady;
+        window.onYouTubeIframeAPIReady = () => {
+          if (oldReady) oldReady();
+          initPlayer();
+        };
+        setTimeout(() => {
+          if (window.YT && window.YT.Player && !ytPlayerRef.current) {
+            initPlayer();
+          }
+        }, 1200);
+      }
+    };
+
+    checkAndInit();
+
+    return () => {
+      if (player && player.destroy) {
+        player.destroy();
+      }
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+      ytPlayerRef.current = null;
+    };
   }, [videoUrl, lessonId, isYouTube]);
 
   const handleTimeUpdate = (e) => {
@@ -79,6 +218,16 @@ const VideoPlayer = forwardRef(({ videoUrl, title, onEnded, onTimeUpdate, lesson
   };
 
   const togglePlay = () => {
+    if (isYouTube && ytPlayerRef.current) {
+      if (isPlaying) {
+        ytPlayerRef.current.pauseVideo();
+        setIsPlaying(false);
+      } else {
+        ytPlayerRef.current.playVideo();
+        setIsPlaying(true);
+      }
+      return;
+    }
     if (!videoRef.current) return;
     if (isPlaying) {
       videoRef.current.pause();
@@ -271,12 +420,8 @@ const VideoPlayer = forwardRef(({ videoUrl, title, onEnded, onTimeUpdate, lesson
       )}
 
       {isYouTube ? (
-        <iframe
-          src={getYouTubeEmbedUrl(videoUrl)}
-          title={title}
-          frameBorder="0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowFullScreen
+        <div
+          ref={iframeRef}
           style={{ width: '100%', height: '100%', borderRadius: '16px' }}
         />
       ) : (

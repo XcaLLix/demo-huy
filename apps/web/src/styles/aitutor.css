@@ -799,9 +799,9 @@ button, input, select, textarea {
 }
 
 .drawer-msg--bot .drawer-bubble {
-  background: var(--mm-card-dark);
-  color: var(--mm-text-primary);
-  border: 1px solid var(--mm-border-dark);
+  background: #ffffff;
+  color: #1e293b;
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-top-left-radius: 2px;
 }
 
@@ -1734,14 +1734,20 @@ button, input, select, textarea {
   border: 2px solid var(--mm-border-dark);
   border-radius: 20px;
   padding: 24px;
-  color: var(--mm-text-primary);
   box-shadow: 6px 6px 0px var(--mm-border-dark);
+  
+  /* Local color overrides to ensure readability on white card background */
+  --mm-text-primary: #1e293b;
+  --mm-text-secondary: #64748b;
+  --mm-gold: #d97706; /* Darker amber for high contrast */
+  --mm-border-dark: rgba(0, 0, 0, 0.08);
+  color: var(--mm-text-primary);
 }
 .outline-node-wrapper {
   display: flex;
   flex-direction: column;
   margin-top: 6px;
-  border-left: 1.5px dashed rgba(255, 255, 255, 0.08);
+  border-left: 1.5px dashed rgba(0, 0, 0, 0.1);
   padding-left: 18px;
 }
 .outline-node-wrapper--root {
@@ -1753,20 +1759,22 @@ button, input, select, textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  padding: 12px 16px;
   border-radius: 12px;
   cursor: pointer;
-  background: rgba(0, 0, 0, 0.12);
-  border: 1px solid rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease;
-  margin-bottom: 6px;
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  margin-bottom: 8px;
 }
 .outline-node-header:hover {
-  background: rgba(255, 210, 52, 0.08);
-  border-color: rgba(255, 210, 52, 0.3);
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
 }
 .outline-node-header--selected {
-  background: rgba(255, 210, 52, 0.15) !important;
+  background: rgba(217, 119, 6, 0.08) !important;
   border-color: var(--mm-gold) !important;
 }
 .outline-node-title-area {
@@ -1795,10 +1803,11 @@ button, input, select, textarea {
   justify-content: center;
   font-size: 14px;
   border-radius: 4px;
+  transition: all 0.15s;
 }
 .outline-node-expand-btn:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.05);
+  color: var(--mm-text-primary);
+  background: rgba(0, 0, 0, 0.05);
 }
 .outline-node-name {
   font-size: 13.5px;

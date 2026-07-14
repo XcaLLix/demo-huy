@@ -36,54 +36,12 @@ export async function getDocumentResources(req: Request, res: Response) {
       whereClause.isFree = isFree === 'true';
     }
 
-    const studentId = (req as any).user?.id;
-    let purchasedDocIds: number[] = [];
-    if (studentId) {
-      const purchases = await prisma.documentPurchase.findMany({
-        where: { studentId },
-        select: { documentId: true }
-      });
-      purchasedDocIds = purchases.map(p => p.documentId);
-    }
-
     const docs = await prisma.documentResource.findMany({
       where: whereClause,
-      include: {
-        ratings: {
-          where: { isHidden: false },
-          select: { rating: true }
-        }
-      },
       orderBy: { id: 'asc' },
     });
 
-    const dataWithRatings = docs.map(d => {
-      const activeRatings = d.ratings || [];
-      const count = activeRatings.length;
-      const average = count > 0 
-        ? Number((activeRatings.reduce((sum, r) => sum + r.rating, 0) / count).toFixed(1))
-        : 0;
-      
-      const { ratings, ...rest } = d;
-
-      let isPurchased = false;
-      if (d.isFree) {
-        isPurchased = true;
-      } else if ((req as any).user?.role === 'ADMIN' || (req as any).user?.role === 'TEACHER') {
-        isPurchased = true;
-      } else {
-        isPurchased = purchasedDocIds.includes(d.id);
-      }
-
-      return {
-        ...rest,
-        averageRating: average,
-        ratingCount: count,
-        isPurchased
-      };
-    });
-
-    return res.status(200).json({ success: true, data: dataWithRatings });
+    return res.status(200).json({ success: true, data: docs });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }

@@ -10,6 +10,15 @@ import {
 import { io } from 'socket.io-client';
 import { api, API_BASE } from '../api';
 
+function resolveImageUrl(url) {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url;
+  }
+  const cleanUrl = url.startsWith('/') ? url : '/' + url;
+  return `${API_BASE}${cleanUrl}`;
+}
+
 function stripImages(text) {
   if (!text) return '';
   return text.replace(/!\[(.*?)\]\((.*?)\)/g, '').trim();
@@ -19,13 +28,15 @@ function getFirstImageUrl(text) {
   if (!text) return null;
   const regex = /!\[(.*?)\]\((.*?)\)/;
   const match = regex.exec(text);
-  return match ? match[2] : null;
+  return match ? resolveImageUrl(match[2]) : null;
 }
 
 function renderSanitizedContent(content) {
   if (!content) return null;
   let html = content;
-  html = html.replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" class="forum-content-image" />');
+  html = html.replace(/!\[(.*?)\]\((.*?)\)/g, (match, alt, src) => {
+    return `<img src="${resolveImageUrl(src)}" alt="${alt}" class="forum-content-image" />`;
+  });
   html = html.replace(/\n/g, '<br />');
   const sanitized = DOMPurify.sanitize(html);
   return <div dangerouslySetInnerHTML={{ __html: sanitized }} />;
@@ -73,6 +84,14 @@ export default function Forum({ currentUser }) {
 
   // Modals & Inputs
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingPost, setEditingPost] = useState(null);
+  const [editCategoryId, setEditCategoryId] = useState('');
+  const [editPostType, setEditPostType] = useState('GENERAL');
+  const [editDifficulty, setEditDifficulty] = useState('MEDIUM');
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [editTagsString, setEditTagsString] = useState('');
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportTarget, setReportTarget] = useState({ postId: null, commentId: null });
@@ -155,6 +174,11 @@ export default function Forum({ currentUser }) {
 
     socketRef.current.on('study_group_created', () => {
       console.log('[Socket] New study group created, refreshing list...');
+      fetchStudyGroups();
+    });
+
+    socketRef.current.on('study_group_deleted', () => {
+      console.log('[Socket] Study group deleted, refreshing...');
       fetchStudyGroups();
     });
 
@@ -438,6 +462,92 @@ export default function Forum({ currentUser }) {
       toast(err.message || 'Đăng bài viết thất bại!', 'error');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDeletePost = async (postId) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa bài viết này không?')) return;
+    try {
+      await api.deleteForumPost(postId);
+      toast('Xóa bài viết thành công!', 'success');
+      setSelectedPost(null);
+      fetchPosts();
+    } catch (err) {
+      toast(err.message || 'Xóa bài viết thất bại!', 'error');
+    }
+  };
+
+  const handleOpenEditModal = (post) => {
+    setEditingPost(post);
+    setEditCategoryId(post.categoryId);
+    setEditPostType(post.postType);
+    setEditDifficulty(post.difficulty || 'MEDIUM');
+    setEditTitle(post.title);
+    
+    // Parse out markdown images and separate the content
+    const imgRegex = /!\[(.*?)\]\((.*?)\)/g;
+    const urls = [];
+    const cleanContent = post.content.replace(imgRegex, (m, alt, src) => {
+      urls.push(src);
+      return '';
+    }).trim();
+    
+    setEditContent(cleanContent);
+    setPostImages(urls);
+    setEditTagsString(post.tags?.map(t => t.name).join(', ') || '');
+    setShowEditModal(true);
+  };
+
+  const handleEditPost = async (e) => {
+    e.preventDefault();
+    if (!editTitle.trim() || !editContent.trim() || submitting) return;
+    setSubmitting(true);
+    try {
+      const parsedTags = editTagsString
+        .split(',')
+        .map(t => t.trim())
+        .filter(t => t.length > 0);
+
+      let finalContent = editContent.trim();
+      if (postImages.length > 0) {
+        finalContent += '\n\n' + postImages.map(img => `![ảnh](${img})`).join('\n');
+      }
+
+      const postPayload = {
+        title: editTitle,
+        content: finalContent,
+        categoryId: Number(editCategoryId),
+        postType: editPostType,
+        difficulty: editPostType === 'QA' ? editDifficulty : undefined,
+        tags: parsedTags
+      };
+
+      const res = await api.updateForumPost(editingPost.id, postPayload);
+      
+      // Update detailed view state if it is currently open
+      if (selectedPost && selectedPost.id === editingPost.id) {
+        setSelectedPost(res.data);
+      }
+      
+      setShowEditModal(false);
+      fetchPosts();
+      toast('Cập nhật bài viết thành công!', 'success');
+    } catch (err) {
+      toast(err.message || 'Cập nhật bài viết thất bại!', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteGroup = async (groupId) => {
+    if (!window.confirm('Bạn có chắc chắn muốn giải tán (xóa) nhóm học tập này? Hành động này không thể hoàn tác.')) return;
+    try {
+      await api.deleteStudyGroup(groupId);
+      setSelectedGroup(null);
+      fetchStudyGroups();
+      toast('Đã xóa nhóm học tập thành công!', 'success');
+    } catch (err) {
+      toast(err.message || 'Xóa nhóm học tập thất bại!', 'error');
     }
   };
 
@@ -918,7 +1028,47 @@ export default function Forum({ currentUser }) {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  {(currentUser?.role === 'ADMIN' || currentUser?.role === 'TEACHER' || selectedPost.authorId === currentUser?.id) && (
+                    <>
+                      <button 
+                        onClick={() => handleOpenEditModal(selectedPost)}
+                        style={{
+                          background: 'none',
+                          border: '1px solid var(--border)',
+                          borderRadius: '6px',
+                          padding: '4px 10px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          color: 'var(--primary)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        Sửa
+                      </button>
+                      <button 
+                        onClick={() => handleDeletePost(selectedPost.id)}
+                        style={{
+                          background: 'none',
+                          border: '1px solid rgba(231, 76, 60, 0.2)',
+                          borderRadius: '6px',
+                          padding: '4px 10px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          color: 'var(--accent-red)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        Xóa
+                      </button>
+                    </>
+                  )}
                   <button 
                     onClick={() => {
                       setReportTarget({ postId: selectedPost.id, commentId: null });
@@ -1466,77 +1616,137 @@ export default function Forum({ currentUser }) {
                             key={post.id} 
                             className={`forum-post-card ${post.isPinned ? 'pinned' : ''}`} 
                             onClick={() => setSelectedPost(post)}
+                            style={{
+                              display: 'flex',
+                              gap: '16px',
+                              padding: '20px',
+                              background: 'var(--bg-card)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--radius-lg)',
+                              cursor: 'pointer',
+                              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+                            }}
                           >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                <span className="badge-pill" style={{ background: 'var(--primary-bg)', color: 'var(--primary)', fontSize: '11px', fontWeight: 'bold' }}>
-                                  {post.category?.name}
-                                </span>
-                                {post.postType === 'QA' && (
-                                  <span className="badge-pill" style={{ background: 'rgba(255, 168, 0, 0.15)', color: 'rgb(255, 168, 0)', fontSize: '11px', fontWeight: 'bold' }}>
-                                    Q&A ({post.difficulty})
-                                  </span>
-                                )}
-                                {post.postType === 'RESOURCE' && (
-                                  <span className="badge-pill" style={{ background: 'rgba(0, 184, 148, 0.15)', color: 'var(--accent-green)', fontSize: '11px', fontWeight: 'bold' }}>
-                                    Học liệu
-                                  </span>
-                                )}
-                                {post.isPinned && (
-                                  <span className="badge-pill" style={{ background: 'var(--primary)', color: '#fff', fontSize: '10px' }}>Ghim</span>
-                                )}
+                            {/* Left Column: Avatar + Thread Connector Line */}
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                              <div style={{
+                                width: '42px',
+                                height: '42px',
+                                borderRadius: '50%',
+                                background: 'var(--primary-bg)',
+                                color: 'var(--primary)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: '900',
+                                fontSize: '15px',
+                                border: '1.5px solid var(--primary-light)',
+                                boxShadow: 'var(--shadow-sm)'
+                              }}>
+                                {post.author?.fullName?.substring(0, 2).toUpperCase() || 'HS'}
                               </div>
-                              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                {new Date(post.createdAt).toLocaleDateString()}
-                              </span>
+                              <div style={{ width: '2px', flexGrow: 1, background: 'var(--border)', marginTop: '8px', minHeight: '30px' }} />
                             </div>
 
-                            <h3 style={{ fontSize: '16.5px', fontWeight: 'bold', margin: '0 0 2px 0', color: 'var(--text-main)' }}>{post.title}</h3>
-                            
-                            {getFirstImageUrl(post.content) && (
-                              <div className="forum-post-preview-image">
-                                <img 
-                                  src={getFirstImageUrl(post.content)} 
-                                  alt="Preview" 
-                                  loading="lazy"
-                                />
-                              </div>
-                            )}
-
-                            {stripImages(post.content) && (
-                              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', margin: '0 0 4px 0', lineHeight: 1.5 }}>
-                                {stripImages(post.content)}
-                              </p>
-                            )}
-
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: '10px', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <HiUser /> {post.author?.fullName}
-                              </span>
-                              <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                                <div style={{ display: 'flex', gap: '4px' }}>
-                                  {['LIKE', 'LOVE', 'LAUGH', 'CLAP'].map(type => {
-                                    const count = post.reactionCounts?.[type] || 0;
-                                    if (count === 0) return null;
-                                    const emoji = type === 'LIKE' ? '👍' : type === 'LOVE' ? '❤️' : type === 'LAUGH' ? '😄' : '👏';
-                                    return <span key={type} title={type}>{emoji} {count}</span>;
-                                  })}
+                            {/* Right Column: Main Content */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              {/* Header info */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                  <span style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-primary)' }}>
+                                    {post.author?.fullName}
+                                  </span>
+                                  <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>•</span>
+                                  <span className="badge-pill" style={{ background: 'var(--primary-bg)', color: 'var(--primary)', fontSize: '10.5px', fontWeight: '800', padding: '3px 8px' }}>
+                                    {post.category?.name}
+                                  </span>
+                                  {post.postType === 'QA' && (
+                                    <span className="badge-pill" style={{ background: 'rgba(255, 168, 0, 0.12)', color: 'rgb(255, 168, 0)', fontSize: '10.5px', fontWeight: '800', padding: '3px 8px' }}>
+                                      Q&A ({post.difficulty})
+                                    </span>
+                                  )}
+                                  {post.postType === 'RESOURCE' && (
+                                    <span className="badge-pill" style={{ background: 'rgba(0, 184, 148, 0.12)', color: 'var(--accent-green)', fontSize: '10.5px', fontWeight: '800', padding: '3px 8px' }}>
+                                      Học liệu
+                                    </span>
+                                  )}
+                                  {post.isPinned && (
+                                    <span className="badge-pill" style={{ background: 'var(--primary)', color: '#fff', fontSize: '9px', padding: '2px 6px' }}>Ghim</span>
+                                  )}
                                 </div>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  <HiChat /> {post.comments?.length || 0}
+                                <span style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
+                                  {new Date(post.createdAt).toLocaleDateString()}
                                 </span>
+                              </div>
+
+                              {/* Title */}
+                              <h3 style={{ fontSize: '16.5px', fontWeight: '800', margin: '4px 0 6px 0', color: 'var(--text-primary)', lineHeight: '1.4' }}>
+                                {post.title}
+                              </h3>
+
+                              {/* Description text */}
+                              {stripImages(post.content) && (
+                                <p style={{
+                                  fontSize: '13.5px',
+                                  color: 'var(--text-secondary)',
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden',
+                                  margin: '0 0 10px 0',
+                                  lineHeight: 1.5,
+                                  wordBreak: 'break-word'
+                                }}>
+                                  {stripImages(post.content)}
+                                </p>
+                              )}
+
+                              {/* Image attached preview */}
+                              {getFirstImageUrl(post.content) && (
+                                <div className="forum-post-preview-image" style={{ borderRadius: '12px', border: '1.5px solid var(--border)', overflow: 'hidden', maxWidth: '100%', maxHeight: '250px', marginBottom: '12px' }}>
+                                  <img 
+                                    src={resolveImageUrl(getFirstImageUrl(post.content))} 
+                                    alt="Preview" 
+                                    loading="lazy"
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  />
+                                </div>
+                              )}
+
+                              {/* Footer Actions (Threads-style Action Bar) */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: '10px', marginTop: '4px' }}>
+                                <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                                  {/* Likes display */}
+                                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                    <HiHeart style={{ color: 'var(--accent-red)', fontSize: '16px' }} />
+                                    <span>
+                                      {Object.values(post.reactionCounts || {}).reduce((a, b) => a + b, 0) || 0}
+                                    </span>
+                                  </div>
+
+                                  {/* Comments count */}
+                                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                    <HiChat style={{ fontSize: '16px', color: 'var(--primary)' }} />
+                                    <span>{post.comments?.length || 0}</span>
+                                  </div>
+                                </div>
+
                                 <button
                                   onClick={(e) => handleToggleSavePost(e, post)}
                                   style={{
                                     border: 'none',
                                     background: 'none',
-                                    padding: 0,
+                                    padding: 4,
                                     cursor: 'pointer',
-                                    color: post.isSaved ? '#f1c40f' : 'var(--text-muted)'
+                                    color: post.isSaved ? '#f1c40f' : 'var(--text-muted)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'transform 0.1s'
                                   }}
                                   title={post.isSaved ? "Bỏ lưu bài viết" : "Lưu bài viết"}
                                 >
-                                  <HiStar style={{ fontSize: '16px' }} />
+                                  <HiStar style={{ fontSize: '18px' }} />
                                 </button>
                               </div>
                             </div>
@@ -1567,13 +1777,24 @@ export default function Forum({ currentUser }) {
                       </div>
                     </div>
                     
-                    <button 
-                      className="btn-outline" 
-                      onClick={() => handleLeaveGroup(selectedGroup.id)}
-                      style={{ color: 'var(--accent-red)', borderColor: 'var(--accent-red)', background: 'none', padding: '6px 14px' }}
-                    >
-                      Rời nhóm
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      {(currentUser?.role === 'ADMIN' || selectedGroup.creatorId === currentUser?.id) && (
+                        <button 
+                          className="btn-outline" 
+                          onClick={() => handleDeleteGroup(selectedGroup.id)}
+                          style={{ color: 'var(--accent-red)', borderColor: 'var(--accent-red)', background: 'none', padding: '6px 14px' }}
+                        >
+                          Xóa nhóm
+                        </button>
+                      )}
+                      <button 
+                        className="btn-outline" 
+                        onClick={() => handleLeaveGroup(selectedGroup.id)}
+                        style={{ color: 'var(--text-secondary)', borderColor: 'var(--border)', background: 'none', padding: '6px 14px' }}
+                      >
+                        Rời nhóm
+                      </button>
+                    </div>
                   </div>
 
                   {/* Tabs menu */}
@@ -2177,6 +2398,122 @@ export default function Forum({ currentUser }) {
                 <button type="button" className="btn-outline" onClick={() => setShowCreateModal(false)} disabled={submitting}>Hủy bỏ</button>
                 <button type="submit" className="btn-primary" disabled={submitting}>
                   {submitting ? 'Đang đăng...' : 'Đăng lên diễn đàn'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Edit Post Modal */}
+      {showEditModal && createPortal(
+        <div className="modal-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 999 }}>
+          <div className="modal-card card" style={{ maxWidth: '600px', width: '90%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '17px', fontWeight: 'bold' }}>Chỉnh sửa bài viết</h3>
+              <button onClick={() => setShowEditModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--text-muted)' }}>✕</button>
+            </div>
+
+            <form onSubmit={handleEditPost} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div className="form-group">
+                <label style={{ fontSize: '12px', fontWeight: '600', marginBottom: '6px', display: 'block' }}>Chủ đề / Môn học:</label>
+                <select className="form-control" value={editCategoryId} onChange={e => setEditCategoryId(e.target.value)} style={{ width: '100%' }}>
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label style={{ fontSize: '12px', fontWeight: '600', marginBottom: '6px', display: 'block' }}>Dạng bài đăng:</label>
+                <select className="form-control" value={editPostType} onChange={e => setEditPostType(e.target.value)} style={{ width: '100%' }}>
+                  <option value="GENERAL">Thảo luận chung</option>
+                  <option value="QA">Hỏi & Đáp (Q&A)</option>
+                  <option value="RESOURCE">Chia sẻ tài liệu / Đề thi</option>
+                </select>
+              </div>
+
+              {editPostType === 'QA' && (
+                <div className="form-group">
+                  <label style={{ fontSize: '12px', fontWeight: '600', marginBottom: '6px', display: 'block' }}>Độ khó:</label>
+                  <select className="form-control" value={editDifficulty} onChange={e => setEditDifficulty(e.target.value)} style={{ width: '100%' }}>
+                    <option value="EASY">Dễ</option>
+                    <option value="MEDIUM">Trung bình</option>
+                    <option value="HARD">Khó</option>
+                  </select>
+                </div>
+              )}
+
+              <div className="form-group">
+                <label style={{ fontSize: '12px', fontWeight: '600', marginBottom: '6px', display: 'block' }}>Tiêu đề câu hỏi / bài thảo luận:</label>
+                <input 
+                  type="text" className="form-control" placeholder="Ví dụ: Cách bấm máy Casio nghiệm nguyên đạo hàm?"
+                  value={editTitle} onChange={e => setEditTitle(e.target.value)} style={{ width: '100%' }} required
+                />
+              </div>
+
+              <div className="form-group">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: '600', margin: 0 }}>Nội dung chi tiết câu hỏi:</label>
+                  <label className="btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'pointer', padding: '4px 10px', fontSize: '11px', margin: 0 }}>
+                    📷 {uploadingImage ? 'Đang tải...' : 'Chèn ảnh'}
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleUploadImageForPost} 
+                      disabled={uploadingImage} 
+                      style={{ display: 'none' }} 
+                    />
+                  </label>
+                </div>
+                <textarea 
+                  className="form-control" placeholder="Nhập nội dung chi tiết bài toán..."
+                  value={editContent} onChange={e => setEditContent(e.target.value)} 
+                  onPaste={(e) => handlePasteImage(e, false)}
+                  onDragOver={(e) => { e.preventDefault(); setDragOverPost(true); }}
+                  onDragLeave={() => setDragOverPost(false)}
+                  onDrop={(e) => { setDragOverPost(false); handleDropImage(e, false); }}
+                  style={{
+                    width: '100%',
+                    minHeight: '120px',
+                    resize: 'vertical',
+                    border: dragOverPost ? '2px dashed #6c5ce7' : '2.5px solid #000000',
+                    background: dragOverPost ? '#f3f0ff' : '#FFFFFF',
+                    transition: 'all 0.15s ease'
+                  }} required
+                />
+
+                {postImages.length > 0 && (
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '10px' }}>
+                    {postImages.map((url, idx) => (
+                      <div key={idx} style={{ position: 'relative', width: '80px', height: '80px', border: '2px solid #000000', borderRadius: '8px', overflow: 'hidden' }}>
+                        <img src={resolveImageUrl(url)} alt="Uploaded preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <button
+                          type="button"
+                          onClick={() => setPostImages(prev => prev.filter((_, i) => i !== idx))}
+                          style={{ position: 'absolute', top: '2px', right: '2px', background: '#e74c3c', color: '#fff', border: 'none', borderRadius: '50%', width: '18px', height: '18px', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label style={{ fontSize: '12px', fontWeight: '600', marginBottom: '6px', display: 'block' }}>Thẻ phân loại (ngăn cách bởi dấu phẩy):</label>
+                <input 
+                  type="text" className="form-control" placeholder="Ví dụ: casio, daoham, toan12"
+                  value={editTagsString} onChange={e => setEditTagsString(e.target.value)} style={{ width: '100%' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                <button type="button" className="btn-outline" onClick={() => setShowEditModal(false)} disabled={submitting}>Hủy bỏ</button>
+                <button type="submit" className="btn-primary" disabled={submitting}>
+                  {submitting ? 'Đang lưu...' : 'Lưu thay đổi'}
                 </button>
               </div>
             </form>

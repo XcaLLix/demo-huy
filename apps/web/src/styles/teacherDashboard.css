@@ -40,12 +40,6 @@
   align-items: center;
   gap: 10px;
   padding: 0 8px;
-  cursor: pointer;
-  transition: opacity 0.2s ease;
-}
-
-.tdb-logo-section:hover {
-  opacity: 0.85;
 }
 
 .tdb-logo-icon {

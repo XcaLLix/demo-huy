@@ -1331,3 +1331,83 @@ export async function createGroupAnnouncement(req: AuthRequest, res: Response) {
   }
 }
 
+export async function updatePost(req: AuthRequest, res: Response) {
+  const { id } = req.params;
+  const { title, content, categoryId, postType, difficulty, tags } = req.body;
+  const userId = req.user?.id;
+
+  try {
+    const post = await prisma.forumPost.findUnique({ where: { id: Number(id) } });
+    if (!post) return res.status(404).json({ success: false, error: 'Không tìm thấy bài viết!' });
+
+    // Permissions: Author or Admin
+    if (post.authorId !== userId && req.user?.role !== 'ADMIN') {
+      return res.status(403).json({ success: false, error: 'Không có quyền chỉnh sửa bài viết này!' });
+    }
+
+    const modResult = await moderateContent(title || '', content || '');
+    if (!modResult.isSafe) {
+      return res.status(400).json({ success: false, error: modResult.reason || 'Nội dung vi phạm tiêu chuẩn cộng đồng.' });
+    }
+
+    const tagConnectOrCreate = (tags || []).map((t: string) => ({
+      where: { name: t },
+      create: { name: t, slug: slugify(t) }
+    }));
+
+    const updated = await prisma.forumPost.update({
+      where: { id: Number(id) },
+      data: {
+        title,
+        content,
+        postType: postType || undefined,
+        categoryId: categoryId ? Number(categoryId) : undefined,
+        difficulty: difficulty || undefined,
+        tags: tags ? {
+          set: [], // clear existing tags
+          connectOrCreate: tagConnectOrCreate
+        } : undefined
+      },
+      include: {
+        category: true,
+        author: { select: { fullName: true, avatarUrl: true } }
+      }
+    });
+
+    ForumCache.clear();
+    return res.status(200).json({ success: true, data: updated });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function deleteStudyGroup(req: AuthRequest, res: Response) {
+  const { id } = req.params;
+  const userId = req.user?.id;
+
+  if (!userId) return res.status(401).json({ success: false, error: 'Chưa xác thực!' });
+
+  try {
+    const group = await prisma.studyGroup.findUnique({ where: { id: Number(id) } });
+    if (!group) return res.status(404).json({ success: false, error: 'Không tìm thấy nhóm học tập!' });
+
+    // Permissions: Creator of the group or Admin
+    if (group.creatorId !== userId && req.user?.role !== 'ADMIN') {
+      return res.status(403).json({ success: false, error: 'Chỉ người tạo nhóm hoặc Admin mới được xóa nhóm này!' });
+    }
+
+    await prisma.studyGroup.delete({ where: { id: Number(id) } });
+
+    // Broadcast update to all connected socket clients
+    const io = getIO();
+    if (io) {
+      io.emit('study_group_deleted', { id: Number(id) });
+    }
+
+    return res.status(200).json({ success: true, data: 'Xóa nhóm học tập thành công!' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+

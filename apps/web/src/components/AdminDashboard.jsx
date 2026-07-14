@@ -28,7 +28,6 @@ import Header from './Header';
 import AdminExamManager from './AdminExamManager';
 import AdminVoucherManager from './AdminVoucherManager';
 import AdminAnnouncementManager from './AdminAnnouncementManager';
-import AdminMaterialsManager from './AdminMaterialsManager';
 
 // Custom Neo-Brutalist Select component with rounded corners and theme support
 const NeoSelect = ({ value, onChange, options, placeholder = 'Chọn...' }) => {
@@ -2602,12 +2601,6 @@ export default function AdminDashboard({
             <span style={{ fontSize: '18px' }}>🛡️</span> Kiểm duyệt báo cáo
           </button>
           <button 
-            className={`admin-menu-item ${activeTab === 'materials' ? 'active' : ''}`}
-            onClick={() => setActiveTab('materials')}
-          >
-            <HiBookOpen style={{ fontSize: '18px' }} /> Kiểm duyệt tài liệu
-          </button>
-          <button 
             className={`admin-menu-item ${activeTab === 'finance' ? 'active' : ''}`}
             onClick={() => setActiveTab('finance')}
           >
@@ -2681,7 +2674,6 @@ export default function AdminDashboard({
                 {activeTab === 'features' && 'QUẢN LÝ CÁC CHỨC NĂNG HỆ THỐNG'}
                 {activeTab === 'announcements' && 'GỬI THÔNG BÁO HỆ THỐNG'}
                 {activeTab === 'moderation' && 'KIỂM DUYỆT BÁO CÁO VI PHẠM'}
-                {activeTab === 'materials' && 'KIỂM DUYỆT TÀI LIỆU HỌC TẬP'}
                 {activeTab === 'finance' && 'QUẢN LÝ TÀI CHÍNH & CHI TRẢ'}
                 {activeTab === 'system-logs' && 'NHẬT KÝ HOẠT ĐỘNG HỆ THỐNG'}
                 {activeTab === 'vouchers' && 'QUẢN LÝ VOUCHER (MÃ GIẢM GIÁ)'}
@@ -5715,13 +5707,6 @@ export default function AdminDashboard({
 
           {activeTab === 'vouchers' && (
             <AdminVoucherManager
-              currentUser={currentUser}
-              addLog={addLog}
-            />
-          )}
-
-          {activeTab === 'materials' && (
-            <AdminMaterialsManager
               currentUser={currentUser}
               addLog={addLog}
             />

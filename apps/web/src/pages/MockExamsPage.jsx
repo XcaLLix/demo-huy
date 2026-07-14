@@ -42,10 +42,14 @@ export default function MockExamsPage({ currentUser, onSelectExam, navigateTo, e
     grade: 'All'
   });
 
-  // Mistakes Bank state
-  const [activeTab, setActiveTab] = useState('list'); // 'list' or 'wrong'
+  // Tab state: 'list' | 'wrong' | 'history'
+  const [activeTab, setActiveTab] = useState('list');
   const [wrongQuestions, setWrongQuestions] = useState([]);
   const [wrongLoading, setWrongLoading] = useState(false);
+
+  // Exam history state
+  const [historyAttempts, setHistoryAttempts] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // AI Similar Question practice state
   const [similarModalOpen, setSimilarModalOpen] = useState(false);
@@ -119,13 +123,34 @@ export default function MockExamsPage({ currentUser, onSelectExam, navigateTo, e
     }
   };
 
+  const loadHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const list = await api.getAttempts();
+      const submitted = (list || []).filter(a => a.status === 'SUBMITTED');
+      submitted.sort((a, b) => new Date(b.submittedAt || b.startedAt) - new Date(a.submittedAt || a.startedAt));
+      setHistoryAttempts(submitted);
+    } catch (err) {
+      console.error('Lỗi tải lịch sử thi:', err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  // Auto-switch to tab from query param (e.g. ?tab=history)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    if (tabParam === 'history' && currentUser) setActiveTab('history');
+    else if (tabParam === 'wrong' && currentUser) setActiveTab('wrong');
+  }, [currentUser]);
+
   useEffect(() => { loadSubjects(); }, []);
   useEffect(() => { loadExams(); }, [filters, examsList]);
-  
+
   useEffect(() => {
-    if (activeTab === 'wrong') {
-      loadWrongQuestions();
-    }
+    if (activeTab === 'wrong') loadWrongQuestions();
+    if (activeTab === 'history') loadHistory();
   }, [activeTab]);
 
   const handleStartExam = (examId) => {
@@ -205,43 +230,32 @@ export default function MockExamsPage({ currentUser, onSelectExam, navigateTo, e
         </h2>
 
         {/* Navigation Tabs */}
-        <div style={{ display: 'flex', gap: '12px', borderBottom: '2px solid var(--border)', paddingBottom: '12px', marginBottom: '24px' }}>
-          <button
-            onClick={() => setActiveTab('list')}
-            style={{
-              padding: '8px 16px',
-              fontSize: '14.5px',
-              fontWeight: '800',
-              border: 'none',
-              background: 'none',
-              cursor: 'pointer',
-              color: activeTab === 'list' ? 'var(--exams-purple)' : 'var(--text-secondary)',
-              borderBottom: activeTab === 'list' ? '3px solid var(--exams-purple)' : 'none',
-              marginBottom: '-14px',
-              transition: 'all 0.2s',
-            }}
-          >
-            📋 Tất cả đề thi
-          </button>
-          {currentUser && (
+        <div style={{ display: 'flex', gap: '4px', borderBottom: '2px solid var(--border)', paddingBottom: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
+          {[
+            { key: 'list', label: '📋 Tất cả đề thi', authRequired: false },
+            { key: 'history', label: '📜 Lịch sử thi', authRequired: true },
+            { key: 'wrong', label: '⚠️ Nhật ký câu sai (AI)', authRequired: true },
+          ].filter(t => !t.authRequired || currentUser).map(tab => (
             <button
-              onClick={() => setActiveTab('wrong')}
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
               style={{
-                padding: '8px 16px',
-                fontSize: '14.5px',
+                padding: '8px 18px',
+                fontSize: '14px',
                 fontWeight: '800',
                 border: 'none',
                 background: 'none',
                 cursor: 'pointer',
-                color: activeTab === 'wrong' ? 'var(--exams-purple)' : 'var(--text-secondary)',
-                borderBottom: activeTab === 'wrong' ? '3px solid var(--exams-purple)' : 'none',
+                color: activeTab === tab.key ? 'var(--exams-purple)' : 'var(--text-secondary)',
+                borderBottom: activeTab === tab.key ? '3px solid var(--exams-purple)' : '3px solid transparent',
                 marginBottom: '-14px',
                 transition: 'all 0.2s',
+                whiteSpace: 'nowrap',
               }}
             >
-              ⚠️ Nhật ký câu sai (AI)
+              {tab.label}
             </button>
-          )}
+          ))}
         </div>
 
         {activeTab === 'list' ? (
@@ -342,6 +356,160 @@ export default function MockExamsPage({ currentUser, onSelectExam, navigateTo, e
               </div>
             )}
           </>
+        ) : activeTab === 'history' ? (
+          /* ── EXAM HISTORY TAB ── */
+          <div style={{ marginTop: '12px', marginBottom: '40px' }}>
+            {/* Header */}
+            <div style={{ background: 'linear-gradient(135deg, #6c5ce715, #a29bfe18)', border: '1.5px solid #6c5ce730', borderRadius: '16px', padding: '20px 24px', marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: '900', color: 'var(--text-primary)', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  📜 Lịch Sử Bài Thi Của Bạn
+                </h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
+                  Xem lại kết quả, phân tích AI và luyện tập tiếp theo cho tất cả các lần thi.
+                </p>
+              </div>
+              <button
+                onClick={loadHistory}
+                style={{ padding: '8px 16px', background: 'var(--exams-purple)', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12.5px', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                🔄 Làm mới
+              </button>
+            </div>
+
+            {historyLoading ? (
+              <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-secondary)' }}>
+                <div style={{ fontSize: '28px', animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</div>
+                <p style={{ marginTop: '12px', fontSize: '13px', fontWeight: 'bold' }}>Đang tải lịch sử thi...</p>
+              </div>
+            ) : historyAttempts.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 20px', background: 'var(--bg-card)', border: '2px dashed var(--border)', borderRadius: '16px' }}>
+                <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>📭</span>
+                <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '8px' }}>Chưa có lịch sử thi nào</h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', maxWidth: '360px', margin: '0 auto 16px' }}>
+                  Hãy chọn một đề thi và bắt đầu làm bài để lịch sử của bạn xuất hiện ở đây.
+                </p>
+                <button
+                  onClick={() => setActiveTab('list')}
+                  style={{ padding: '10px 20px', background: 'var(--exams-purple)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer' }}
+                >
+                  📋 Xem danh sách đề thi
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {historyAttempts.map((att, idx) => {
+                  const score = att.score ?? 0;
+                  const scoreColor = score >= 8 ? '#00b894' : score >= 5 ? '#e17055' : '#d63031';
+                  const scoreBg = score >= 8 ? 'rgba(0,184,148,0.1)' : score >= 5 ? 'rgba(225,112,85,0.1)' : 'rgba(214,48,49,0.1)';
+                  const rankLabel = score >= 9 ? 'Xuất sắc' : score >= 8 ? 'Giỏi' : score >= 6.5 ? 'Khá' : score >= 5 ? 'Trung bình' : 'Cần cải thiện';
+                  const dateStr = att.submittedAt
+                    ? new Date(att.submittedAt).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                    : '—';
+                  const totalQs = (att.correctCount || 0) + (att.wrongCount || 0) + (att.skippedCount || 0);
+                  const durationMins = att.durationUsed ? Math.ceil(att.durationUsed / 60) : null;
+                  const retakeMode = att.aiFeedback?.retakeMode || null;
+
+                  return (
+                    <div
+                      key={att.id}
+                      style={{
+                        background: 'var(--bg-card)',
+                        border: '1.5px solid var(--border)',
+                        borderRadius: '14px',
+                        padding: '18px 20px',
+                        display: 'flex',
+                        gap: '16px',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        boxShadow: 'var(--shadow-sm)',
+                        transition: 'box-shadow 0.2s',
+                        position: 'relative'
+                      }}
+                    >
+                      {/* Score Badge */}
+                      <div style={{
+                        minWidth: '70px',
+                        textAlign: 'center',
+                        background: scoreBg,
+                        border: `2px solid ${scoreColor}`,
+                        borderRadius: '12px',
+                        padding: '10px 8px',
+                        flexShrink: 0
+                      }}>
+                        <div style={{ fontSize: '22px', fontWeight: '900', color: scoreColor, lineHeight: 1 }}>
+                          {score.toFixed(1)}
+                        </div>
+                        <div style={{ fontSize: '10px', fontWeight: 'bold', color: scoreColor, marginTop: '2px' }}>{rankLabel}</div>
+                      </div>
+
+                      {/* Info */}
+                      <div style={{ flex: 1, minWidth: '180px' }}>
+                        <div style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '4px', lineHeight: 1.3 }}>
+                          {att.exam?.title || 'Đề thi thử'}
+                          {retakeMode && (
+                            <span style={{ marginLeft: '8px', fontSize: '10px', background: '#6c5ce720', color: 'var(--exams-purple)', padding: '2px 7px', borderRadius: '4px', fontWeight: 'bold' }}>
+                              {retakeMode === 'wrong_only' ? 'Làm lại câu sai' : retakeMode === 'weak_topic' ? 'Chủ đề yếu' : retakeMode === 'bookmarked' ? 'Câu đánh dấu' : 'Ôn luyện'}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                          {att.exam?.subject && (
+                            <span style={{ background: 'var(--bg-main)', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold' }}>
+                              {att.exam.subject}
+                            </span>
+                          )}
+                          <span>✅ {att.correctCount || 0}/{totalQs || '?'} câu đúng</span>
+                          {durationMins && <span>⏱ {durationMins} phút</span>}
+                          <span>🕐 {dateStr}</span>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div style={{ display: 'flex', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+                        <button
+                          onClick={() => navigateTo(`/mock-exams/${att.examId}/result/${att.id}`)}
+                          style={{
+                            padding: '8px 14px',
+                            background: 'var(--bg-main)',
+                            border: '1.5px solid var(--border)',
+                            borderRadius: '8px',
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            color: 'var(--text-primary)',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                          }}
+                        >
+                          🔎 Xem kết quả
+                        </button>
+                        <button
+                          onClick={() => navigateTo(`/mock-exams/${att.examId}/start`)}
+                          style={{
+                            padding: '8px 14px',
+                            background: 'var(--exams-purple)',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            color: '#fff',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                          }}
+                        >
+                          ⚡ Thi lại
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         ) : (
           /* Wrong Questions Log Tab */
           <div style={{ marginTop: '12px' }}>

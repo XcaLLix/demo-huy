@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from './lib/prisma.js';
 
 export async function seedSystemSettings() {
   console.log('[SeedSettings] Khởi tạo các cấu hình hệ thống mặc định...');

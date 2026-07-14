@@ -151,7 +151,16 @@ export const api = {
     return request(`/courses?${params}`);
   },
 
+  aiSearchCourses: (query) =>
+    request('/courses/ai-search', { method: 'POST', body: { query } }),
+
   getCourseById: (id) => request(`/courses/${id}`),
+
+  createCourseReview: (id, rating, comment) =>
+    request(`/courses/${id}/reviews`, {
+      method: 'POST',
+      body: { rating, comment }
+    }),
 
   createCourse: (payload) => request('/courses', { method: 'POST', body: payload }),
   updateCourse: (id, payload) => request(`/courses/${id}`, { method: 'PUT', body: payload }),
@@ -238,12 +247,6 @@ export const api = {
     return request('/enrollments/demo', { method: 'POST', body });
   },
 
-  createDocumentVNPayPayment: (documentId) => request('/document-purchases', { method: 'POST', body: { documentId } }),
-
-  checkDocumentPurchaseStatus: (documentId) => request(`/document-purchases/status?documentId=${documentId}`),
-
-  purchaseDocumentDemo: (documentId) => request('/document-purchases/demo', { method: 'POST', body: { documentId } }),
-
   checkProStatus: () => request('/users/pro-status'),
 
   requestRoleChange: (requestedRole, reason) =>
@@ -284,6 +287,9 @@ export const api = {
   deleteForumPost: (id) =>
     request(`/forum/posts/${id}`, { method: 'DELETE' }),
 
+  updateForumPost: (id, postData) =>
+    request(`/forum/posts/${id}`, { method: 'PUT', body: postData }),
+
   togglePinForumPost: (id) =>
     request(`/forum/posts/${id}/pin`, { method: 'PUT' }),
 
@@ -316,6 +322,9 @@ export const api = {
 
   leaveStudyGroup: (id) =>
     request(`/forum/study-groups/${id}/leave`, { method: 'POST' }),
+
+  deleteStudyGroup: (id) =>
+    request(`/forum/study-groups/${id}`, { method: 'DELETE' }),
 
   getForumLeaderboard: () =>
     request('/forum/leaderboard', { method: 'GET' }),
@@ -374,6 +383,18 @@ export const api = {
       method: 'POST',
       body: { text },
     }),
+
+  generateFlashcardMnemonic: (front, back) =>
+    request('/ai/flashcards/mnemonic', {
+      method: 'POST',
+      body: { front, back },
+    }),
+
+  generateFlashcardsOCR: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return request('/ai/flashcards/ocr', { method: 'POST', body: formData });
+  },
 
   saveMindmap: (title, content, id = null) =>
     request('/mindmaps', {
@@ -514,16 +535,9 @@ export const api = {
   downloadMaterial: (id) => request(`/materials/${id}/download`, { method: 'POST' }),
 
   // ADMIN MATERIALS MODERATION
-  getAdminMaterials: () => request('/admin/materials'),
   getAdminPendingMaterials: () => request('/admin/materials/pending'),
-  approveMaterial: (id) => request(`/admin/materials/${id}/approve`, { method: 'PATCH' }),
-  rejectMaterial: (id, reason) => request(`/admin/materials/${id}/reject`, { method: 'PATCH', body: { reason } }),
-  hideMaterial: (id) => request(`/admin/materials/${id}/hide`, { method: 'PATCH' }),
-
-  // DOCUMENT RATINGS AND REVIEWS
-  getDocumentRatings: (id) => request(`/document-resources/${id}/ratings`),
-  submitDocumentRating: (id, rating, comment) => request(`/document-resources/${id}/rating`, { method: 'POST', body: { rating, comment } }),
-  hideDocumentRating: (id, reason, isHidden = true) => request(`/ratings/${id}/hide`, { method: 'PATCH', body: { reason, isHidden } }),
+  approveMaterial: (id) => request(`/admin/materials/${id}/approve`, { method: 'POST' }),
+  rejectMaterial: (id) => request(`/admin/materials/${id}/reject`, { method: 'POST' }),
 
   getTeacherStats: () => request('/teacher/stats'),
 

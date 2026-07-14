@@ -6050,19 +6050,20 @@ body {
   background: var(--bg-card) !important;
   border: 1px solid var(--border) !important;
   border-radius: var(--radius-lg) !important;
-  transition: all 0.2s ease !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
   position: relative !important;
   overflow: hidden !important;
   box-shadow: var(--shadow-sm) !important;
   display: flex !important;
-  flex-direction: column !important;
-  gap: 12px !important;
+  flex-direction: row !important;
+  gap: 16px !important;
 }
 
 .forum-post-card:hover {
   transform: translateY(-2px) !important;
   box-shadow: var(--shadow-md) !important;
   border-color: var(--primary-light) !important;
+  background: #FAF8FF !important;
 }
 
 .forum-post-card.pinned {
@@ -8671,8 +8672,18 @@ body {
 }
 
 .leaderboard-row:hover {
-  background: rgba(108, 92, 231, 0.05) !important;
+  background: #4D7C0F !important;
   transform: translateX(4px);
+}
+.leaderboard-row:hover .leaderboard-row-rank {
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+}
+.leaderboard-row:hover .leaderboard-row-name,
+.leaderboard-row:hover .leaderboard-row-grade,
+.leaderboard-row:hover .leaderboard-row-province,
+.leaderboard-row:hover .leaderboard-row-score {
+  color: #ffffff !important;
 }
 
 .animate-slide-up {

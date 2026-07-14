@@ -758,7 +758,6 @@ export default function LandingPage({
   navigateTo,
   cartCourses,
   onAddToCart,
-  onRemoveCourse,
   notifications = [],
   unreadCount = 0,
   onClearNotifications
@@ -3519,21 +3518,7 @@ export default function LandingPage({
         {/* ================= EXAM BANK DEDICATED PAGE ================= */}
         {activeLandingView === 'exam-bank' && (
           <div style={{ width: '100%', maxWidth: '100%', margin: 0, padding: 0 }}>
-            <ExamBankPage
-              currentUser={currentUser}
-              navigateTo={navigateTo}
-              hideHeader={true}
-              cartDocs={cartCourses}
-              onAddToCart={(doc) => {
-                if (onAddToCart) onAddToCart({ ...doc, type: 'DOCUMENT' });
-              }}
-              onCheckoutDoc={(doc) => {
-                if (onCheckoutCourse) onCheckoutCourse({ ...doc, type: 'DOCUMENT' });
-              }}
-              onRemoveDoc={(docId) => {
-                if (onRemoveCourse) onRemoveCourse(docId);
-              }}
-            />
+            <ExamBankPage currentUser={currentUser} navigateTo={navigateTo} hideHeader={true} />
           </div>
         )}
 

@@ -3,7 +3,46 @@ import type { AuthRequest } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
 import fs from 'fs';
 import path from 'path';
-import { MaterialService } from '../services/material.service.js';
+
+// Helper to sync material to public DocumentResource catalog
+async function syncMaterialToPublic(material: any) {
+  if (material.isPublic && material.isApproved) {
+    const existing = await prisma.documentResource.findFirst({
+      where: { driveUrl: material.fileUrl }
+    });
+
+    const docData = {
+      title: material.title,
+      description: material.description || null,
+      subject: material.subject,
+      level: material.grade || '12',
+      price: Math.round(material.price || 0),
+      isFree: !material.price || material.price === 0,
+      isActive: true,
+      isDeleted: false
+    };
+
+    if (existing) {
+      await prisma.documentResource.update({
+        where: { id: existing.id },
+        data: docData
+      });
+    } else {
+      await prisma.documentResource.create({
+        data: {
+          ...docData,
+          driveUrl: material.fileUrl
+        }
+      });
+    }
+  } else {
+    // If not public or not approved, ensure it does not exist in the public library
+    await prisma.documentResource.deleteMany({
+      where: { driveUrl: material.fileUrl }
+    });
+  }
+}
+
 
 // ==========================================
 // 1. TEACHER ENDPOINTS
@@ -20,21 +59,7 @@ export async function getTeacherMaterials(req: AuthRequest, res: Response) {
       orderBy: { uploadedAt: 'desc' }
     });
 
-    // Tìm DocumentResource tương ứng để lấy ID phục vụ lấy đánh giá
-    const fileUrls = materials.map(m => m.fileUrl);
-    const docResources = await prisma.documentResource.findMany({
-      where: { driveUrl: { in: fileUrls } }
-    });
-
-    const data = materials.map(m => {
-      const doc = docResources.find(d => d.driveUrl === m.fileUrl);
-      return {
-        ...m,
-        documentResourceId: doc ? doc.id : null
-      };
-    });
-
-    return res.status(200).json({ success: true, data });
+    return res.status(200).json({ success: true, data: materials });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }
@@ -49,7 +74,7 @@ export async function createTeacherMaterial(req: AuthRequest, res: Response) {
     return res.status(400).json({ success: false, error: 'Vui lòng chọn tệp tài liệu để tải lên!' });
   }
 
-  const { title, description, subject, grade, tags, price, status } = req.body;
+  const { title, description, subject, grade, tags, price, isPublic } = req.body;
 
   if (!title || !subject) {
     // Cleanup file
@@ -58,27 +83,8 @@ export async function createTeacherMaterial(req: AuthRequest, res: Response) {
   }
 
   try {
-    // Lưu trữ tệp tin theo ID giáo viên
-    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/documents/teacher-${teacherId}/${req.file.filename}`;
+    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
     const parsedTags = Array.isArray(tags) ? tags : (tags ? String(tags).split(',').map(t => t.trim()) : []);
-    const ext = path.extname(req.file.originalname).toLowerCase();
-
-    // Hỗ trợ xem trực tuyến đối với PDF
-    let previewUrl: string | null = null;
-    let previewStatus: 'READY' | 'PROCESSING' | 'FAILED' | null = null;
-    let pageCount: number | null = null;
-
-    if (ext === '.pdf') {
-      previewUrl = fileUrl;
-      previewStatus = 'READY';
-      pageCount = await MaterialService.getPdfPageCount(req.file.path);
-    }
-
-    // Trạng thái tải lên ban đầu phải là DRAFT hoặc PENDING_REVIEW
-    let initialStatus = status || 'DRAFT';
-    if (initialStatus !== 'DRAFT' && initialStatus !== 'PENDING_REVIEW') {
-      initialStatus = 'DRAFT';
-    }
 
     const material = await prisma.teacherMaterial.create({
       data: {
@@ -88,23 +94,21 @@ export async function createTeacherMaterial(req: AuthRequest, res: Response) {
         subject,
         grade: grade || null,
         fileUrl,
-        fileType: ext.substring(1),
+        fileType: path.extname(req.file.originalname).substring(1).toLowerCase(),
         fileSize: req.file.size,
         tags: parsedTags,
         price: price ? Number(price) : 0,
-        status: initialStatus as any,
-        previewUrl,
-        previewStatus,
-        pageCount
+        isPublic: isPublic === 'true' || isPublic === true,
+        isApproved: isPublic === 'true' || isPublic === true // Auto-approve if public
       }
     });
 
-    // Đồng bộ sang thư viện công cộng (chỉ tạo nếu APPROVED, trường hợp này chưa tạo)
-    await MaterialService.syncMaterialToPublic(material.id);
+    // Sync to public library
+    await syncMaterialToPublic(material);
 
     return res.status(201).json({ success: true, data: material });
   } catch (err: any) {
-    try { fs.unlinkSync(req.file!.path); } catch (e) {}
+    try { fs.unlinkSync(req.file.path); } catch (e) {}
     return res.status(500).json({ success: false, error: err.message });
   }
 }
@@ -113,9 +117,8 @@ export async function createTeacherMaterial(req: AuthRequest, res: Response) {
 export async function updateTeacherMaterial(req: AuthRequest, res: Response) {
   const id = parseInt(req.params.id);
   const teacherId = req.user?.id;
-  if (!teacherId) return res.status(401).json({ success: false, error: 'Chưa xác thực!' });
 
-  const { title, description, subject, grade, tags, price, status } = req.body;
+  const { title, description, subject, grade, tags, price, isPublic } = req.body;
 
   try {
     const material = await prisma.teacherMaterial.findFirst({
@@ -128,22 +131,6 @@ export async function updateTeacherMaterial(req: AuthRequest, res: Response) {
 
     const parsedTags = Array.isArray(tags) ? tags : (tags ? String(tags).split(',').map(t => t.trim()) : undefined);
 
-    // Xác định trạng thái mới
-    const isApprovedBefore = material.status === 'APPROVED';
-    const isUpdatingFields = title || description !== undefined || subject || grade !== undefined || parsedTags || price !== undefined;
-    
-    let newStatus = status || material.status;
-    
-    // Nếu sửa đổi tệp tin đã duyệt, quay về trạng thái PENDING_REVIEW để duyệt lại
-    if (isApprovedBefore && isUpdatingFields) {
-      newStatus = 'PENDING_REVIEW';
-    }
-
-    // Giáo viên không được tự ý duyệt tài liệu
-    if (newStatus === 'APPROVED' || newStatus === 'REJECTED' || newStatus === 'HIDDEN') {
-      newStatus = 'PENDING_REVIEW';
-    }
-
     const updated = await prisma.teacherMaterial.update({
       where: { id },
       data: {
@@ -153,20 +140,13 @@ export async function updateTeacherMaterial(req: AuthRequest, res: Response) {
         ...(grade !== undefined ? { grade } : {}),
         ...(parsedTags ? { tags: parsedTags } : {}),
         ...(price !== undefined ? { price: Number(price) } : {}),
-        status: newStatus as any,
-        // Nếu phải gửi duyệt lại, xóa lịch sử duyệt cũ
-        ...(newStatus === 'PENDING_REVIEW' ? {
-          approvedBy: null,
-          approvedAt: null,
-          rejectedBy: null,
-          rejectedAt: null,
-          rejectionReason: null
-        } : {})
+        ...(isPublic !== undefined ? { isPublic: isPublic === 'true' || isPublic === true } : {}),
+        isApproved: isPublic !== undefined ? (isPublic === 'true' || isPublic === true) : material.isApproved
       }
     });
 
-    // Đồng bộ lại vào DocumentResource
-    await MaterialService.syncMaterialToPublic(updated.id);
+    // Sync changes to public library
+    await syncMaterialToPublic(updated);
 
     return res.status(200).json({ success: true, data: updated });
   } catch (err: any) {
@@ -178,7 +158,6 @@ export async function updateTeacherMaterial(req: AuthRequest, res: Response) {
 export async function deleteTeacherMaterial(req: AuthRequest, res: Response) {
   const id = parseInt(req.params.id);
   const teacherId = req.user?.id;
-  if (!teacherId) return res.status(401).json({ success: false, error: 'Chưa xác thực!' });
 
   try {
     const material = await prisma.teacherMaterial.findFirst({
@@ -189,21 +168,20 @@ export async function deleteTeacherMaterial(req: AuthRequest, res: Response) {
       return res.status(404).json({ success: false, error: 'Không tìm thấy tài liệu hoặc bạn không có quyền xóa!' });
     }
 
-    // Xóa tệp tin trên đĩa cứng
+    // Try deleting file from local disk
     try {
       const filename = path.basename(material.fileUrl);
-      const filePath = path.resolve(process.cwd(), 'uploads', 'documents', `teacher-${teacherId}`, filename);
+      const filePath = path.resolve(process.cwd(), 'uploads', filename);
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }
     } catch (e) {}
 
-    // Gỡ tài liệu khỏi thư viện công cộng
+    // Remove from public library before deleting record
     await prisma.documentResource.deleteMany({
       where: { driveUrl: material.fileUrl }
     });
 
-    // Xóa khỏi DB
     await prisma.teacherMaterial.delete({ where: { id } });
 
     return res.status(200).json({ success: true, data: 'Xóa tài liệu thành công!' });
@@ -216,7 +194,6 @@ export async function deleteTeacherMaterial(req: AuthRequest, res: Response) {
 export async function submitTeacherMaterial(req: AuthRequest, res: Response) {
   const id = parseInt(req.params.id);
   const teacherId = req.user?.id;
-  if (!teacherId) return res.status(401).json({ success: false, error: 'Chưa xác thực!' });
 
   try {
     const material = await prisma.teacherMaterial.findFirst({
@@ -229,17 +206,8 @@ export async function submitTeacherMaterial(req: AuthRequest, res: Response) {
 
     const updated = await prisma.teacherMaterial.update({
       where: { id },
-      data: {
-        status: 'PENDING_REVIEW',
-        approvedBy: null,
-        approvedAt: null,
-        rejectedBy: null,
-        rejectedAt: null,
-        rejectionReason: null
-      }
+      data: { isApproved: false } // Trigger review flag
     });
-
-    await MaterialService.syncMaterialToPublic(updated.id);
 
     return res.status(200).json({ success: true, data: { message: 'Đã gửi tài liệu phê duyệt!', data: updated } });
   } catch (err: any) {
@@ -258,7 +226,8 @@ export async function getPublicMaterials(req: Request, res: Response) {
   try {
     const materials = await prisma.teacherMaterial.findMany({
       where: {
-        status: 'APPROVED',
+        isPublic: true,
+        isApproved: true,
         ...(subject ? { subject: String(subject) } : {}),
         ...(grade ? { grade: String(grade) } : {}),
         ...(tag ? { tags: { has: String(tag) } } : {}),
@@ -289,7 +258,6 @@ export async function getPublicMaterials(req: Request, res: Response) {
       fileSize: m.fileSize,
       tags: m.tags,
       price: m.price,
-      previewUrl: m.previewUrl,
       downloadCount: m.downloadCount,
       viewCount: m.viewCount,
       uploadedAt: m.uploadedAt,
@@ -320,8 +288,8 @@ export async function getMaterialDetail(req: Request, res: Response) {
       }
     });
 
-    if (!material || material.status !== 'APPROVED') {
-      return res.status(404).json({ success: false, error: 'Không tìm thấy tài liệu hoặc chưa được duyệt!' });
+    if (!material || !material.isPublic || !material.isApproved) {
+      return res.status(404).json({ success: false, error: 'Không tìm thấy tài liệu!' });
     }
 
     return res.status(200).json({
@@ -351,6 +319,7 @@ export async function downloadMaterial(req: Request, res: Response) {
       return res.status(404).json({ success: false, error: 'Không tìm thấy tài liệu!' });
     }
 
+    // In a real vercel blob environment, we might sign URL. In local disk uploads, we just return the direct URL.
     return res.status(200).json({ success: true, data: { fileUrl: material.fileUrl } });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
@@ -361,57 +330,11 @@ export async function downloadMaterial(req: Request, res: Response) {
 // 3. ADMIN ENDPOINTS
 // ==========================================
 
-// GET /admin/materials (Xem toàn bộ tài liệu)
-export async function getAdminMaterials(req: AuthRequest, res: Response) {
-  try {
-    const materials = await prisma.teacherMaterial.findMany({
-      include: {
-        teacher: {
-          include: {
-            user: { select: { fullName: true, email: true } }
-          }
-        }
-      },
-      orderBy: { uploadedAt: 'desc' }
-    });
-
-    const result = materials.map(m => ({
-      id: m.id,
-      title: m.title,
-      description: m.description,
-      subject: m.subject,
-      grade: m.grade,
-      fileUrl: m.fileUrl,
-      fileType: m.fileType,
-      fileSize: m.fileSize,
-      tags: m.tags,
-      price: m.price,
-      status: m.status,
-      previewUrl: m.previewUrl,
-      pageCount: m.pageCount,
-      rejectionReason: m.rejectionReason,
-      approvedBy: m.approvedBy,
-      approvedAt: m.approvedAt,
-      rejectedBy: m.rejectedBy,
-      rejectedAt: m.rejectedAt,
-      hiddenBy: m.hiddenBy,
-      hiddenAt: m.hiddenAt,
-      uploadedAt: m.uploadedAt,
-      teacherName: m.teacher.user.fullName,
-      teacherEmail: m.teacher.user.email
-    }));
-
-    return res.status(200).json({ success: true, data: result });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
-}
-
-// GET /admin/materials/pending (Giữ để tương thích ngược nếu cần)
+// GET /admin/materials/pending
 export async function getAdminPendingMaterials(req: AuthRequest, res: Response) {
   try {
     const pending = await prisma.teacherMaterial.findMany({
-      where: { status: 'PENDING_REVIEW' },
+      where: { isApproved: false },
       include: {
         teacher: {
           include: {
@@ -444,96 +367,52 @@ export async function getAdminPendingMaterials(req: AuthRequest, res: Response) 
   }
 }
 
-// PATCH /admin/materials/:id/approve
+// POST /admin/materials/:id/approve
 export async function approveMaterial(req: AuthRequest, res: Response) {
   const id = parseInt(req.params.id);
-  const adminId = req.user?.id;
-  if (!adminId) return res.status(401).json({ success: false, error: 'Chưa xác thực!' });
 
   try {
     const updated = await prisma.teacherMaterial.update({
       where: { id },
-      data: {
-        status: 'APPROVED',
-        approvedBy: adminId,
-        approvedAt: new Date(),
-        rejectedBy: null,
-        rejectedAt: null,
-        rejectionReason: null,
-        hiddenBy: null,
-        hiddenAt: null
-      }
+      data: { isApproved: true }
     });
 
-    // Đồng bộ sang bảng DocumentResource công khai
-    await MaterialService.syncMaterialToPublic(updated.id);
+    // Sync to public library
+    await syncMaterialToPublic(updated);
 
-    return res.status(200).json({ success: true, data: { message: 'Phê duyệt tài liệu thành công!', data: updated } });
+    return res.status(200).json({ success: true, data: { message: 'Duyệt tài liệu thành công!', data: updated } });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }
 }
 
-// PATCH /admin/materials/:id/reject
+// POST /admin/materials/:id/reject
 export async function rejectMaterial(req: AuthRequest, res: Response) {
   const id = parseInt(req.params.id);
-  const adminId = req.user?.id;
-  if (!adminId) return res.status(401).json({ success: false, error: 'Chưa xác thực!' });
-
   const { reason } = req.body;
-  if (!reason) {
-    return res.status(400).json({ success: false, error: 'Vui lòng cung cấp lý do từ chối!' });
-  }
 
   try {
-    const updated = await prisma.teacherMaterial.update({
-      where: { id },
-      data: {
-        status: 'REJECTED',
-        rejectionReason: reason,
-        rejectedBy: adminId,
-        rejectedAt: new Date(),
-        approvedBy: null,
-        approvedAt: null,
-        hiddenBy: null,
-        hiddenAt: null
+    // Delete or just keep as disapproved with admin notes. The specs say "reject material". We delete it or set status.
+    // Let's delete it or mark isApproved = false to avoid listing. Let's delete the file and the record.
+    const material = await prisma.teacherMaterial.findUnique({ where: { id } });
+    if (!material) return res.status(404).json({ success: false, error: 'Không tìm thấy tài liệu!' });
+
+    try {
+      const filename = path.basename(material.fileUrl);
+      const filePath = path.resolve(process.cwd(), 'uploads', filename);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
       }
+    } catch (e) {}
+
+    // Remove from public library as well
+    await prisma.documentResource.deleteMany({
+      where: { driveUrl: material.fileUrl }
     });
 
-    // Gỡ tài liệu khỏi thư viện công cộng
-    await MaterialService.syncMaterialToPublic(updated.id);
+    await prisma.teacherMaterial.delete({ where: { id } });
 
-    return res.status(200).json({ success: true, data: { message: 'Từ chối phê duyệt tài liệu thành công!', data: updated } });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
-}
-
-// PATCH /admin/materials/:id/hide
-export async function hideMaterial(req: AuthRequest, res: Response) {
-  const id = parseInt(req.params.id);
-  const adminId = req.user?.id;
-  if (!adminId) return res.status(401).json({ success: false, error: 'Chưa xác thực!' });
-
-  try {
-    const updated = await prisma.teacherMaterial.update({
-      where: { id },
-      data: {
-        status: 'HIDDEN',
-        hiddenBy: adminId,
-        hiddenAt: new Date(),
-        approvedBy: null,
-        approvedAt: null,
-        rejectedBy: null,
-        rejectedAt: null,
-        rejectionReason: null
-      }
-    });
-
-    // Đồng bộ trạng thái ẩn sang DocumentResource (set isActive = false)
-    await MaterialService.syncMaterialToPublic(updated.id);
-
-    return res.status(200).json({ success: true, data: { message: 'Đã ẩn tài liệu thành công!', data: updated } });
+    return res.status(200).json({ success: true, data: { message: 'Đã từ chối và xóa tài liệu không phù hợp.' } });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }
