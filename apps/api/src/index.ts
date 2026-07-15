@@ -16,7 +16,7 @@ import { streamAIChat, refreshRoadmap, generateAIQuestions, generateMindmap, sav
 
 import { chatbotConsult } from './controllers/chatbot.js';
 import { getDocumentResources, getDocumentComments, addDocumentComment, getUserDocuments, createUserDocument, deleteUserDocument } from './controllers/document.js';
-import { createVNPayPayment, vnpayWebhook, sepayWebhook, checkEnrollmentStatus, checkUserProStatus, createDemoEnrollment, getPremiumPricing } from './controllers/payment.js';
+import { createVNPayPayment, vnpayWebhook, sepayWebhook, checkEnrollmentStatus, checkUserProStatus, createDemoEnrollment, getPremiumPricing, checkDocumentPurchaseStatus, createDocumentVNPayPayment, createDocumentDemoPurchase } from './controllers/payment.js';
 import { authenticateJWT, requireRole, optionalAuthenticateJWT } from './middleware/auth.js';
 import { ownsCourse, ownsLesson, ownsAttempt } from './middleware/ownership.js';
 import { rateLimiter } from './middleware/rateLimit.js';
@@ -95,10 +95,13 @@ import {
   downloadMaterial,
   getAdminPendingMaterials,
   approveMaterial,
-  rejectMaterial
+  rejectMaterial,
+  getAdminMaterials,
+  hideMaterial
 } from './controllers/material.js';
 
-import { uploadValidation } from './middleware/upload.js';
+import { uploadValidation, teacherMaterialUploadValidation } from './middleware/upload.js';
+import { getRatings, submitOrUpdateRating, hideRating } from './controllers/rating.js';
 import {
   getCategories, createCategory, deleteCategory,
   getPosts, getPostById, createPost, deletePost, togglePinPost, reactPost, updatePost,
@@ -314,7 +317,7 @@ app.delete('/lessons/:id', authenticateJWT, requireRole(['TEACHER', 'ADMIN']), o
 app.post('/lessons', authenticateJWT, requireRole(['TEACHER', 'ADMIN']), createLesson);
 
 // Document Resource Routes
-app.get('/document-resources', getDocumentResources);
+app.get('/document-resources', optionalAuthenticateJWT, getDocumentResources);
 app.get('/document-resources/:id/comments', getDocumentComments);
 app.post('/document-resources/:id/comments', authenticateJWT, addDocumentComment);
 
@@ -360,6 +363,11 @@ app.post('/enrollments/sepay-webhook', sepayWebhook);
 app.get('/users/pro-status', authenticateJWT, requireRole(['STUDENT']), checkUserProStatus);
 app.post('/enrollments/demo', authenticateJWT, requireRole(['STUDENT']), createDemoEnrollment);
 app.get('/enrollments/pricing', getPremiumPricing);
+
+// Protected Document Payment Routes
+app.post('/document-purchases', authenticateJWT, requireRole(['STUDENT']), createDocumentVNPayPayment);
+app.get('/document-purchases/status', authenticateJWT, requireRole(['STUDENT', 'TEACHER', 'ADMIN']), checkDocumentPurchaseStatus);
+app.post('/document-purchases/demo', authenticateJWT, requireRole(['STUDENT']), createDocumentDemoPurchase);
 
 // Protected AI Routes
 app.post('/ai/chat', (req, res, next) => {
@@ -529,7 +537,7 @@ app.post('/admin/reports/:id/warning', authenticateJWT, requireRole(['ADMIN']), 
 // Teacher side
 app.get('/teacher/stats', authenticateJWT, requireRole(['TEACHER']), getTeacherDashboardStats);
 app.get('/teacher/materials', authenticateJWT, requireRole(['TEACHER']), getTeacherMaterials);
-app.post('/teacher/materials', authenticateJWT, requireRole(['TEACHER']), uploadValidation, createTeacherMaterial);
+app.post('/teacher/materials', authenticateJWT, requireRole(['TEACHER']), teacherMaterialUploadValidation, createTeacherMaterial);
 app.put('/teacher/materials/:id', authenticateJWT, requireRole(['TEACHER']), updateTeacherMaterial);
 app.delete('/teacher/materials/:id', authenticateJWT, requireRole(['TEACHER']), deleteTeacherMaterial);
 app.post('/teacher/materials/:id/submit', authenticateJWT, requireRole(['TEACHER']), submitTeacherMaterial);
@@ -540,9 +548,16 @@ app.get('/materials/:id', getMaterialDetail);
 app.post('/materials/:id/download', downloadMaterial);
 
 // Admin side
+app.get('/admin/materials', authenticateJWT, requireRole(['ADMIN']), getAdminMaterials);
 app.get('/admin/materials/pending', authenticateJWT, requireRole(['ADMIN']), getAdminPendingMaterials);
-app.post('/admin/materials/:id/approve', authenticateJWT, requireRole(['ADMIN']), approveMaterial);
-app.post('/admin/materials/:id/reject', authenticateJWT, requireRole(['ADMIN']), rejectMaterial);
+app.patch('/admin/materials/:id/approve', authenticateJWT, requireRole(['ADMIN']), approveMaterial);
+app.patch('/admin/materials/:id/reject', authenticateJWT, requireRole(['ADMIN']), rejectMaterial);
+app.patch('/admin/materials/:id/hide', authenticateJWT, requireRole(['ADMIN']), hideMaterial);
+
+// Ratings and Reviews
+app.get('/document-resources/:id/ratings', optionalAuthenticateJWT, getRatings);
+app.post('/document-resources/:id/rating', authenticateJWT, submitOrUpdateRating);
+app.patch('/ratings/:id/hide', authenticateJWT, hideRating);
 
 // Root Hello check
 app.get('/', (req, res) => {

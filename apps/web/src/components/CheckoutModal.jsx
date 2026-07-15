@@ -18,23 +18,27 @@ export default function CheckoutModal({ courses = [], onClose, onPaymentSuccess,
 
   const currentUser = JSON.parse(localStorage.getItem('current_user')) || {};
   const studentId = currentUser.id || 1;
-  const transferCode = courses.length > 0 ? `EP${studentId}C${courses[0].id}` : `EP${studentId}CRT`;
+  const isDocument = courses.length > 0 && (courses[0].type === 'DOCUMENT' || courses[0].driveUrl);
+  const transferCode = courses.length > 0 
+    ? (isDocument ? `ED${studentId}D${courses[0].id}` : `EP${studentId}C${courses[0].id}`) 
+    : `EP${studentId}CRT`;
 
   // Helper function to parse course price to actual VND
-  const parsePrice = (priceVal) => {
+  const parsePrice = (priceVal, item) => {
+    const isDoc = item && (item.type === 'DOCUMENT' || item.driveUrl);
     if (typeof priceVal === 'number') {
-      if (priceVal < 10000) return priceVal * 1000;
+      if (!isDoc && priceVal < 10000) return priceVal * 1000;
       return priceVal;
     }
     if (typeof priceVal === 'string') {
       const cleaned = Number(priceVal.replace(/\D/g, ''));
-      if (cleaned < 10000) return cleaned * 1000;
+      if (!isDoc && cleaned < 10000) return cleaned * 1000;
       return cleaned;
     }
     return 0;
   };
 
-  const originalAmount = courses.reduce((sum, c) => sum + parsePrice(c.priceSale ?? c.price ?? c.priceOriginal), 0);
+  const originalAmount = courses.reduce((sum, c) => sum + parsePrice(c.priceSale ?? c.price ?? c.priceOriginal, c), 0);
   const discountAmount = discountVal;
   const finalAmount = Math.max(0, originalAmount - discountAmount);
 
@@ -50,24 +54,33 @@ export default function CheckoutModal({ courses = [], onClose, onPaymentSuccess,
   useEffect(() => {
     let intervalId;
     if (courses.length === 0) return;
-    const courseId = courses[0].id; // query status for the primary cart course
+    const item = courses[0];
+    const isDoc = item.type === 'DOCUMENT' || item.driveUrl;
 
     const checkPaymentStatus = async () => {
       const token = localStorage.getItem('access_token');
       if (!token) return;
 
       try {
-        const res = await fetch(`${API_BASE}/enrollments/status?courseId=${courseId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
+        if (isDoc) {
+          const res = await api.checkDocumentPurchaseStatus(item.id);
+          if (res.success && res.data?.isPurchased) {
+            addLog(`[SePay Webhook] Hệ thống đã ghi nhận khoản thanh toán tự động cho tài liệu "${item.title}".`, 'sys');
+            setStep(4);
+            onPaymentSuccess(courses.map(c => c.id));
           }
-        });
-        const data = await res.json();
-        
-        if (data.success && data.data?.isEnrolled) {
-          addLog(`[SePay Webhook] Hệ thống đã ghi nhận khoản thanh toán tự động cho giỏ hàng.`, 'sys');
-          setStep(4);
-          onPaymentSuccess(courses.map(c => c.id));
+        } else {
+          const res = await fetch(`${API_BASE}/enrollments/status?courseId=${item.id}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          const data = await res.json();
+          if (data.success && data.data?.isEnrolled) {
+            addLog(`[SePay Webhook] Hệ thống đã ghi nhận khoản thanh toán tự động cho giỏ hàng.`, 'sys');
+            setStep(4);
+            onPaymentSuccess(courses.map(c => c.id));
+          }
         }
       } catch (err) {
         console.error('Lỗi khi thăm dò trạng thái giao dịch:', err);
@@ -131,26 +144,52 @@ export default function CheckoutModal({ courses = [], onClose, onPaymentSuccess,
     setStep(2);
   };
 
-  const handleFreeCheckout = () => {
+  const handleFreeCheckout = async () => {
     const titleSummary = courses.map(c => `"${c.title}"`).join(', ');
-    addLog(`[Voucher] Áp dụng mã giảm giá ${promoCode.trim().toUpperCase()} kích hoạt khóa học ${titleSummary}...`, 'sys');
+    const isDoc = courses.length > 0 && (courses[0].type === 'DOCUMENT' || courses[0].driveUrl);
+    
     setStep(3);
-    setTimeout(() => {
-      addLog(`[Voucher] Kích hoạt thành công! Đã mở khóa nhóm khóa học: ${titleSummary}`, 'sys');
+    try {
+      if (isDoc) {
+        addLog(`[Voucher] Áp dụng mã giảm giá ${promoCode.trim().toUpperCase()} kích hoạt tài liệu "${courses[0].title}"...`, 'sys');
+        await api.purchaseDocumentDemo(courses[0].id);
+        addLog(`[Voucher] Kích hoạt thành công tài liệu: "${courses[0].title}"`, 'sys');
+      } else {
+        addLog(`[Voucher] Áp dụng mã giảm giá ${promoCode.trim().toUpperCase()} kích hoạt khóa học ${titleSummary}...`, 'sys');
+        await new Promise(r => setTimeout(r, 1200));
+        addLog(`[Voucher] Kích hoạt thành công! Đã mở khóa nhóm khóa học: ${titleSummary}`, 'sys');
+      }
       onPaymentSuccess(courses.map(c => c.id), promoCode.trim().toUpperCase());
       setStep(4);
-    }, 1200);
+    } catch (err) {
+      console.error(err);
+      toast('Không thể kích hoạt vật phẩm!', 'error');
+      setStep(1);
+    }
   };
 
-  const handleSimulatePayment = () => {
+  const handleSimulatePayment = async () => {
     const titleSummary = courses.map(c => `"${c.title}"`).join(', ');
-    addLog(`[Demo Mode] Tiến hành mô phỏng thanh toán nhóm khóa học ${titleSummary}...`, 'sys');
+    const isDoc = courses.length > 0 && (courses[0].type === 'DOCUMENT' || courses[0].driveUrl);
+    
     setStep(3);
-    setTimeout(() => {
-      addLog(`[Demo Mode] Xác nhận thành công! Đã kích hoạt quyền sở hữu nhóm khóa học.`, 'sys');
+    try {
+      if (isDoc) {
+        addLog(`[Demo Mode] Tiến hành mô phỏng thanh toán tài liệu "${courses[0].title}"...`, 'sys');
+        await api.purchaseDocumentDemo(courses[0].id);
+        addLog(`[Demo Mode] Xác nhận thành công! Đã kích hoạt quyền sở hữu tài liệu.`, 'sys');
+      } else {
+        addLog(`[Demo Mode] Tiến hành mô phỏng thanh toán nhóm khóa học ${titleSummary}...`, 'sys');
+        await new Promise(r => setTimeout(r, 1500));
+        addLog(`[Demo Mode] Xác nhận thành công! Đã kích hoạt quyền sở hữu nhóm khóa học.`, 'sys');
+      }
       onPaymentSuccess(courses.map(c => c.id), promoCode.trim().toUpperCase());
       setStep(4);
-    }, 1500);
+    } catch (err) {
+      console.error(err);
+      toast('Không thể mô phỏng thanh toán!', 'error');
+      setStep(1);
+    }
   };
 
   const handleManualCheck = async () => {
@@ -159,31 +198,44 @@ export default function CheckoutModal({ courses = [], onClose, onPaymentSuccess,
     addLog(`[SePay] Học sinh yêu cầu kiểm tra sao kê thủ công giao dịch: ${transferCode}`, 'sys');
     
     const token = localStorage.getItem('access_token');
-    const courseId = courses[0]?.id;
-
-    if (!token || !courseId) {
+    const primaryItem = courses[0];
+    if (!token || !primaryItem) {
       setPollingError('Vui lòng đăng nhập để thực hiện giao dịch!');
       setIsVerifying(false);
       return;
     }
 
+    const isDoc = primaryItem.type === 'DOCUMENT' || primaryItem.driveUrl;
+
     try {
       await new Promise((resolve) => setTimeout(resolve, 1500));
       
-      const res = await fetch(`${API_BASE}/enrollments/status?courseId=${courseId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+      if (isDoc) {
+        const res = await api.checkDocumentPurchaseStatus(primaryItem.id);
+        if (res.success && res.data?.isPurchased) {
+          addLog(`[SePay] Chuyển khoản thành công! Đã mở khóa tài liệu.`, 'sys');
+          setStep(4);
+          onPaymentSuccess(courses.map(c => c.id));
+        } else {
+          addLog(`[SePay] Giao dịch "${transferCode}" chưa xuất hiện.`, 'sys');
+          setPollingError('Hệ thống chưa nhận được giao dịch chuyển khoản của em. Vui lòng đợi từ 1-2 phút sau khi chuyển khoản thành công và kiểm tra lại.');
         }
-      });
-      const data = await res.json();
-      
-      if (data.success && data.data?.isEnrolled) {
-        addLog(`[SePay] Chuyển khoản thành công! Đã mở khóa nhóm khóa học.`, 'sys');
-        setStep(4);
-        onPaymentSuccess(courses.map(c => c.id));
       } else {
-        addLog(`[SePay] Giao dịch "${transferCode}" chưa xuất hiện.`, 'sys');
-        setPollingError('Hệ thống chưa nhận được giao dịch chuyển khoản của em. Vui lòng đợi từ 1-2 phút sau khi chuyển khoản thành công và kiểm tra lại.');
+        const res = await fetch(`${API_BASE}/enrollments/status?courseId=${primaryItem.id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const data = await res.json();
+        
+        if (data.success && data.data?.isEnrolled) {
+          addLog(`[SePay] Chuyển khoản thành công! Đã mở khóa nhóm khóa học.`, 'sys');
+          setStep(4);
+          onPaymentSuccess(courses.map(c => c.id));
+        } else {
+          addLog(`[SePay] Giao dịch "${transferCode}" chưa xuất hiện.`, 'sys');
+          setPollingError('Hệ thống chưa nhận được giao dịch chuyển khoản của em. Vui lòng đợi từ 1-2 phút sau khi chuyển khoản thành công và kiểm tra lại.');
+        }
       }
     } catch (err) {
       console.error(err);
@@ -289,7 +341,7 @@ export default function CheckoutModal({ courses = [], onClose, onPaymentSuccess,
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {courses.map((c) => {
-                    const price = parsePrice(c.priceSale ?? c.price ?? c.priceOriginal);
+                    const price = parsePrice(c.priceSale ?? c.price ?? c.priceOriginal, c);
                     return (
                       <div 
                         key={c.id} 
@@ -307,7 +359,7 @@ export default function CheckoutModal({ courses = [], onClose, onPaymentSuccess,
                       >
                         <div style={{
                           width: '48px', height: '48px', borderRadius: '8px',
-                          background: 'linear-gradient(135deg, #7C3AED, #4F46E5)',
+                          background: (c.type === 'DOCUMENT' || c.driveUrl) ? '#ef4444' : 'linear-gradient(135deg, #7C3AED, #4F46E5)',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           color: '#fff', fontSize: '18px', fontWeight: 'bold', border: '2px solid #000', flexShrink: 0
                         }}>
@@ -318,7 +370,10 @@ export default function CheckoutModal({ courses = [], onClose, onPaymentSuccess,
                             {c.title}
                           </h4>
                           <p style={{ margin: 0, fontSize: '12px', color: '#555', fontWeight: '700' }}>
-                            Môn: {c.subject} • Giáo viên: {c.teacherName || c.instructor?.name || 'Cố vấn EduPath'}
+                            {(c.type === 'DOCUMENT' || c.driveUrl) 
+                              ? `Môn: ${c.subject} • Tài liệu học tập`
+                              : `Môn: ${c.subject} • Giáo viên: ${c.teacherName || c.instructor?.name || 'Cố vấn EduPath'}`
+                            }
                           </p>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -639,61 +694,70 @@ export default function CheckoutModal({ courses = [], onClose, onPaymentSuccess,
               ĐANG ĐỐI SOÁT GIAO DỊCH TỪ SEPAY...
             </h3>
             <p style={{ fontSize: '13.5px', color: '#555', lineHeight: '1.6', margin: 0, fontWeight: '700' }}>
-              Hệ thống đang kiểm tra tự động sao kê tài khoản ngân hàng liên kết. Vui lòng giữ kết nối trong vài giây, EduPath AI sẽ mở khóa toàn bộ khóa học ngay sau khi nhận được tiền.
+              Hệ thống đang kiểm tra tự động sao kê tài khoản ngân hàng liên kết. Vui lòng giữ kết nối trong vài giây, EduPath AI sẽ mở khóa vật phẩm ngay sau khi nhận được tiền.
             </p>
           </div>
         )}
 
         {/* STEP 4: Success unlock screen */}
-        {step === 4 && (
-          <div style={{
-            background: '#fff', border: '3px solid #000', borderRadius: '16px',
-            padding: '50px 30px', boxShadow: '6px 6px 0px #000', textAlign: 'center',
-            maxWidth: '650px', margin: '40px auto'
-          }}>
-            <div style={{ fontSize: '80px', color: 'var(--accent-green)', marginBottom: '20px', display: 'flex', justifyContent: 'center' }}>
-              <HiCheckCircle />
-            </div>
-            <h3 style={{ fontSize: '24px', fontWeight: '950', marginBottom: '12px', color: '#000' }}>
-              MỞ KHÓA THÀNH CÔNG! 🎉
-            </h3>
+        {step === 4 && (() => {
+          const isDoc = courses.length > 0 && (courses[0].type === 'DOCUMENT' || courses[0].driveUrl);
+          return (
             <div style={{
-              background: '#F0FDF4', border: '2px solid #22c55e', borderRadius: '12px',
-              padding: '16px', marginBottom: '24px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '8px'
+              background: '#fff', border: '3px solid #000', borderRadius: '16px',
+              padding: '50px 30px', boxShadow: '6px 6px 0px #000', textAlign: 'center',
+              maxWidth: '650px', margin: '40px auto'
             }}>
-              <strong style={{ fontSize: '14px', color: '#15803d' }}>📚 Danh sách các khóa học đã mở khóa:</strong>
-              <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: '#15803d', fontWeight: 'bold' }}>
-                {courses.map(c => (
-                  <li key={c.id}>{c.title}</li>
-                ))}
-              </ul>
+              <div style={{ fontSize: '80px', color: 'var(--accent-green)', marginBottom: '20px', display: 'flex', justifyContent: 'center' }}>
+                <HiCheckCircle />
+              </div>
+              <h3 style={{ fontSize: '24px', fontWeight: '950', marginBottom: '12px', color: '#000' }}>
+                MỞ KHÓA THÀNH CÔNG! 🎉
+              </h3>
+              <div style={{
+                background: '#F0FDF4', border: '2px solid #22c55e', borderRadius: '12px',
+                padding: '16px', marginBottom: '24px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '8px'
+              }}>
+                <strong style={{ fontSize: '14px', color: '#15803d' }}>
+                  {isDoc ? '📂 Danh sách các tài liệu học tập đã mở khóa:' : '📚 Danh sách các khóa học đã mở khóa:'}
+                </strong>
+                <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: '#15803d', fontWeight: 'bold' }}>
+                  {courses.map(c => (
+                    <li key={c.id}>{c.title}</li>
+                  ))}
+                </ul>
+              </div>
+              <p style={{ fontSize: '14px', color: '#555', marginBottom: '28px', lineHeight: '1.6', fontWeight: '700' }}>
+                {isDoc 
+                  ? 'Cảm ơn em đã sử dụng tài liệu học tập cùng EduPath AI! Hệ thống đã ghi nhận quyền sở hữu của em đối với các tài liệu trên.' 
+                  : 'Cảm ơn em đã tham gia học tập cùng EduPath AI! Hệ thống đã ghi nhận quyền sở hữu của em đối với các khóa học trên. Bắt đầu lộ trình học tập cá nhân hóa ngay nào!'
+                }
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <button 
+                  onClick={onClose}
+                  style={{
+                    padding: '14px 36px', background: '#7C3AED', color: '#fff',
+                    border: '3px solid #000', borderRadius: '12px', fontSize: '15px', fontWeight: '950',
+                    boxShadow: '4px 4px 0px #000', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
+                    transition: 'all 0.1s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translate(-2px, -2px)';
+                    e.currentTarget.style.boxShadow = '6px 6px 0px #000';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'none';
+                    e.currentTarget.style.boxShadow = '4px 4px 0px #000';
+                  }}
+                >
+                  <HiLockOpen style={{ fontSize: '18px' }} /> 
+                  {isDoc ? 'Quay lại xem tài liệu ngay!' : 'Vào học ngay thôi!'}
+                </button>
+              </div>
             </div>
-            <p style={{ fontSize: '14px', color: '#555', marginBottom: '28px', lineHeight: '1.6', fontWeight: '700' }}>
-              Cảm ơn em đã tham gia học tập cùng EduPath AI! Hệ thống đã ghi nhận quyền sở hữu của em đối với các khóa học trên. Bắt đầu lộ trình học tập cá nhân hóa ngay nào!
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <button 
-                onClick={onClose}
-                style={{
-                  padding: '14px 36px', background: '#7C3AED', color: '#fff',
-                  border: '3px solid #000', borderRadius: '12px', fontSize: '15px', fontWeight: '950',
-                  boxShadow: '4px 4px 0px #000', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
-                  transition: 'all 0.1s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translate(-2px, -2px)';
-                  e.currentTarget.style.boxShadow = '6px 6px 0px #000';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'none';
-                  e.currentTarget.style.boxShadow = '4px 4px 0px #000';
-                }}
-              >
-                <HiLockOpen style={{ fontSize: '18px' }} /> Vào học ngay thôi!
-              </button>
-            </div>
-          </div>
-        )}
+          );
+        })()}
       </main>
     </div>
   );

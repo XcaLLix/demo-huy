@@ -247,6 +247,12 @@ export const api = {
     return request('/enrollments/demo', { method: 'POST', body });
   },
 
+  createDocumentVNPayPayment: (documentId) => request('/document-purchases', { method: 'POST', body: { documentId } }),
+
+  checkDocumentPurchaseStatus: (documentId) => request(`/document-purchases/status?documentId=${documentId}`),
+
+  purchaseDocumentDemo: (documentId) => request('/document-purchases/demo', { method: 'POST', body: { documentId } }),
+
   checkProStatus: () => request('/users/pro-status'),
 
   requestRoleChange: (requestedRole, reason) =>
@@ -535,9 +541,16 @@ export const api = {
   downloadMaterial: (id) => request(`/materials/${id}/download`, { method: 'POST' }),
 
   // ADMIN MATERIALS MODERATION
+  getAdminMaterials: () => request('/admin/materials'),
   getAdminPendingMaterials: () => request('/admin/materials/pending'),
-  approveMaterial: (id) => request(`/admin/materials/${id}/approve`, { method: 'POST' }),
-  rejectMaterial: (id) => request(`/admin/materials/${id}/reject`, { method: 'POST' }),
+  approveMaterial: (id) => request(`/admin/materials/${id}/approve`, { method: 'PATCH' }),
+  rejectMaterial: (id, reason) => request(`/admin/materials/${id}/reject`, { method: 'PATCH', body: { reason } }),
+  hideMaterial: (id) => request(`/admin/materials/${id}/hide`, { method: 'PATCH' }),
+
+  // DOCUMENT RATINGS AND REVIEWS
+  getDocumentRatings: (id) => request(`/document-resources/${id}/ratings`),
+  submitDocumentRating: (id, rating, comment) => request(`/document-resources/${id}/rating`, { method: 'POST', body: { rating, comment } }),
+  hideDocumentRating: (id, reason, isHidden = true) => request(`/ratings/${id}/hide`, { method: 'PATCH', body: { reason, isHidden } }),
 
   getTeacherStats: () => request('/teacher/stats'),
 

@@ -74,6 +74,8 @@ model User {
   userEffort           UserEffort?
   voucherUsages        VoucherUsage[]
   voucherReservations  VoucherReservation[]
+  documentRatings      DocumentRating[]
+  documentPurchases    DocumentPurchase[]
 }
 
 
@@ -773,7 +775,10 @@ model DocumentResource {
   updatedAt           DateTime @default(now()) @updatedAt
   commissionPercent   Float?
   markdownDescription String?  @db.Text
+  previewUrl          String?
   comments            DocumentComment[]
+  ratings             DocumentRating[]
+  purchases           DocumentPurchase[]
 
   @@map("document_resources")
 }
@@ -1095,24 +1100,33 @@ model AffiliateMaterial {
 }
 
 model TeacherMaterial {
-  id            Int       @id @default(autoincrement())
-  teacherId     Int
-  teacher       Teacher   @relation(fields: [teacherId], references: [userId], onDelete: Cascade)
-  title         String
-  description   String?
-  subject       String
-  grade         String?
-  fileUrl       String
-  fileType      String
-  fileSize      Int
-  thumbnailUrl  String?
-  tags          String[]
-  isPublic      Boolean   @default(false)
-  isApproved    Boolean   @default(false)
-  downloadCount Int       @default(0)
-  viewCount     Int       @default(0)
-  price         Float     @default(0)
-  uploadedAt    DateTime  @default(now())
+  id              Int            @id @default(autoincrement())
+  teacherId       Int
+  teacher         Teacher        @relation(fields: [teacherId], references: [userId], onDelete: Cascade)
+  title           String
+  description     String?
+  subject         String
+  grade           String?
+  fileUrl         String
+  fileType        String
+  fileSize        Int
+  thumbnailUrl    String?
+  tags            String[]
+  status          MaterialStatus @default(DRAFT)
+  previewUrl      String?
+  previewStatus   PreviewStatus?
+  pageCount       Int?
+  rejectionReason String?
+  approvedBy      Int?
+  approvedAt      DateTime?
+  rejectedBy      Int?
+  rejectedAt      DateTime?
+  hiddenBy        Int?
+  hiddenAt        DateTime?
+  downloadCount   Int            @default(0)
+  viewCount       Int            @default(0)
+  price           Float          @default(0)
+  uploadedAt      DateTime       @default(now())
 }
 
 // ── Thống kê hàng tháng (Dashboard Admin) ──
@@ -1355,6 +1369,54 @@ model Announcement {
   updatedAt         DateTime @updatedAt
 
   @@map("announcements")
+}
+
+enum MaterialStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  HIDDEN
+}
+
+enum PreviewStatus {
+  PROCESSING
+  READY
+  FAILED
+}
+
+model DocumentRating {
+  id             Int              @id @default(autoincrement())
+  documentId     Int
+  studentId      Int
+  rating         Int
+  comment        String?          @db.Text
+  isHidden       Boolean          @default(false)
+  hiddenReason   String?          @db.Text
+  hiddenBy       Int?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt @default(now())
+
+  document       DocumentResource @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  student        User             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, studentId])
+  @@map("document_ratings")
+}
+
+model DocumentPurchase {
+  id            Int              @id @default(autoincrement())
+  studentId     Int
+  documentId    Int
+  paidAt        DateTime         @default(now())
+  transactionId String           @unique
+  amount        Float            @default(0)
+
+  student       User             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  document      DocumentResource @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, documentId])
+  @@map("document_purchases")
 }
 
 

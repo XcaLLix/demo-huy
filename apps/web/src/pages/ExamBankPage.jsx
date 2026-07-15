@@ -68,7 +68,7 @@ function renderDescription(desc) {
 // ============================================================
 // EXAM BANK PAGE COMPONENT (DOCUMENT REPOSITORY)
 // ============================================================
-export default function ExamBankPage({ currentUser, navigateTo, hideHeader }) {
+export default function ExamBankPage({ currentUser, navigateTo, hideHeader, cartDocs = [], onAddToCart, onCheckoutDoc, onRemoveDoc }) {
   const [selectedSubject, setSelectedSubject] = useState('all');
   const [selectedLevel, setSelectedLevel] = useState('Tất cả');
   const [selectedPriceFilter, setSelectedPriceFilter] = useState('Tất cả');
@@ -79,6 +79,27 @@ export default function ExamBankPage({ currentUser, navigateTo, hideHeader }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [previewDoc, setPreviewDoc] = useState(null);
+  const [isDocPurchased, setIsDocPurchased] = useState(true);
+
+  // States for Document Ratings and Reviews
+  const [ratingsInfo, setRatingsInfo] = useState({ ratings: [], average: 0, count: 0 });
+  const [ratingsLoading, setRatingsLoading] = useState(false);
+  const [userRating, setUserRating] = useState(5);
+  const [userComment, setUserComment] = useState('');
+  const [submittingRating, setSubmittingRating] = useState(false);
+
+  // Sync document purchase status when document-purchased event is received
+  useEffect(() => {
+    const handlePurchaseSuccess = (e) => {
+      const ids = e.detail?.documentIds || [];
+      setDocuments(prev => prev.map(d => ids.includes(d.id) ? { ...d, isPurchased: true } : d));
+      if (previewDoc && ids.includes(previewDoc.id)) {
+        setIsDocPurchased(true);
+      }
+    };
+    window.addEventListener('document-purchased', handlePurchaseSuccess);
+    return () => window.removeEventListener('document-purchased', handlePurchaseSuccess);
+  }, [previewDoc]);
 
   // ============================================================
   // LOCAL AI SEARCH, ROADMAP & CHATBOT STATES
@@ -139,7 +160,46 @@ export default function ExamBankPage({ currentUser, navigateTo, hideHeader }) {
     }
   };
 
-  // Reset chatbot modal state & load comments on preview document change
+  const fetchRatings = async (docId) => {
+    setRatingsLoading(true);
+    try {
+      const res = await api.getDocumentRatings(docId);
+      if (res) {
+        setRatingsInfo({
+          ratings: res.ratings || [],
+          average: res.average || 0,
+          count: res.count || 0
+        });
+      }
+    } catch (err) {
+      console.error('[Fetch Ratings Error]', err);
+    } finally {
+      setRatingsLoading(false);
+    }
+  };
+
+  const handlePostRating = async (e) => {
+    if (e) e.preventDefault();
+    if (!previewDoc) return;
+    if (!currentUser) {
+      toast('Vui lòng đăng nhập để gửi đánh giá!', 'error');
+      return;
+    }
+
+    setSubmittingRating(true);
+    try {
+      await api.submitDocumentRating(previewDoc.id, userRating, userComment);
+      toast('Đã gửi đánh giá thành công!', 'success');
+      setUserComment('');
+      fetchRatings(previewDoc.id);
+    } catch (err) {
+      toast(err.message || 'Không thể gửi đánh giá.', 'error');
+    } finally {
+      setSubmittingRating(false);
+    }
+  };
+
+  // Reset chatbot modal state & load comments/ratings on preview document change
   useEffect(() => {
     if (previewDoc) {
       setModalTab('details');
@@ -150,7 +210,32 @@ export default function ExamBankPage({ currentUser, navigateTo, hideHeader }) {
         }
       ]);
       setNewCommentText('');
+      setUserComment('');
+      setUserRating(5);
       fetchComments(previewDoc.id);
+      fetchRatings(previewDoc.id);
+
+      // Check purchase status if the document is not free
+      if (previewDoc.isFree) {
+        setIsDocPurchased(true);
+      } else if (!currentUser) {
+        setIsDocPurchased(false);
+      } else {
+        api.checkDocumentPurchaseStatus(previewDoc.id)
+          .then(res => {
+            if (res && res.isPurchased !== undefined) {
+              setIsDocPurchased(res.isPurchased);
+            } else {
+              setIsDocPurchased(false);
+            }
+          })
+          .catch(err => {
+            console.error('[Purchase Check Error]', err);
+            setIsDocPurchased(false);
+          });
+      }
+    } else {
+      setIsDocPurchased(true);
     }
   }, [previewDoc]);
 
@@ -483,12 +568,69 @@ export default function ExamBankPage({ currentUser, navigateTo, hideHeader }) {
     return { total, uniqueSubjects, freeCount };
   }, [documents]);
 
-  const handleDownload = (doc) => {
-    if (doc.driveUrl) {
-      window.open(doc.driveUrl, '_blank');
-      toast(`Đang tải xuống: ${doc.title}`, 'success');
+  const handleDownload = async (doc) => {
+    if (!doc.isFree && currentUser) {
+      try {
+        const res = await api.checkDocumentPurchaseStatus(doc.id);
+        if (res && res.isPurchased) {
+          if (doc.driveUrl) {
+            window.open(doc.driveUrl, '_blank');
+            toast(`Đang tải xuống: ${doc.title}`, 'success');
+          } else {
+            toast(`Tài liệu này chưa có liên kết tải trực tiếp.`, 'error');
+          }
+        } else {
+          handleCheckoutDocDirect(doc);
+        }
+      } catch (err) {
+        handleCheckoutDocDirect(doc);
+      }
+    } else if (!doc.isFree && !currentUser) {
+      toast('Vui lòng đăng nhập để mua và tải tài liệu!', 'error');
     } else {
-      toast(`Tài liệu này chưa có liên kết tải trực tiếp.`, 'error');
+      if (doc.driveUrl) {
+        window.open(doc.driveUrl, '_blank');
+        toast(`Đang tải xuống: ${doc.title}`, 'success');
+      } else {
+        toast(`Tài liệu này chưa có liên kết tải trực tiếp.`, 'error');
+      }
+    }
+  };
+
+  const handleViewOnline = async (doc) => {
+    if (!doc.isFree && currentUser) {
+      try {
+        const res = await api.checkDocumentPurchaseStatus(doc.id);
+        if (res && res.isPurchased) {
+          setPreviewDoc(doc);
+          setTimeout(() => {
+            setModalTab('online-read');
+          }, 50);
+        } else {
+          handleCheckoutDocDirect(doc);
+        }
+      } catch (err) {
+        handleCheckoutDocDirect(doc);
+      }
+    } else if (!doc.isFree && !currentUser) {
+      toast('Vui lòng đăng nhập để mua và đọc tài liệu!', 'error');
+    } else {
+      setPreviewDoc(doc);
+      setTimeout(() => {
+        setModalTab('online-read');
+      }, 50);
+    }
+  };
+
+  const handleAddDocToCart = (doc) => {
+    if (onAddToCart) {
+      onAddToCart(doc);
+    }
+  };
+
+  const handleCheckoutDocDirect = (doc) => {
+    if (onCheckoutDoc) {
+      onCheckoutDoc(doc);
     }
   };
 
@@ -558,6 +700,31 @@ export default function ExamBankPage({ currentUser, navigateTo, hideHeader }) {
       <div className="exambank-filters">
         <div className="exambank-filters__inner">
 
+
+          {/* Subject Filter Row */}
+          <div className="exambank-filters__row" style={{ flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
+            <span className="exambank-filters__label">📚 Môn học</span>
+            <div className="exambank-filters__chips" style={{ flexWrap: 'wrap', gap: '6px' }}>
+              <button
+                type="button"
+                className={`exambank-chip ${selectedSubject === 'all' ? 'exambank-chip--active' : ''}`}
+                onClick={() => setSelectedSubject('all')}
+              >
+                Tất cả môn
+              </button>
+              {SUBJECTS.map(s => (
+                <button
+                  key={s.id}
+                  type="button"
+                  className={`exambank-chip ${selectedSubject === s.id ? 'exambank-chip--active' : ''}`}
+                  onClick={() => setSelectedSubject(s.id)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <span>{s.emoji}</span> {s.name}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Level + Price Tier + Search */}
           <div className="exambank-filters__row">
@@ -634,9 +801,23 @@ export default function ExamBankPage({ currentUser, navigateTo, hideHeader }) {
                 const cardColor = matchedSubject ? matchedSubject.color : '#64748b';
                 const cardEmoji = matchedSubject ? matchedSubject.emoji : '📄';
                 
-                // Get file extension from title (e.g. PDF)
-                const ext = doc.title.split('.').pop()?.toUpperCase() || 'PDF';
-                const displayExt = ext.length > 4 ? 'DOC' : ext;
+                 // Get file extension from driveUrl (e.g. PDF)
+                 const getExt = (url) => {
+                   if (!url) return 'PDF';
+                   try {
+                     const pathname = url.includes('://') ? new URL(url).pathname : url;
+                     const parts = pathname.split('.');
+                     if (parts.length < 2) return 'PDF';
+                     const ext = parts.pop().toLowerCase();
+                     if (ext === 'pdf') return 'PDF';
+                     if (ext === 'doc') return 'DOC';
+                     if (ext === 'docx') return 'DOCX';
+                     return 'PDF';
+                   } catch (e) {
+                     return 'PDF';
+                   }
+                 };
+                 const displayExt = getExt(doc.driveUrl);
 
                 return (
                   <article
@@ -645,7 +826,7 @@ export default function ExamBankPage({ currentUser, navigateTo, hideHeader }) {
                     style={{ '--card-color': cardColor }}
                   >
                     <div className="exambank-card__header">
-                      <div className="exambank-card__year-badge" style={{ background: cardColor }}>
+                      <div className="exambank-card__year-badge" style={{ background: displayExt === 'PDF' ? '#ef4444' : cardColor }}>
                         <span>{displayExt}</span>
                         <small>Định dạng</small>
                       </div>
@@ -659,6 +840,17 @@ export default function ExamBankPage({ currentUser, navigateTo, hideHeader }) {
                         <p className="exambank-card__subtitle" style={{ fontSize: '11.5px', marginTop: '4px' }}>
                           Khối lớp: {doc.level === 'Sinh viên' ? 'Sinh viên' : `Lớp ${doc.level}`}
                         </p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px', fontSize: '12px' }}>
+                          <span style={{ color: '#f59e0b' }}>
+                            {doc.averageRating > 0 ? (
+                              <>{'★'.repeat(Math.round(doc.averageRating))}{'☆'.repeat(5 - Math.round(doc.averageRating))}</>
+                            ) : (
+                              '☆☆☆☆☆'
+                            )}
+                          </span>
+                          <strong style={{ color: '#1e293b' }}>{doc.averageRating ? doc.averageRating.toFixed(1) : '0.0'}</strong>
+                          <span style={{ color: '#64748b' }}>({doc.ratingCount || 0} đánh giá)</span>
+                        </div>
                       </div>
                     </div>
 
@@ -682,18 +874,51 @@ export default function ExamBankPage({ currentUser, navigateTo, hideHeader }) {
                     </div>
 
                     <div className="exambank-card__actions">
-                      <button
-                        className="exambank-card__btn exambank-card__btn--view"
-                        onClick={() => setPreviewDoc(doc)}
-                      >
-                        <HiEye /> Xem chi tiết
-                      </button>
-                      <button
-                        className="exambank-card__btn exambank-card__btn--download"
-                        onClick={() => handleDownload(doc)}
-                      >
-                        <HiDownload /> Tải tài liệu
-                      </button>
+                      {(!doc.isFree && !doc.isPurchased) ? (
+                        <>
+                          <button
+                            type="button"
+                            className="exambank-card__btn exambank-card__btn--view"
+                            style={{ background: '#FFF', border: '2px solid #000', borderRadius: '8px', boxShadow: '2px 2px 0px #000', fontWeight: 'bold' }}
+                            onClick={() => handleAddDocToCart(doc)}
+                          >
+                            🛒 Thêm giỏ hàng
+                          </button>
+                          <button
+                            type="button"
+                            className="exambank-card__btn exambank-card__btn--download"
+                            style={{ background: '#FFE259', color: '#000', border: '2px solid #000', borderRadius: '8px', boxShadow: '2px 2px 0px #000', fontWeight: 'bold' }}
+                            onClick={() => handleCheckoutDocDirect(doc)}
+                          >
+                            💳 Mua ngay
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            className="exambank-card__btn exambank-card__btn--view"
+                            onClick={() => setPreviewDoc(doc)}
+                          >
+                            <HiEye /> Xem chi tiết
+                          </button>
+                          {displayExt === 'PDF' ? (
+                            <button
+                              className="exambank-card__btn exambank-card__btn--download"
+                              style={{ background: '#ef4444', color: '#fff' }}
+                              onClick={() => handleViewOnline(doc)}
+                            >
+                              <HiEye /> Xem tài liệu
+                            </button>
+                          ) : (
+                            <button
+                              className="exambank-card__btn exambank-card__btn--download"
+                              onClick={() => handleDownload(doc)}
+                            >
+                              <HiDownload /> Tải tài liệu
+                            </button>
+                          )}
+                        </>
+                      )}
                     </div>
                   </article>
                 );
@@ -793,6 +1018,22 @@ export default function ExamBankPage({ currentUser, navigateTo, hideHeader }) {
                 >
                   👥 Thảo luận học viên
                 </button>
+                <button
+                  type="button"
+                  className={`exambank-modal-tab ${modalTab === 'reviews' ? 'exambank-modal-tab--active' : ''}`}
+                  onClick={() => setModalTab('reviews')}
+                >
+                  ⭐ Đánh giá ({ratingsInfo.count})
+                </button>
+                {previewDoc.previewUrl && (
+                  <button
+                    type="button"
+                    className={`exambank-modal-tab ${modalTab === 'online-read' ? 'exambank-modal-tab--active' : ''}`}
+                    onClick={() => setModalTab('online-read')}
+                  >
+                    📖 Đọc trực tuyến
+                  </button>
+                )}
               </div>
 
               {modalTab === 'details' ? (
@@ -908,7 +1149,7 @@ export default function ExamBankPage({ currentUser, navigateTo, hideHeader }) {
                     </form>
                   </div>
                 </div>
-              ) : (
+              ) : modalTab === 'discussion' ? (
                 /* Discussion Board Tab panel */
                 <div style={{ marginBottom: '24px' }} className="exambank-discussion">
                   {/* Form to submit comment */}
@@ -982,16 +1223,191 @@ export default function ExamBankPage({ currentUser, navigateTo, hideHeader }) {
                     </div>
                   )}
                 </div>
-              )}
+              ) : modalTab === 'reviews' ? (
+                /* Ratings and Reviews Tab panel */
+                <div style={{ marginBottom: '24px' }}>
+                  {/* Average stats banner */}
+                  <div style={{ 
+                    display: 'flex', 
+                    gap: '20px', 
+                    alignItems: 'center', 
+                    background: '#faf9f6', 
+                    padding: '20px', 
+                    borderRadius: '12px', 
+                    border: '1.5px solid #e8e2d6', 
+                    marginBottom: '20px' 
+                  }}>
+                    <div style={{ textAlign: 'center', paddingRight: '20px', borderRight: '2px solid #e8e2d6', minWidth: '90px' }}>
+                      <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#0f172a' }}>{ratingsInfo.average}</div>
+                      <div style={{ color: '#f59e0b', fontSize: '15px', margin: '4px 0' }}>
+                        {'★'.repeat(Math.round(ratingsInfo.average))}{'☆'.repeat(5 - Math.round(ratingsInfo.average))}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#64748b' }}>{ratingsInfo.count} đánh giá</div>
+                    </div>
+                    <div>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 'bold', color: '#1e293b' }}>⭐ Đánh giá trung bình từ học sinh</h4>
+                      <p style={{ margin: 0, fontSize: '12px', color: '#64748b', lineHeight: '1.5' }}>Đánh giá này được tổng hợp tự động từ phản hồi thực tế của các học viên đã sử dụng tài liệu.</p>
+                    </div>
+                  </div>
+
+                  {/* Submit Rating Form */}
+                  {currentUser ? (
+                    <form onSubmit={handlePostRating} style={{ background: '#fffbeb', border: '2px solid #000', padding: '16px', borderRadius: '12px', marginBottom: '20px' }}>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '13.5px', fontWeight: 'bold', color: '#1e293b' }}>✍️ Gửi đánh giá của em</h4>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 'bold' }}>Số sao đánh giá:</span>
+                        <div style={{ display: 'flex', gap: '6px', fontSize: '20px', cursor: 'pointer' }}>
+                          {[1, 2, 3, 4, 5].map(star => (
+                            <span 
+                              key={star} 
+                              onClick={() => setUserRating(star)}
+                              style={{ color: star <= userRating ? '#f59e0b' : '#cbd5e1', transition: 'color 0.2s' }}
+                            >
+                              ★
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <textarea
+                          rows="3"
+                          placeholder="Nhập nhận xét chi tiết của em về tài liệu học tập này..."
+                          value={userComment}
+                          onChange={e => setUserComment(e.target.value)}
+                          style={{ 
+                            width: '100%', 
+                            padding: '10px', 
+                            border: '2px solid #000', 
+                            borderRadius: '8px', 
+                            fontSize: '13px', 
+                            outline: 'none', 
+                            boxSizing: 'border-box' 
+                          }}
+                          required
+                        />
+                        <button 
+                          type="submit" 
+                          disabled={submittingRating}
+                          style={{ 
+                            alignSelf: 'flex-end', 
+                            padding: '8px 20px', 
+                            background: '#6366f1', 
+                            color: '#fff', 
+                            border: '2px solid #000', 
+                            borderRadius: '8px', 
+                            fontWeight: 'bold', 
+                            cursor: 'pointer', 
+                            boxShadow: '2px 2px 0px #000',
+                            marginTop: '4px'
+                          }}
+                        >
+                          {submittingRating ? 'Đang gửi...' : 'Gửi nhận xét'}
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div style={{ padding: '14px', background: '#f1f5f9', border: '1.5px dashed #cbd5e1', borderRadius: '8px', fontSize: '12.5px', color: '#475569', textAlign: 'center', marginBottom: '20px' }}>
+                      🔑 Vui lòng đăng nhập để bình chọn và viết đánh giá cho tài liệu này.
+                    </div>
+                  )}
+
+                  {/* Ratings list */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {ratingsLoading ? (
+                      <div style={{ textAlign: 'center', padding: '20px 0', fontSize: '12px', color: '#64748b' }}>Đang tải danh sách nhận xét...</div>
+                    ) : ratingsInfo.ratings.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '20px 0', fontSize: '12px', color: '#64748b', fontStyle: 'italic' }}>Chưa có nhận xét nào. Hãy là người đầu tiên đánh giá!</div>
+                    ) : (
+                      ratingsInfo.ratings.map(r => {
+                        const init = r.student.fullName ? r.student.fullName[0].toUpperCase() : '?';
+                        return (
+                          <div key={r.id} style={{ display: 'flex', gap: '12px', background: '#fff', padding: '12px', borderRadius: '10px', border: '1.5px solid #e2e8f0' }}>
+                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#818cf8', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 'bold', flexShrink: 0 }}>
+                              {r.student.avatarUrl ? (
+                                <img src={r.student.avatarUrl} alt={r.student.fullName} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                              ) : init}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#1e293b' }}>{r.student.fullName}</span>
+                                <span style={{ color: '#f59e0b', fontSize: '11px' }}>{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</span>
+                              </div>
+                              <p style={{ margin: '4px 0 0 0', fontSize: '12.5px', color: '#475569', lineHeight: '1.4' }}>{r.comment || '(Học sinh chỉ vote sao)'}</p>
+                              <span style={{ fontSize: '10.5px', color: '#94a3b8', display: 'block', marginTop: '4px' }}>
+                                {new Date(r.createdAt).toLocaleDateString('vi-VN')}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              ) : modalTab === 'online-read' && previewDoc.previewUrl ? (
+                !isDocPurchased ? (
+                  <div style={{
+                    marginBottom: '24px', height: '400px', border: '3px solid #000', borderRadius: '12px',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    background: '#FFFDF9', boxShadow: '4px 4px 0px #000', padding: '40px', textAlign: 'center'
+                  }}>
+                    <div style={{ fontSize: '64px', marginBottom: '16px' }}>🔒</div>
+                    <h3 style={{ fontSize: '20px', fontWeight: '950', color: '#000', margin: '0 0 10px 0' }}>Tài liệu này thuộc gói Premium</h3>
+                    <p style={{ fontSize: '13.5px', color: '#555', maxWidth: '420px', lineHeight: 1.5, margin: '0 0 24px 0', fontWeight: 'bold' }}>
+                      Em cần mua tài liệu này để mở khóa tính năng đọc trực tuyến và tải về máy.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleCheckoutDocDirect(previewDoc)}
+                      style={{
+                        padding: '12px 28px', background: '#FFE259', color: '#000',
+                        border: '3px solid #000', borderRadius: '10px', fontSize: '14.5px', fontWeight: '950',
+                        boxShadow: '3px 3px 0px #000', cursor: 'pointer'
+                      }}
+                    >
+                      💳 Mua tài liệu ngay ({(previewDoc.price || 0).toLocaleString()}đ)
+                    </button>
+                  </div>
+                ) : (
+                  /* Online PDF Reading Tab panel */
+                  <div style={{ marginBottom: '20px', height: '72vh', border: '3px solid #000', borderRadius: '12px', overflow: 'hidden', boxShadow: '4px 4px 0px #000' }}>
+                    <iframe
+                      src={previewDoc.previewUrl}
+                      title="PDF Online Reader"
+                      style={{ width: '100%', height: '100%', border: 'none' }}
+                    />
+                  </div>
+                )
+              ) : null}
 
               {/* Action Buttons */}
               <div className="exambank-modal__actions">
                 <button className="exambank-modal__btn exambank-modal__btn--secondary" onClick={() => setPreviewDoc(null)}>
                   Đóng cửa sổ
                 </button>
-                <button className="exambank-modal__btn exambank-modal__btn--primary" onClick={() => handleDownload(previewDoc)}>
-                  <HiDownload /> Mở Google Drive để Tải về
-                </button>
+                {!isDocPurchased ? (
+                  <button 
+                    className="exambank-modal__btn" 
+                    style={{ background: '#FFE259', color: '#000', border: '2.5px solid #000', boxShadow: '2px 2px 0px #000' }}
+                    onClick={() => handleCheckoutDocDirect(previewDoc)}
+                  >
+                    💳 Mua tài liệu để Tải về
+                  </button>
+                ) : (
+                  <>
+                    {previewDoc.previewUrl && (
+                      <button 
+                        className="exambank-modal__btn" 
+                        style={{ background: '#3b82f6', color: '#fff', border: '2.5px solid #000', boxShadow: '2px 2px 0px #000', display: 'flex', alignItems: 'center', gap: '6px' }}
+                        onClick={() => window.open(previewDoc.previewUrl, '_blank')}
+                      >
+                        <HiEye /> Xem ở trang mới
+                      </button>
+                    )}
+                    <button className="exambank-modal__btn exambank-modal__btn--primary" onClick={() => handleDownload(previewDoc)}>
+                      <HiDownload /> Tải xuống tài liệu
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>

@@ -26,17 +26,17 @@ export async function authenticateJWT(req: AuthRequest, res: Response, next: Nex
   const token = authHeader.split(' ')[1];
   try {
     const payload = jwt.verify(token, JWT_SECRET) as AuthRequest['user'];
-    
+
     // Check if user is blocked or inactive in DB
     const dbUser = await prisma.user.findUnique({
       where: { id: payload?.id },
       select: { status: true, isActive: true }
     });
-    
+
     if (!dbUser) {
       return res.status(401).json({ success: false, error: 'Tài khoản không tồn tại!' });
     }
-    
+
     if (!dbUser.isActive || dbUser.status === 'BLOCKED') {
       return res.status(403).json({ success: false, error: 'Tài khoản của bạn đã bị khóa! Không thể thao tác hệ thống.' });
     }
@@ -76,7 +76,7 @@ export async function optionalAuthenticateJWT(req: AuthRequest, res: Response, n
       where: { id: payload?.id },
       select: { status: true, isActive: true }
     });
-    
+
     if (dbUser && dbUser.isActive && dbUser.status !== 'BLOCKED') {
       req.user = payload;
     }
