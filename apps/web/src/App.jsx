@@ -29,6 +29,7 @@ import OCRScanner from './components/OCRScanner.jsx';
 import StudentDashboard from './components/dashboard/StudentDashboard';
 import ContributionHeatmap from './components/ContributionHeatmap';
 import LeaderboardTab from './components/LeaderboardTab';
+import LoadingOverlay from './components/LoadingOverlay';
 
 import CoursesPage from './pages/CoursesPage';
 import CourseDetailPage from './pages/CourseDetailPage';
@@ -1945,6 +1946,26 @@ export default function App() {
     const handler = (e) => showToast.current(e.detail.message, e.detail.type);
     window.addEventListener('app:toast', handler);
     return () => window.removeEventListener('app:toast', handler);
+  }, []);
+
+  // Global loading overlay states and event listeners
+  const [globalLoading, setGlobalLoading] = useState(false);
+  const [globalLoadingMessage, setGlobalLoadingMessage] = useState('Đang xử lý dữ liệu...');
+
+  useEffect(() => {
+    const showHandler = (e) => {
+      setGlobalLoadingMessage(e.detail?.message || 'Đang xử lý dữ liệu...');
+      setGlobalLoading(true);
+    };
+    const hideHandler = () => {
+      setGlobalLoading(false);
+    };
+    window.addEventListener('app:show-loading', showHandler);
+    window.addEventListener('app:hide-loading', hideHandler);
+    return () => {
+      window.removeEventListener('app:show-loading', showHandler);
+      window.removeEventListener('app:hide-loading', hideHandler);
+    };
   }, []);
 
   // AI feedback modal
@@ -4533,6 +4554,9 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Global premium wave loader overlay */}
+      {globalLoading && <LoadingOverlay message={globalLoadingMessage} />}
 
     </div>
   );

@@ -3,6 +3,12 @@ import { HiMail, HiLockClosed, HiUser, HiBookOpen, HiArrowLeft, HiEye, HiEyeOff,
 import { useGoogleLogin } from '@react-oauth/google';
 import { api } from '../api';
 
+const COMBO_OPTIONS = [
+  { value: 'A01 (Toán – Lý – Anh)', label: 'Khối A01', desc: 'Toán – Lý – Anh', icon: '📐' },
+  { value: 'B00 (Toán – Hóa – Sinh)', label: 'Khối B00', desc: 'Toán – Hóa – Sinh', icon: '🧪' },
+  { value: 'D01 (Toán – Văn – Anh)', label: 'Khối D01', desc: 'Toán – Văn – Anh', icon: '✍️' }
+];
+
 function mapBackendUser(backendUser, password) {
   const roleLower = (backendUser.role || 'STUDENT').toLowerCase();
   const name = backendUser.fullName || backendUser.email.split('@')[0];
@@ -242,8 +248,15 @@ export default function AuthPage({ defaultMode = 'login', onAuthSuccess, usersLi
       return;
     }
 
+    const phoneRegex = /^(0|\+84)(3|5|7|8|9)[0-9]{8}$/;
+    if (phone && !phoneRegex.test(phone.replace(/\s+/g, ''))) {
+      setErrorMessage('Số điện thoại không hợp lệ. Vui lòng nhập đúng định dạng Việt Nam gồm 10 chữ số (ví dụ: 0912345678).');
+      return;
+    }
+
     setLoading(true);
     setErrorMessage('');
+    window.dispatchEvent(new CustomEvent('app:show-loading', { detail: { message: 'Đang gửi yêu cầu đăng ký & mã OTP...' } }));
     try {
       const payload = {
         email,
@@ -269,6 +282,7 @@ export default function AuthPage({ defaultMode = 'login', onAuthSuccess, usersLi
       setErrorMessage(err.message);
     } finally {
       setLoading(false);
+      window.dispatchEvent(new CustomEvent('app:hide-loading'));
     }
   };
 
@@ -283,6 +297,7 @@ export default function AuthPage({ defaultMode = 'login', onAuthSuccess, usersLi
 
     setLoading(true);
     setErrorMessage('');
+    window.dispatchEvent(new CustomEvent('app:show-loading', { detail: { message: 'Đang xác minh mã OTP đăng ký...' } }));
     try {
       const data = await api.verifyOtpRegister(pendingSignupEmail, signupOtpInput);
       saveAuthTokens(data);
@@ -301,6 +316,7 @@ export default function AuthPage({ defaultMode = 'login', onAuthSuccess, usersLi
       }
     } finally {
       setLoading(false);
+      window.dispatchEvent(new CustomEvent('app:hide-loading'));
     }
   };
 
@@ -453,6 +469,7 @@ export default function AuthPage({ defaultMode = 'login', onAuthSuccess, usersLi
     setLoading(true);
     setErrorMessage('');
     setSuccessMessage('');
+    window.dispatchEvent(new CustomEvent('app:show-loading', { detail: { message: 'Đang gửi mã OTP khôi phục mật khẩu...' } }));
     try {
       const data = await api.forgotPassword(resetEmail);
       setTypedOtp('');
@@ -468,6 +485,7 @@ export default function AuthPage({ defaultMode = 'login', onAuthSuccess, usersLi
       setErrorMessage(err.message);
     } finally {
       setLoading(false);
+      window.dispatchEvent(new CustomEvent('app:hide-loading'));
     }
   };
 
@@ -479,6 +497,7 @@ export default function AuthPage({ defaultMode = 'login', onAuthSuccess, usersLi
     setLoading(true);
     setErrorMessage('');
     setSuccessMessage('');
+    window.dispatchEvent(new CustomEvent('app:show-loading', { detail: { message: 'Đang xác thực mã OTP khôi phục...' } }));
     try {
       const data = await api.verifyResetOtp(resetEmail, typedOtp);
       setResetToken(data.token);
@@ -489,6 +508,7 @@ export default function AuthPage({ defaultMode = 'login', onAuthSuccess, usersLi
       setErrorMessage(err.message);
     } finally {
       setLoading(false);
+      window.dispatchEvent(new CustomEvent('app:hide-loading'));
     }
   };
 
@@ -513,6 +533,7 @@ export default function AuthPage({ defaultMode = 'login', onAuthSuccess, usersLi
     setLoading(true);
     setErrorMessage('');
     setSuccessMessage('');
+    window.dispatchEvent(new CustomEvent('app:show-loading', { detail: { message: 'Đang tiến hành đặt lại mật khẩu mới...' } }));
     try {
       const msg = await api.resetPassword(resetToken, password);
       setSuccessMessage(typeof msg === 'string' ? msg : (msg?.data || 'Đặt lại mật khẩu thành công! Vui lòng đăng nhập lại.'));
@@ -527,6 +548,7 @@ export default function AuthPage({ defaultMode = 'login', onAuthSuccess, usersLi
       setErrorMessage(err.message);
     } finally {
       setLoading(false);
+      window.dispatchEvent(new CustomEvent('app:hide-loading'));
     }
   };
 
@@ -1070,15 +1092,66 @@ export default function AuthPage({ defaultMode = 'login', onAuthSuccess, usersLi
                     </div>
 
                     {userRole === 'student' && (
-                      <div className="auth-input-group">
-                        <label>KHỐI THI MỤC TIÊU</label>
-                        <div className="auth-input-wrap">
-                          <HiBookOpen className="auth-input-icon" />
-                          <select value={combo} onChange={e => setCombo(e.target.value)} style={{ appearance: 'none' }}>
-                            <option value="A01 (Toán – Lý – Anh)">A01 — Toán, Vật lý, Tiếng Anh</option>
-                            <option value="B00 (Toán – Hóa – Sinh)">B00 — Toán, Hóa học, Sinh học</option>
-                            <option value="D01 (Toán – Văn – Anh)">D01 — Toán, Ngữ văn, Tiếng Anh</option>
-                          </select>
+                      <div className="auth-input-group" style={{ marginBottom: '20px' }}>
+                        <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', letterSpacing: '0.8px', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                          KHỐI THI MỤC TIÊU
+                        </label>
+                        <div className="auth-combo-cards-grid" style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(3, 1fr)',
+                          gap: '12px',
+                          width: '100%'
+                        }}>
+                          {COMBO_OPTIONS.map((opt) => {
+                            const isSelected = combo === opt.value;
+                            let activeStyle = {};
+                            if (isSelected) {
+                              if (opt.label === 'Khối A01') {
+                                activeStyle = { background: '#EBF5FF', borderColor: '#3498DB', color: '#1B4F72', boxShadow: '0 4px 12px rgba(52, 152, 219, 0.15)' };
+                              } else if (opt.label === 'Khối B00') {
+                                activeStyle = { background: '#E8F8F5', borderColor: '#2ECC71', color: '#0E6251', boxShadow: '0 4px 12px rgba(46, 204, 113, 0.15)' };
+                              } else {
+                                activeStyle = { background: '#F5EEF8', borderColor: '#9B59B6', color: '#5B2C6F', boxShadow: '0 4px 12px rgba(155, 89, 182, 0.15)' };
+                              }
+                            }
+                            return (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => setCombo(opt.value)}
+                                style={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  padding: '14px 8px',
+                                  borderRadius: '12px',
+                                  border: isSelected ? '2px solid' : '1.5px solid #E2E8F0',
+                                  background: '#FFF',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                  outline: 'none',
+                                  ...activeStyle
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (!isSelected) {
+                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                    e.currentTarget.style.borderColor = 'var(--primary-light)';
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!isSelected) {
+                                    e.currentTarget.style.transform = 'none';
+                                    e.currentTarget.style.borderColor = '#E2E8F0';
+                                  }
+                                }}
+                              >
+                                <span style={{ fontSize: '24px', marginBottom: '6px' }}>{opt.icon}</span>
+                                <span style={{ fontSize: '13px', fontWeight: '800', marginBottom: '2px' }}>{opt.label}</span>
+                                <span style={{ fontSize: '10.5px', opacity: 0.8, fontWeight: '600', textAlign: 'center', color: isSelected ? 'inherit' : '#64748B' }}>{opt.desc}</span>
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
