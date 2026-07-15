@@ -738,7 +738,8 @@ export default function MockExamResultPage({ examId, attemptId, currentUser, nav
                                               textAlign: 'left',
                                               cursor: cursor,
                                               transition: 'all 0.2s',
-                                              outline: 'none'
+                                              outline: 'none',
+                                              whiteSpace: 'normal'
                                             }}
                                           >
                                             <span
@@ -888,7 +889,7 @@ export default function MockExamResultPage({ examId, attemptId, currentUser, nav
         examId={examId}
         attemptId={attemptId}
         onRetake={handleRetake}
-        wrongCount={result?.wrong_count || 0}
+        wrongCount={(result?.wrong_count || 0) + (result?.blank_count || result?.blankCount || 0)}
         bookmarkedCount={bookmarkedKeys.length}
       />
 

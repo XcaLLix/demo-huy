@@ -109,12 +109,18 @@ export default function SmartRetakeOptions({ examId, attemptId, onRetake, wrongC
                 background: isActive ? bg : 'transparent',
                 border: `1.5px solid ${isActive ? color : disabled ? 'var(--border)' : border}`,
                 borderRadius: '12px',
-                padding: '14px',
+                padding: '16px 14px',
                 cursor: disabled ? 'not-allowed' : 'pointer',
                 opacity: disabled ? 0.5 : 1,
                 textAlign: 'left',
                 transition: 'all 0.15s',
-                position: 'relative'
+                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column',
+                height: '100%',
+                width: '100%',
+                boxSizing: 'border-box',
+                whiteSpace: 'normal'
               }}
             >
               {badge && (

@@ -42,21 +42,12 @@ export default function MockExamsPage({ currentUser, onSelectExam, navigateTo, e
     grade: 'All'
   });
 
-  // Tab state: 'list' | 'wrong' | 'history'
+  // Tab state: 'list' | 'history'
   const [activeTab, setActiveTab] = useState('list');
-  const [wrongQuestions, setWrongQuestions] = useState([]);
-  const [wrongLoading, setWrongLoading] = useState(false);
 
   // Exam history state
   const [historyAttempts, setHistoryAttempts] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
-
-  // AI Similar Question practice state
-  const [similarModalOpen, setSimilarModalOpen] = useState(false);
-  const [similarQuestion, setSimilarQuestion] = useState(null);
-  const [similarLoading, setSimilarLoading] = useState(false);
-  const [similarSelectedOption, setSimilarSelectedOption] = useState(null);
-  const [similarAnswerSubmitted, setSimilarAnswerSubmitted] = useState(false);
 
   const loadSubjects = async () => {
     if (supabase) {
@@ -111,18 +102,6 @@ export default function MockExamsPage({ currentUser, onSelectExam, navigateTo, e
     }
   };
 
-  const loadWrongQuestions = async () => {
-    setWrongLoading(true);
-    try {
-      const res = await api.getWrongQuestions();
-      setWrongQuestions(res || []);
-    } catch (err) {
-      console.error('Lỗi tải nhật ký câu sai:', err);
-    } finally {
-      setWrongLoading(false);
-    }
-  };
-
   const loadHistory = async () => {
     setHistoryLoading(true);
     try {
@@ -142,68 +121,17 @@ export default function MockExamsPage({ currentUser, onSelectExam, navigateTo, e
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get('tab');
     if (tabParam === 'history' && currentUser) setActiveTab('history');
-    else if (tabParam === 'wrong' && currentUser) setActiveTab('wrong');
   }, [currentUser]);
 
   useEffect(() => { loadSubjects(); }, []);
   useEffect(() => { loadExams(); }, [filters, examsList]);
 
   useEffect(() => {
-    if (activeTab === 'wrong') loadWrongQuestions();
     if (activeTab === 'history') loadHistory();
   }, [activeTab]);
 
   const handleStartExam = (examId) => {
     navigateTo(`/mock-exams/${examId}/start`);
-  };
-
-  const handleRetakeWrong = async (examId, attemptId) => {
-    try {
-      const retake = await mockExamService.createSmartRetake(examId, 'wrong_only', attemptId);
-      if (!retake || !retake.questions || retake.questions.length === 0) {
-        alert('Không có câu hỏi sai nào phù hợp để làm lại!');
-        return;
-      }
-      navigateTo(`/mock-exams/${examId}/start`, { retakeMode: 'wrong_only', retakeData: retake });
-    } catch (err) {
-      console.error(err);
-      alert('Không thể tạo phiên làm lại câu sai.');
-    }
-  };
-
-  const handlePracticeSimilar = async (wq) => {
-    setSimilarModalOpen(true);
-    setSimilarLoading(true);
-    setSimilarQuestion(null);
-    setSimilarSelectedOption(null);
-    setSimilarAnswerSubmitted(false);
-    try {
-      const res = await api.generateSimilarQuestion({
-        content: wq.content,
-        topic: wq.topic,
-        difficulty: wq.difficulty,
-        options: wq.options,
-        explanation: wq.explanation,
-        subject: wq.subject
-      });
-      setSimilarQuestion(res);
-    } catch (err) {
-      console.error(err);
-      alert('Không thể sinh câu hỏi tương tự từ AI.');
-      setSimilarModalOpen(false);
-    } finally {
-      setSimilarLoading(false);
-    }
-  };
-
-  const handleSelectSimilarOption = (opt) => {
-    if (similarAnswerSubmitted) return;
-    setSimilarSelectedOption(opt);
-  };
-
-  const handleSubmitSimilarAnswer = () => {
-    if (!similarSelectedOption) return;
-    setSimilarAnswerSubmitted(true);
   };
 
   const subjectCounts = {};
@@ -234,7 +162,6 @@ export default function MockExamsPage({ currentUser, onSelectExam, navigateTo, e
           {[
             { key: 'list', label: '📋 Tất cả đề thi', authRequired: false },
             { key: 'history', label: '📜 Lịch sử thi', authRequired: true },
-            { key: 'wrong', label: '⚠️ Nhật ký câu sai (AI)', authRequired: true },
           ].filter(t => !t.authRequired || currentUser).map(tab => (
             <button
               key={tab.key}
@@ -356,7 +283,7 @@ export default function MockExamsPage({ currentUser, onSelectExam, navigateTo, e
               </div>
             )}
           </>
-        ) : activeTab === 'history' ? (
+        ) : (
           /* ── EXAM HISTORY TAB ── */
           <div style={{ marginTop: '12px', marginBottom: '40px' }}>
             {/* Header */}
@@ -510,184 +437,6 @@ export default function MockExamsPage({ currentUser, onSelectExam, navigateTo, e
               </div>
             )}
           </div>
-        ) : (
-          /* Wrong Questions Log Tab */
-          <div style={{ marginTop: '12px' }}>
-            <div style={{ background: 'var(--bg-card)', border: '2px solid var(--border)', borderRadius: '16px', padding: '20px', marginBottom: '24px', boxShadow: 'var(--shadow-sm)' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: '900', color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>🤖</span> Nhật Ký Câu Sai Thông Minh & AI Luyện Tập
-              </h3>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.5' }}>
-                Hệ thống tự động lưu trữ toàn bộ câu hỏi bạn đã làm sai trong các đề thi. Bạn có thể luyện tập lại các câu hỏi này hoặc yêu cầu AI tạo ra các câu hỏi tương tự để nắm vững kiến thức!
-              </p>
-            </div>
-
-            {wrongLoading ? (
-              <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-secondary)' }}>
-                <div style={{ fontSize: '24px', animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</div>
-                <p style={{ marginTop: '12px', fontSize: '13px', fontWeight: 'bold' }}>Đang nạp nhật ký câu sai...</p>
-              </div>
-            ) : wrongQuestions.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '40px' }}>
-                {wrongQuestions.map((wq, idx) => (
-                  <div key={wq.id || idx} style={{
-                    background: 'var(--bg-card)',
-                    border: '2px solid var(--border)',
-                    borderRadius: '12px',
-                    padding: '20px',
-                    boxShadow: 'var(--shadow-sm)',
-                    position: 'relative'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <span style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', background: 'var(--exams-purple)', color: '#fff' }}>
-                          {wq.subject || 'Môn học'}
-                        </span>
-                        {wq.topic && (
-                          <span style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', background: 'var(--bg-main)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
-                            {wq.topic}
-                          </span>
-                        )}
-                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                          Độ khó: <strong>{wq.difficulty === 'HARD' ? 'Khó' : wq.difficulty === 'EASY' ? 'Dễ' : 'Trung bình'}</strong>
-                        </span>
-                      </div>
-                      <span style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>
-                        Nguồn đề: <strong style={{ color: 'var(--text-primary)' }}>{wq.examTitle || 'Đề thi'}</strong>
-                      </span>
-                    </div>
-
-                    <div style={{ fontSize: '14.5px', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '16px', lineHeight: '1.6' }}>
-                      Câu hỏi: {wq.content}
-                    </div>
-
-                    {/* Render image or audio if exists */}
-                    {wq.imageUrl && (
-                      <div style={{ marginBottom: '16px' }}>
-                        <img src={wq.imageUrl} alt="Đính kèm câu hỏi" style={{ maxWidth: '100%', maxHeight: '250px', border: '1px solid var(--border)', borderRadius: '8px', objectFit: 'contain' }} />
-                      </div>
-                    )}
-                    {wq.audioUrl && (
-                      <div style={{ marginBottom: '16px' }}>
-                        <audio src={wq.audioUrl} controls style={{ width: '100%', maxWidth: '400px' }} />
-                      </div>
-                    )}
-
-                    {/* Options list */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
-                      {wq.options && Object.entries(wq.options).map(([key, value]) => {
-                        const isCorrect = key === wq.correctAnswer;
-                        const isSelected = key === wq.selectedAnswer;
-                        let borderStyle = '1px solid var(--border)';
-                        let bgStyle = 'var(--bg-main)';
-                        let textColor = 'var(--text-secondary)';
-                        
-                        if (isCorrect) {
-                          borderStyle = '2px solid #2ecc71';
-                          bgStyle = 'rgba(46, 204, 113, 0.1)';
-                          textColor = '#27ae60';
-                        } else if (isSelected) {
-                          borderStyle = '2px solid #e74c3c';
-                          bgStyle = 'rgba(231, 76, 60, 0.1)';
-                          textColor = '#c0392b';
-                        }
-
-                        return (
-                          <div key={key} style={{
-                            padding: '10px 14px',
-                            borderRadius: '8px',
-                            border: borderStyle,
-                            background: bgStyle,
-                            color: textColor,
-                            fontSize: '13px',
-                            fontWeight: (isCorrect || isSelected) ? 'bold' : 'normal',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                          }}>
-                            <span style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: '24px',
-                              height: '24px',
-                              borderRadius: '50%',
-                              background: isCorrect ? '#2ecc71' : isSelected ? '#e74c3c' : 'var(--border)',
-                              color: (isCorrect || isSelected) ? '#fff' : 'var(--text-primary)',
-                              fontSize: '12px',
-                              fontWeight: 'bold'
-                            }}>{key}</span>
-                            <div style={{ flex: 1 }}>{value}</div>
-                            {isCorrect && <span style={{ fontSize: '11px', color: '#27ae60' }}>(Đáp án đúng)</span>}
-                            {isSelected && !isCorrect && <span style={{ fontSize: '11px', color: '#c0392b' }}>(Bạn chọn)</span>}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Explanation */}
-                    {wq.explanation && (
-                      <div style={{ background: 'var(--bg-main)', borderLeft: '4px solid var(--exams-purple)', padding: '12px 16px', borderRadius: '6px', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: '1.5' }}>
-                        <strong>Lời giải:</strong> {wq.explanation}
-                      </div>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '16px' }}>
-                      <button
-                        onClick={() => handleRetakeWrong(wq.examId, wq.attemptId)}
-                        style={{
-                          padding: '8px 16px',
-                          background: 'var(--bg-card)',
-                          border: '2px solid var(--border)',
-                          borderRadius: '8px',
-                          fontWeight: 'bold',
-                          fontSize: '12.5px',
-                          color: 'var(--text-primary)',
-                          cursor: 'pointer',
-                          boxShadow: 'var(--shadow-sm)',
-                          transition: 'all 0.2s',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px'
-                        }}
-                      >
-                        🔄 Làm lại các câu sai của đề này
-                      </button>
-                      <button
-                        onClick={() => handlePracticeSimilar(wq)}
-                        style={{
-                          padding: '8px 16px',
-                          background: 'var(--exams-purple)',
-                          border: '2px solid var(--border)',
-                          borderRadius: '8px',
-                          fontWeight: 'bold',
-                          fontSize: '12.5px',
-                          color: '#fff',
-                          cursor: 'pointer',
-                          boxShadow: 'var(--shadow-sm)',
-                          transition: 'all 0.2s',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px'
-                        }}
-                      >
-                        🤖 Luyện câu tương tự AI
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{ textAlign: 'center', padding: '60px 20px', background: 'var(--bg-card)', border: '2px dashed var(--border)', borderRadius: '16px' }}>
-                <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>🎉</span>
-                <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '8px' }}>Nhật ký câu sai trống!</h3>
-                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', maxWidth: '400px', margin: '0 auto' }}>
-                  Tuyệt vời! Bạn không có bất kỳ câu hỏi làm sai nào. Hãy tích cực làm thêm nhiều đề thi khác để duy trì phong độ nhé.
-                </p>
-              </div>
-            )}
-          </div>
         )}
 
         {/* CTA Banner for guests */}
@@ -702,247 +451,6 @@ export default function MockExamsPage({ currentUser, onSelectExam, navigateTo, e
         )}
       </div>
 
-      {/* AI Similar Question Practice Modal */}
-      {similarModalOpen && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.6)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-          padding: '20px',
-          backdropFilter: 'blur(4px)'
-        }}>
-          <div style={{
-            background: 'var(--bg-card)',
-            border: '3px solid var(--border)',
-            borderRadius: '16px',
-            width: '100%',
-            maxWidth: '650px',
-            boxShadow: 'var(--shadow-lg)',
-            display: 'flex',
-            flexDirection: 'column',
-            maxHeight: '90vh',
-            animation: 'fadeIn 0.2s ease'
-          }}>
-            {/* Modal Header */}
-            <div style={{
-              padding: '16px 20px',
-              borderBottom: '2px solid var(--border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              background: 'var(--bg-main)'
-            }}>
-              <h3 style={{ fontSize: '16px', fontWeight: '900', color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>🤖</span> AI Luyện Tập Câu Hỏi Tương Tự
-              </h3>
-              <button
-                onClick={() => setSimilarModalOpen(false)}
-                style={{
-                  border: 'none',
-                  background: 'none',
-                  fontSize: '20px',
-                  color: 'var(--text-secondary)',
-                  cursor: 'pointer',
-                  padding: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                <HiX />
-              </button>
-            </div>
-
-            {/* Modal Content */}
-            <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
-              {similarLoading ? (
-                <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-                  <div style={{ fontSize: '28px', animation: 'spin 1.5s linear infinite', display: 'inline-block' }}>⚡</div>
-                  <p style={{ marginTop: '12px', fontSize: '13.5px', color: 'var(--text-primary)', fontWeight: 'bold' }}>
-                    AI đang biên soạn câu hỏi tương tự cùng độ khó...
-                  </p>
-                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                    Lộ trình học tối ưu hóa theo timing và mục tiêu của bạn.
-                  </p>
-                </div>
-              ) : similarQuestion ? (
-                <div>
-                  <div style={{
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    fontSize: '11px',
-                    fontWeight: 'bold',
-                    background: 'var(--bg-main)',
-                    border: '1px solid var(--border)',
-                    color: 'var(--text-secondary)',
-                    display: 'inline-block',
-                    marginBottom: '12px'
-                  }}>
-                    Chủ đề: {similarQuestion.topic || 'Chung'} | Độ khó: {similarQuestion.difficulty || 'MEDIUM'}
-                  </div>
-
-                  <div style={{ fontSize: '14.5px', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '20px', lineHeight: '1.6' }}>
-                    {similarQuestion.content}
-                  </div>
-
-                  {/* Option Choices */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
-                    {similarQuestion.options && similarQuestion.options.map((opt) => {
-                      const isSelected = similarSelectedOption === opt.label;
-                      const isCorrectAnswer = opt.label === similarQuestion.correctAnswer;
-                      
-                      let borderStyle = '1px solid var(--border)';
-                      let bgStyle = 'var(--bg-card)';
-                      let textColor = 'var(--text-primary)';
-
-                      if (similarAnswerSubmitted) {
-                        if (isCorrectAnswer) {
-                          borderStyle = '2px solid #2ecc71';
-                          bgStyle = 'rgba(46, 204, 113, 0.1)';
-                          textColor = '#27ae60';
-                        } else if (isSelected) {
-                          borderStyle = '2px solid #e74c3c';
-                          bgStyle = 'rgba(231, 76, 60, 0.1)';
-                          textColor = '#c0392b';
-                        }
-                      } else if (isSelected) {
-                        borderStyle = '2px solid var(--exams-purple)';
-                        bgStyle = 'rgba(108, 92, 231, 0.05)';
-                      }
-
-                      return (
-                        <button
-                          key={opt.label}
-                          disabled={similarAnswerSubmitted}
-                          onClick={() => handleSelectSimilarOption(opt.label)}
-                          style={{
-                            width: '100%',
-                            textAlign: 'left',
-                            padding: '12px 16px',
-                            borderRadius: '8px',
-                            border: borderStyle,
-                            background: bgStyle,
-                            color: textColor,
-                            fontSize: '13px',
-                            fontWeight: isSelected ? 'bold' : 'normal',
-                            cursor: similarAnswerSubmitted ? 'default' : 'pointer',
-                            transition: 'all 0.2s',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px',
-                            boxSizing: 'border-box'
-                          }}
-                        >
-                          <span style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '50%',
-                            background: isCorrectAnswer && similarAnswerSubmitted ? '#2ecc71' : (isSelected ? 'var(--exams-purple)' : 'var(--border)'),
-                            color: (isCorrectAnswer && similarAnswerSubmitted) || isSelected ? '#fff' : 'var(--text-primary)',
-                            fontSize: '12px',
-                            fontWeight: 'bold'
-                          }}>{opt.label}</span>
-                          <div style={{ flex: 1 }}>{opt.text}</div>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Submission and Result message */}
-                  {!similarAnswerSubmitted ? (
-                    <button
-                      onClick={handleSubmitSimilarAnswer}
-                      disabled={!similarSelectedOption}
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        background: similarSelectedOption ? 'var(--exams-purple)' : 'var(--border)',
-                        color: similarSelectedOption ? '#fff' : 'var(--text-muted)',
-                        border: '2px solid var(--border)',
-                        borderRadius: '8px',
-                        fontWeight: 'bold',
-                        fontSize: '13.5px',
-                        cursor: similarSelectedOption ? 'pointer' : 'not-allowed',
-                        boxShadow: similarSelectedOption ? 'var(--shadow-sm)' : 'none',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      Kiểm tra đáp án
-                    </button>
-                  ) : (
-                    <div style={{
-                      padding: '16px',
-                      borderRadius: '8px',
-                      border: '2px solid var(--border)',
-                      background: 'var(--bg-main)',
-                      marginBottom: '10px'
-                    }}>
-                      <div style={{
-                        fontSize: '14px',
-                        fontWeight: 'bold',
-                        color: similarSelectedOption === similarQuestion.correctAnswer ? '#27ae60' : '#c0392b',
-                        marginBottom: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}>
-                        {similarSelectedOption === similarQuestion.correctAnswer ? (
-                          <><span>✅</span> Chính xác! Bạn đã hiểu bài rất tốt.</>
-                        ) : (
-                          <><span>❌</span> Chưa chính xác. Đừng lo lắng, hãy xem lời giải thích bên dưới.</>
-                        )}
-                      </div>
-                      <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
-                        <strong style={{ color: 'var(--text-primary)' }}>Giải thích chi tiết:</strong> {similarQuestion.explanation}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>Không thể sinh câu hỏi lúc này.</p>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div style={{
-              padding: '12px 20px',
-              borderTop: '2px solid var(--border)',
-              display: 'flex',
-              justifyContent: 'flex-end',
-              background: 'var(--bg-main)',
-              borderBottomLeftRadius: '13px',
-              borderBottomRightRadius: '13px'
-            }}>
-              <button
-                onClick={() => setSimilarModalOpen(false)}
-                style={{
-                  padding: '8px 16px',
-                  background: 'var(--bg-card)',
-                  border: '2px solid var(--border)',
-                  borderRadius: '8px',
-                  fontWeight: 'bold',
-                  fontSize: '12.5px',
-                  color: 'var(--text-primary)',
-                  cursor: 'pointer',
-                  boxShadow: 'var(--shadow-sm)'
-                }}
-              >
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -330,6 +330,7 @@ app.delete('/user-documents/:id', authenticateJWT, requireRole(['STUDENT', 'TEAC
 app.get('/exams', getExams);
 app.get('/exams/attempts', authenticateJWT, requireRole(['STUDENT', 'TEACHER', 'ADMIN']), getAttempts);
 app.get('/exams/attempts/:attemptId', authenticateJWT, requireRole(['STUDENT', 'TEACHER', 'ADMIN']), ownsAttempt, getAttemptById);
+app.get('/exams/wrong-questions', authenticateJWT, requireRole(['STUDENT', 'TEACHER', 'ADMIN']), getWrongQuestions);
 app.get('/exams/:id', getExamById);
 app.get('/exams/:id/questions', getExamQuestionsPublic);
 app.post('/exams/:id/attempts', authenticateJWT, requireRole(['STUDENT', 'TEACHER', 'ADMIN']), startAttempt);
@@ -353,7 +354,6 @@ app.post('/exam-attempts/:attemptId/ai-coach', authenticateJWT, requireRole(['ST
 app.post('/exam-attempts/generate-similar-question', authenticateJWT, requireRole(['STUDENT', 'TEACHER', 'ADMIN']), generateSimilarQuestion);
 app.post('/exams/:id/smart-retake', authenticateJWT, requireRole(['STUDENT', 'TEACHER', 'ADMIN']), createSmartRetake);
 app.get('/users/me/exam-history', authenticateJWT, requireRole(['STUDENT', 'TEACHER', 'ADMIN']), getExamHistory);
-app.get('/exams/wrong-questions', authenticateJWT, requireRole(['STUDENT', 'TEACHER', 'ADMIN']), getWrongQuestions);
 
 // Protected Payment Routes
 app.post('/enrollments', authenticateJWT, requireRole(['STUDENT']), createVNPayPayment);

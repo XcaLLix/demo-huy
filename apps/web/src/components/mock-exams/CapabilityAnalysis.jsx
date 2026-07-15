@@ -36,8 +36,8 @@ export default function CapabilityAnalysis({ topicStats = {}, difficultyStats = 
     .map(([name, s]) => ({ name, ...s }))
     .filter(t => t.total > 0);
 
-  const strongTopics = topics.filter(t => (t.accuracy || 0) >= 0.8).sort((a, b) => b.accuracy - a.accuracy).slice(0, 4);
-  const weakTopics = topics.filter(t => (t.accuracy || 0) < 0.6).sort((a, b) => a.accuracy - b.accuracy).slice(0, 4);
+  const strongTopics = topics.filter(t => (t.accuracy || 0) >= 0.8).sort((a, b) => b.accuracy - a.accuracy);
+  const weakTopics = topics.filter(t => (t.accuracy || 0) < 0.6).sort((a, b) => a.accuracy - b.accuracy);
   const midTopics = topics.filter(t => (t.accuracy || 0) >= 0.6 && (t.accuracy || 0) < 0.8);
 
   const overallAccuracy = topics.length > 0

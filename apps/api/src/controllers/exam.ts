@@ -1264,13 +1264,21 @@ export async function createSmartRetake(req: AuthRequest, res: Response) {
           include: { attemptAnswers: { include: { question: true } } }
         });
         if (prevAttempt) {
-          const wrongAnswers = prevAttempt.attemptAnswers.filter(a => !a.isCorrect);
+          // A question is incorrect if it has a wrong answer or was skipped (no attemptAnswer record)
+          const incorrectExamQuestions = exam.examQuestions.filter(eq => {
+            const ans = prevAttempt.attemptAnswers.find(a => a.questionId === eq.questionId);
+            return !ans || !ans.isCorrect;
+          });
+
           if (mode === 'wrong_similar') {
-            baseQuestions = wrongAnswers.map(a => exam.examQuestions.find(eq => eq.questionId === a.questionId)).filter(Boolean) as any;
+            baseQuestions = incorrectExamQuestions;
           } else {
             const rightAnswers = prevAttempt.attemptAnswers.filter(a => a.isCorrect);
-            const selectedWrong = wrongAnswers.slice(0, 7).map(a => exam.examQuestions.find(eq => eq.questionId === a.questionId)).filter(Boolean);
-            const selectedRight = rightAnswers.slice(0, 10 - selectedWrong.length).map(a => exam.examQuestions.find(eq => eq.questionId === a.questionId)).filter(Boolean);
+            const selectedWrong = incorrectExamQuestions.slice(0, 7);
+            const rightExamQuestions = rightAnswers
+              .map(a => exam.examQuestions.find(eq => eq.questionId === a.questionId))
+              .filter(Boolean);
+            const selectedRight = rightExamQuestions.slice(0, 10 - selectedWrong.length).map(a => exam.examQuestions.find(eq => eq.questionId === a.questionId)).filter(Boolean);
             baseQuestions = [...selectedWrong, ...selectedRight] as any;
           }
         }
@@ -1424,13 +1432,17 @@ Cấu trúc mỗi câu hỏi trong JSON phải chính xác như sau:
         include: { attemptAnswers: true }
       });
       if (prevAttempt) {
+        const answeredIds = prevAttempt.attemptAnswers.map(a => a.questionId);
         const wrongIds = prevAttempt.attemptAnswers
           .filter(a => !a.isCorrect)
           .map(a => a.questionId);
         
-        if (wrongIds.length > 0) {
-          filteredQuestions = exam.examQuestions.filter(eq => wrongIds.includes(eq.questionId));
-        } else {
+        // A question is incorrect if it is wrong or skipped (not in answeredIds)
+        filteredQuestions = exam.examQuestions.filter(eq => 
+          wrongIds.includes(eq.questionId) || !answeredIds.includes(eq.questionId)
+        );
+
+        if (filteredQuestions.length === 0) {
           // Adaptive fallback: if 100% correct, challenge them with HARD questions
           filteredQuestions = exam.examQuestions.filter(eq => eq.question.difficulty === 'HARD');
           if (filteredQuestions.length === 0) {
