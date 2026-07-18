@@ -84,17 +84,19 @@ export default function DiscussionTab({
 
   return (
     <div className="discussion-tab animate-in">
-      <form onSubmit={handleSubmit} style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', width: '100%' }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px', width: '100%' }}>
         <div style={{
-          width: '40px',
-          height: '40px',
+          width: '38px',
+          height: '38px',
           borderRadius: '50%',
           background: '#eef2ff',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           overflow: 'hidden',
-          flexShrink: 0
+          flexShrink: 0,
+          border: '1.5px solid #fff',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
         }}>
           {currentUser?.avatarUrl ? (
             <img src={currentUser.avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -109,17 +111,27 @@ export default function DiscussionTab({
           type="text"
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
-          placeholder="Viết bình luận..."
+          placeholder="Viết câu hỏi hoặc chia sẻ bình luận của em..."
           style={{
             flex: 1,
             height: '40px',
-            borderRadius: '8px',
-            border: '1.5px solid #cbd5e1',
+            borderRadius: '10px',
+            border: '1.5px solid rgba(226, 232, 240, 0.9)',
             padding: '0 16px',
             fontSize: '13.5px',
             fontFamily: "'Outfit', sans-serif",
             outline: 'none',
-            transition: 'border-color 0.2s'
+            transition: 'all 0.2s',
+            background: '#ffffff',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.01)'
+          }}
+          onFocus={(e) => {
+            e.target.style.borderColor = '#6366f1';
+            e.target.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.12)';
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = 'rgba(226, 232, 240, 0.9)';
+            e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.01)';
           }}
           required
         />
@@ -129,17 +141,27 @@ export default function DiscussionTab({
           style={{
             width: '40px',
             height: '40px',
-            borderRadius: '8px',
-            background: '#9e9cf2',
+            borderRadius: '10px',
+            background: 'linear-gradient(135deg, #818cf8, #6366f1)',
             color: '#fff',
             border: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            fontSize: '18px',
-            transition: 'background 0.2s',
-            flexShrink: 0
+            fontSize: '20px',
+            fontWeight: 'bold',
+            transition: 'all 0.2s',
+            flexShrink: 0,
+            boxShadow: '0 3px 6px rgba(99, 102, 241, 0.2)'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'linear-gradient(135deg, #6366f1, #4f46e5)';
+            e.currentTarget.style.transform = 'translateY(-1px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'linear-gradient(135deg, #818cf8, #6366f1)';
+            e.currentTarget.style.transform = 'none';
           }}
         >
           ↵

@@ -7,14 +7,19 @@ export async function chatbotConsult(req: Request, res: Response) {
     return res.status(400).json({ success: false, error: 'Tin nhắn không được để trống!' });
   }
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  const model = process.env.OPENROUTER_MODEL || 'openrouter/free';
+  const userOpenRouterKey = req.headers['x-user-openrouter-key'] as string | undefined;
+  const userOpenRouterModel = req.headers['x-user-openrouter-model'] as string | undefined;
+
+  const rawKeys = process.env.OPENROUTER_API_KEYS || process.env.OPENROUTER_API_KEY || '';
+  const apiKeys = userOpenRouterKey ? [userOpenRouterKey] : rawKeys.split(',').map(k => k.trim()).filter(Boolean);
+  const apiKey = apiKeys[0];
+  const model = userOpenRouterKey ? (userOpenRouterModel || 'google/gemini-2.5-flash') : (process.env.OPENROUTER_MODEL || 'openrouter/free');
 
   if (!apiKey) {
-    console.error('[Chatbot Error] OPENROUTER_API_KEY is not configured in .env file!');
+    console.error('[Chatbot Error] OPENROUTER_API_KEY is not configured in .env file or headers!');
     return res.status(500).json({ 
       success: false, 
-      error: 'Hệ thống AI Chatbot đang bảo trì. Vui lòng quay lại sau!' 
+      error: 'Hệ thống AI Chatbot đang bảo trì. Vui lòng cấu hình API Key cá nhân để dùng!' 
     });
   }
 

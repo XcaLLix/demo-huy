@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   HiSparkles, HiPlus, HiMinus, HiTrash, HiSave, HiDownload, 
   HiDocumentText, HiRefresh, HiUpload, HiX, HiChevronRight, 
-  HiChevronLeft, HiFolder, HiBadgeCheck, HiStar, HiVolumeUp
+  HiChevronLeft, HiFolder, HiBadgeCheck, HiStar, HiVolumeUp,
+  HiOutlineCog, HiOutlineQuestionMarkCircle
 } from 'react-icons/hi';
 import { 
   FaPencilAlt, FaLeaf, FaLaptop, FaUsers, FaMapMarkerAlt, 
@@ -258,6 +259,19 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
   const [isChatTyping, setIsChatTyping] = useState(false);
   const chatEndRef = useRef(null);
 
+  // User OpenRouter API Configuration States
+  const [userApiKey, setUserApiKey] = useState(() => localStorage.getItem('user_openrouter_api_key') || '');
+  const [userModel, setUserModel] = useState(() => localStorage.getItem('user_openrouter_model') || 'google/gemini-2.5-flash');
+  const [showSettings, setShowSettings] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
+
+  const handleSaveSettings = () => {
+    localStorage.setItem('user_openrouter_api_key', userApiKey.trim());
+    localStorage.setItem('user_openrouter_model', userModel);
+    setShowSettings(false);
+    toast('Đã lưu cấu hình API Key cá nhân thành công!', 'success');
+  };
+
   // AI Chatbot Resizer States and Handlers
   const [sidebarWidth, setSidebarWidth] = useState(320); // Default to 320px
   const isDraggingRef = useRef(false);
@@ -456,16 +470,18 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
     }
 
     const cleanText = message.toLowerCase();
-    const isGen = cleanText.includes("tạo bộ thẻ") || 
-                  cleanText.includes("tạo flashcard") || 
-                  cleanText.includes("tạo thẻ học") || 
-                  cleanText.includes("tạo bộ card") || 
-                  cleanText.includes("thiết kế bộ thẻ") || 
-                  cleanText.includes("thiết kế flashcard") || 
-                  cleanText.includes("làm bộ thẻ") || 
-                  cleanText.includes("làm flashcard") ||
-                  cleanText.includes("generate flashcard") ||
-                  /(?:tạo|làm|sinh|thiết kế|generate|create|make|build)\s+(?:cho\s+tôi\s+)?(?:một\s+)?(?:bộ\s+)?(?:thẻ|flashcard|card|bộ từ vựng|thẻ học)/i.test(cleanText);
+    
+    // Check if user says 'tạo đi', 'ok tạo đi', etc.
+    const isConfirmGen = /^(ok\s+)?tạo\s+(đi|luôn|thôi)/i.test(cleanText) || 
+                          cleanText.includes("bắt đầu tạo") || 
+                          cleanText === 'tạo' ||
+                          cleanText === 'tạo đi';
+
+    // General creation keywords check
+    const hasCreationVerb = /(?:tạo|làm|sinh|thiết kế|generate|create|make|build|soạn|viết)/i.test(cleanText);
+    const hasTargetNoun = /(?:thẻ|flashcard|card|bộ|từ vựng|công thức|lý thuyết|câu hỏi|từ)/i.test(cleanText);
+    
+    const isGen = isConfirmGen || (hasCreationVerb && hasTargetNoun);
 
     if (isGen) {
       // Add standard loading message from bot
@@ -474,8 +490,26 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
         text: 'Đang khởi tạo và thiết kế bộ thẻ học theo yêu cầu của em. Quá trình này có thể mất vài giây...' 
       }]);
 
+      // Construct a richer prompt if this is a follow-up or confirmation request
+      let promptText = message;
+      const isFollowUp = cleanText.startsWith('nhưng mà') || 
+                         cleanText.includes('mặt trước') || 
+                         cleanText.includes('mặt sau') || 
+                         cleanText.includes('đổi thành') ||
+                         isConfirmGen;
+      if (isFollowUp) {
+        const lastDetailedMsg = [...chatMessages].reverse().find(msg => 
+          msg.sender === 'user' && 
+          msg.text.length > 15 && 
+          !msg.text.toLowerCase().includes('tạo đi')
+        );
+        if (lastDetailedMsg) {
+          promptText = `Yêu cầu trước đó: "${lastDetailedMsg.text}". Yêu cầu điều chỉnh mới: "${message}". Hãy tạo bộ thẻ ghi nhớ hoàn chỉnh kết hợp cả hai yêu cầu trên.`;
+        }
+      }
+
       try {
-        const result = await api.generateFlashcards(message);
+        const result = await api.generateFlashcards(promptText);
         
         if (!Array.isArray(result) || result.length === 0) {
           throw new Error('Dữ liệu flashcard trả về không hợp lệ.');
@@ -490,9 +524,17 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
 
         // Infer a nice deck title from the user prompt
         let extractedTitle = '';
-        const match = message.match(/(?:tạo|làm|sinh|thiết kế|generate|create)\s+(?:cho\s+tôi\s+)?(?:một\s+)?(?:bộ\s+)?(?:thẻ|flashcard|card|bộ từ vựng|thẻ học)(?:\s+mới)?(?:\s+(?:về|chủ đề|cho|có\s+tên|tên\s+là))?\s*(.+)/i);
-        if (match && match[1]) {
-          extractedTitle = match[1].trim();
+        const nameMatch = promptText.match(/(?:đặt\s+)?tên\s+là\s+["']?([^"'\n]+?)["']?(?:\s+cho\s+tôi|\s+nữa|\s*$)/i);
+        if (nameMatch && nameMatch[1]) {
+          extractedTitle = nameMatch[1].trim();
+        } else {
+          const match = promptText.match(/(?:tạo|làm|sinh|thiết kế|generate|create)\s+(?:cho\s+tôi\s+)?(?:một\s+)?(?:bộ\s+)?(?:thẻ|flashcard|card|bộ từ vựng|thẻ học)(?:\s+mới)?(?:\s+(?:về|chủ đề|cho|có\s+tên|tên\s+là))?\s*(.+)/i);
+          if (match && match[1]) {
+            extractedTitle = match[1].trim();
+            extractedTitle = extractedTitle.replace(/(?:cho\s+tôi|nhất|ngay\s+lập\s+tức|ngay)$/i, '').trim();
+          }
+        }
+        if (extractedTitle) {
           extractedTitle = extractedTitle.charAt(0).toUpperCase() + extractedTitle.slice(1);
         } else {
           extractedTitle = 'Flashcard AI - ' + new Date().toLocaleDateString('vi-VN');
@@ -2389,25 +2431,221 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
         {/* ================= RIGHT SIDEBAR ================= */}
         <aside className="flashcard-right-sidebar">
           {/* Chat Header */}
-          <div className="flashcard-chat-header">
-            <h5 className="flashcard-chat-header-title">EDUBOT ĐỒNG HÀNH</h5>
-            <span className="flashcard-chat-header-status">Hoạt động</span>
+          <div className="flashcard-chat-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h5 className="flashcard-chat-header-title" style={{ margin: 0 }}>EDUBOT ĐỒNG HÀNH</h5>
+              <span className="flashcard-chat-header-status" style={{ fontSize: '10px', background: '#d1fae5', color: '#065f46', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>Hoạt động</span>
+            </div>
 
-            {/* Mascot decoration */}
-            <svg 
-              style={{ animation: 'float-moon 4s ease-in-out infinite' }} 
-              width="24" 
-              height="24" 
-              viewBox="0 0 64 64"
-            >
-              <circle cx="32" cy="32" r="28" fill="#FFFFFF" />
-              <circle cx="24" cy="28" r="2.5" fill="#1E1E18" />
-              <circle cx="40" cy="28" r="2.5" fill="#1E1E18" />
-              <path d="M 28 36 Q 32 40 36 36" stroke="#1E1E18" strokeWidth="2.5" strokeLinecap="round" fill="none" />
-              <circle cx="19" cy="32" r="3" fill="#FFB4B4" opacity="0.6" />
-              <circle cx="45" cy="32" r="3" fill="#FFB4B4" opacity="0.6" />
-            </svg>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {/* Question Help Button */}
+              <button 
+                type="button" 
+                onClick={() => {
+                  setShowGuide(!showGuide);
+                  setShowSettings(false);
+                }} 
+                title="Hướng dẫn lấy API Key miễn phí"
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  color: showGuide ? '#f59e0b' : '#94a3b8', 
+                  cursor: 'pointer', 
+                  fontSize: '18px', 
+                  transition: 'color 0.2s', 
+                  display: 'flex', 
+                  alignItems: 'center',
+                  animation: 'attention-rotate 3s infinite ease-in-out'
+                }}
+              >
+                <HiOutlineQuestionMarkCircle />
+              </button>
+
+              {/* Settings Gear Button */}
+              <button 
+                type="button" 
+                onClick={() => {
+                  setShowSettings(!showSettings);
+                  setShowGuide(false);
+                }} 
+                title="Cấu hình API Key cá nhân"
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  color: showSettings ? '#6366f1' : '#94a3b8', 
+                  cursor: 'pointer', 
+                  fontSize: '18px', 
+                  transition: 'color 0.2s', 
+                  display: 'flex', 
+                  alignItems: 'center' 
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.color = '#6366f1'}
+                onMouseLeave={(e) => e.currentTarget.style.color = showSettings ? '#6366f1' : '#94a3b8'}
+              >
+                <HiOutlineCog />
+              </button>
+
+              {/* Mascot decoration */}
+              <svg 
+                style={{ animation: 'float-moon 4s ease-in-out infinite' }} 
+                width="20" 
+                height="20" 
+                viewBox="0 0 64 64"
+              >
+                <circle cx="32" cy="32" r="28" fill="#FFFFFF" />
+                <circle cx="24" cy="28" r="2.5" fill="#1E1E18" />
+                <circle cx="40" cy="28" r="2.5" fill="#1E1E18" />
+                <path d="M 28 36 Q 32 40 36 36" stroke="#1E1E18" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+                <circle cx="19" cy="32" r="3" fill="#FFB4B4" opacity="0.6" />
+                <circle cx="45" cy="32" r="3" fill="#FFB4B4" opacity="0.6" />
+              </svg>
+            </div>
           </div>
+
+          {/* Free AI configuration guide panel */}
+          {showGuide && (
+            <div style={{
+              background: '#fef3c7',
+              borderBottom: '1px solid #fde68a',
+              padding: '16px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+              textAlign: 'left'
+            }}>
+              <h4 style={{ fontSize: '13px', fontWeight: '800', color: '#92400e', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                💡 Hướng dẫn cấu hình AI Miễn phí 100%
+              </h4>
+              <p style={{ fontSize: '11px', color: '#78350f', margin: 0, lineHeight: '1.5' }}>
+                Học sinh có thể cấu hình API Key cá nhân để trò chuyện với Trợ lý AI và tự động tạo flashcard hoàn toàn miễn phí mà không lo giới hạn:
+              </p>
+              <ol style={{ fontSize: '11.5px', color: '#78350f', margin: '0 0 0 16px', padding: 0, display: 'flex', flexDirection: 'column', gap: '4px', fontWeight: '600' }}>
+                <li>Đăng ký tài khoản miễn phí tại OpenRouter.</li>
+                <li>Tạo khóa API Key (miễn phí, không yêu cầu thẻ).</li>
+                <li>Bấm bánh răng ⚙️ bên cạnh, dán Key và chọn model Gemini 2.5 Flash (Miễn phí).</li>
+              </ol>
+              <a 
+                href="https://openrouter.ai/settings/keys" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                style={{
+                  background: '#d97706',
+                  color: '#fff',
+                  textDecoration: 'none',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  fontSize: '11.5px',
+                  fontWeight: '800',
+                  textAlign: 'center',
+                  marginTop: '4px',
+                  boxShadow: '0 2px 4px rgba(217, 119, 6, 0.2)'
+                }}
+              >
+                Tạo API Key miễn phí ngay 🔑
+              </a>
+            </div>
+          )}
+
+          {/* Personal API settings panel */}
+          {showSettings && (
+            <div style={{
+              background: '#f8fafc',
+              borderBottom: '1px solid #e2e8f0',
+              padding: '16px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              textAlign: 'left'
+            }}>
+              <h4 style={{ fontSize: '13px', fontWeight: '800', color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                ⚙️ Cấu hình API Key cá nhân (Pay-as-you-go)
+              </h4>
+              <p style={{ fontSize: '11px', color: '#64748b', margin: 0, lineHeight: '1.4' }}>
+                Nhập API Key OpenRouter cá nhân của em để gọi mô hình AI cao cấp tạo flashcard siêu tốc và trò chuyện không giới hạn.
+              </p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569' }}>OpenRouter API Key:</label>
+                <input 
+                  type="password"
+                  placeholder="sk-or-v1-..."
+                  value={userApiKey}
+                  onChange={e => setUserApiKey(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '12px',
+                    fontFamily: 'monospace',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569' }}>Mô hình AI thông minh:</label>
+                <select
+                  value={userModel}
+                  onChange={e => setUserModel(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '12.5px',
+                    background: '#fff',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  <option value="google/gemini-2.5-flash">⚡ Google Gemini 2.5 Flash (Khuyên dùng - Rất nhanh)</option>
+                  <option value="google/gemini-2.5-pro">🚀 Google Gemini 2.5 Pro (Cao cấp - Rất thông minh)</option>
+                  <option value="meta-llama/llama-3.2-11b-vision-instruct:free">🖼️ Llama 3.2 Vision (Miễn phí hoàn toàn)</option>
+                  <option value="google/gemini-2.5-flash:free">⚡ Google Gemini 2.5 Flash (Miễn phí - Chỉ chat chữ)</option>
+                  <option value="qwen/qwen-2.5-72b-instruct:free">🤖 Qwen 2.5 72B (Miễn phí - Logic xuất sắc)</option>
+                  <option value="deepseek/deepseek-chat">🧠 DeepSeek Chat V3 (Trả phí - Cực thông minh)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                <button
+                  onClick={handleSaveSettings}
+                  style={{
+                    flex: 1,
+                    background: 'linear-gradient(135deg, #818cf8, #6366f1)',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Lưu cấu hình
+                </button>
+                <button
+                  onClick={() => {
+                    setUserApiKey('');
+                    localStorage.removeItem('user_openrouter_api_key');
+                    alert('Đã xóa API Key cá nhân, hệ thống sẽ sử dụng key dùng chung của lớp học.');
+                  }}
+                  style={{
+                    background: '#f1f5f9',
+                    color: '#475569',
+                    border: '1px solid #cbd5e1',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Xóa Key
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Chat Messages */}
           <div className="flashcard-chat-messages-container">

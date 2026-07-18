@@ -21,8 +21,8 @@ import NotePanel from '../components/courses/learning/NotePanel';
 import KeyboardShortcutsOverlay from '../components/courses/learning/KeyboardShortcutsOverlay';
 import CompletionModal from '../components/courses/learning/CompletionModal';
 
-const EduPathLogo = () => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginRight: '8px' }}>
+const EduPathLogo = ({ onClick }) => (
+  <div onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginRight: '8px' }}>
     <img src={sunLogo} alt="EduPath AI" style={{ width: '28px', height: '28px', objectFit: 'contain' }} />
     <span style={{ fontSize: '18px', fontWeight: '800', color: '#6366f1', letterSpacing: '-0.5px', fontFamily: "'Outfit', sans-serif" }}>
       EduPath <em style={{ color: '#4f46e5', fontStyle: 'normal' }}>AI</em>
@@ -45,7 +45,8 @@ export default function LearningPage({
   lessonId, 
   currentUser, 
   onSelectLesson, 
-  onBackToCourse 
+  onBackToCourse,
+  navigateTo
 }) {
   const [course, setCourse] = useState(null);
   const [currentLesson, setCurrentLesson] = useState(null);
@@ -485,7 +486,7 @@ Nội dung bài học: "${currentLesson.content || 'Khái niệm và cách giả
         boxSizing: 'border-box'
       }}>
         <div className="header-left" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <EduPathLogo />
+          <EduPathLogo onClick={() => navigateTo ? navigateTo('/') : window.location.href = '/'} />
           <h2 className="current-lesson-title" style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: '#0f172a', fontFamily: "'Outfit', sans-serif" }}>
             {course.title}
           </h2>
@@ -697,61 +698,6 @@ Nội dung bài học: "${currentLesson.content || 'Khái niệm và cách giả
                     </div>
                     
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }} className="transcript-right-pane">
-                      {/* Summary download card */}
-                      <div style={{
-                        background: '#f8fafc',
-                        border: '1.5px dashed #cbd5e1',
-                        borderRadius: '12px',
-                        padding: '24px 16px',
-                        textAlign: 'center',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '10px'
-                      }}>
-                        <div style={{
-                          width: '42px',
-                          height: '42px',
-                          borderRadius: '50%',
-                          background: '#eef2ff',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#3f51b5',
-                          fontSize: '20px'
-                        }}>
-                          <FileIcon />
-                        </div>
-                        <h4 style={{ fontSize: '14px', fontWeight: '800', margin: 0, color: '#0f172a' }}>Tải bản Tóm tắt AI</h4>
-                        <button
-                          onClick={() => {
-                            toast('Đang khởi tạo tóm tắt thông minh từ AI...', 'info');
-                            setTimeout(() => {
-                              const docText = `Tóm tắt bài học: ${currentLesson.title}\n\n1. Kiến thức cốt lõi:\n- Phân tích chi tiết các dạng lý thuyết trọng tâm.\n- Áp dụng sơ đồ tư duy hệ thống hóa kiến thức.\n\n2. Ghi chú & Công thức:\n- Ghi nhớ công thức đặc biệt được giáo viên nhấn mạnh trong bài giảng.`;
-                              const blob = new Blob([docText], { type: 'text/plain;charset=utf-8' });
-                              const link = document.createElement('a');
-                              link.href = URL.createObjectURL(blob);
-                              link.download = `Tom_tat_${currentLesson.title.replace(/\s+/g, '_')}.txt`;
-                              link.click();
-                              toast('Tải tóm tắt video thành công! 📄', 'success');
-                            }, 1000);
-                          }}
-                          style={{
-                            background: '#3f51b5',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '6px',
-                            padding: '8px 20px',
-                            fontWeight: '700',
-                            fontSize: '12.5px',
-                            cursor: 'pointer',
-                            boxShadow: '0 2px 4px rgba(63, 81, 181, 0.2)'
-                          }}
-                        >
-                          Tải tóm tắt
-                        </button>
-                      </div>
-                      
                       {/* Real timestamped notes form and cards */}
                       <NotePanel 
                         lesson={currentLesson} 
@@ -786,20 +732,58 @@ Nội dung bài học: "${currentLesson.content || 'Khái niệm và cách giả
                         </span>
                       </div>
 
-                      {/* Flip card box with real 3D effect */}
-                      <div className={`flashcard-3d-wrapper ${isFlipped ? 'flipped' : ''}`} onClick={() => setIsFlipped(!isFlipped)}>
-                        <div className="flashcard-3d-card">
-                          {/* Front Side */}
-                          <div className="flashcard-3d-side flashcard-3d-front">
-                            <span className="flashcard-badge">{lessonFlashcards[currentCardIdx]?.partOfSpeech || 'Khái niệm'}</span>
-                            <p className="flashcard-content">{lessonFlashcards[currentCardIdx]?.front}</p>
-                            <span className="flashcard-hint">🔄 Nhấp để lật thẻ</span>
-                          </div>
-                          {/* Back Side */}
-                          <div className="flashcard-3d-side flashcard-3d-back">
-                            <span className="flashcard-badge flashcard-badge--back">{lessonFlashcards[currentCardIdx]?.partOfSpeech || 'Định nghĩa'}</span>
-                            <p className="flashcard-content flashcard-content--back">{lessonFlashcards[currentCardIdx]?.back}</p>
-                            <span className="flashcard-hint flashcard-hint--back">🔄 Nhấp để lật thẻ</span>
+                      {/* Flip card box with real 3D effect & physical stacked paper look */}
+                      <div className="flashcard-3d-wrapper-outer" style={{ position: 'relative', width: '100%', padding: '0 8px 8px 8px', boxSizing: 'border-box', margin: '12px 0 24px 0' }}>
+                        {/* Stacked background paper layers */}
+                        <div style={{ position: 'absolute', top: '8px', left: '16px', right: '16px', bottom: '-4px', background: '#cbd5e1', borderRadius: '16px', border: '1.5px solid #cbd5e1', zIndex: 1, opacity: 0.8 }}></div>
+                        <div style={{ position: 'absolute', top: '4px', left: '12px', right: '12px', bottom: '0px', background: '#f1f5f9', borderRadius: '16px', border: '1.5px solid #cbd5e1', zIndex: 2, opacity: 0.9 }}></div>
+                        
+                        {/* Binder Rings decoration */}
+                        <div className="flashcard-binder-rings" style={{ position: 'absolute', top: '-14px', left: '0', right: '0', display: 'flex', justifyContent: 'center', gap: '80px', zIndex: 10, pointerEvents: 'none' }}>
+                          <div className="flashcard-binder-ring" style={{ width: '14px', height: '32px', borderRadius: '7px', background: 'linear-gradient(90deg, #94a3b8, #cbd5e1 50%, #64748b)', boxShadow: '0 3px 6px rgba(0,0,0,0.16)' }}></div>
+                          <div className="flashcard-binder-ring" style={{ width: '14px', height: '32px', borderRadius: '7px', background: 'linear-gradient(90deg, #94a3b8, #cbd5e1 50%, #64748b)', boxShadow: '0 3px 6px rgba(0,0,0,0.16)' }}></div>
+                        </div>
+
+                        <div className={`flashcard-3d-wrapper ${isFlipped ? 'flipped' : ''}`} onClick={() => setIsFlipped(!isFlipped)} style={{ zIndex: 3, position: 'relative', margin: 0 }}>
+                          <div className="flashcard-3d-card">
+                            {/* Front Side */}
+                            <div className="flashcard-3d-side flashcard-3d-front">
+                              {/* Binder Holes */}
+                              <div className="flashcard-binder-holes" style={{ position: 'absolute', top: '12px', left: '0', right: '0', display: 'flex', justifyContent: 'center', gap: '80px', zIndex: 4 }}>
+                                <div className="flashcard-binder-hole" style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#cbd5e1', border: '1px solid #94a3b8', boxShadow: 'inset 0 1.5px 3px rgba(0,0,0,0.15)' }}></div>
+                                <div className="flashcard-binder-hole" style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#cbd5e1', border: '1px solid #94a3b8', boxShadow: 'inset 0 1.5px 3px rgba(0,0,0,0.15)' }}></div>
+                              </div>
+
+                              <div className="flashcard-badge-row" style={{ position: 'absolute', top: '32px', display: 'flex', gap: '8px', justifyContent: 'center', width: 'auto', left: '50%', transform: 'translateX(-50%)', zIndex: 5 }}>
+                                <span className="flashcard-badge" style={{ position: 'static', background: '#f59e0b', color: '#ffffff', borderColor: '#d97706', fontSize: '10px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', padding: '4px 12px', borderRadius: '99px', border: '1px solid #d97706', whiteSpace: 'nowrap' }}>KHÁI NIỆM</span>
+                                {lessonFlashcards[currentCardIdx]?.partOfSpeech && lessonFlashcards[currentCardIdx]?.partOfSpeech !== 'Khái niệm' && lessonFlashcards[currentCardIdx]?.partOfSpeech !== 'Định nghĩa' && (
+                                  <span className="flashcard-badge" style={{ position: 'static', background: '#e0f2fe', color: '#0369a1', borderColor: '#bae6fd', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', padding: '4px 12px', borderRadius: '99px', border: '1px solid #bae6fd', whiteSpace: 'nowrap' }}>
+                                    {lessonFlashcards[currentCardIdx].partOfSpeech}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="flashcard-content">{lessonFlashcards[currentCardIdx]?.front}</p>
+                              <span className="flashcard-hint">🔄 Nhấp để lật thẻ</span>
+                            </div>
+                            {/* Back Side */}
+                            <div className="flashcard-3d-side flashcard-3d-back">
+                              {/* Binder Holes */}
+                              <div className="flashcard-binder-holes" style={{ position: 'absolute', top: '12px', left: '0', right: '0', display: 'flex', justifyContent: 'center', gap: '80px', zIndex: 4 }}>
+                                <div className="flashcard-binder-hole" style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#334155', border: '1px solid #1e293b', boxShadow: 'inset 0 1.5px 3px rgba(0,0,0,0.3)' }}></div>
+                                <div className="flashcard-binder-hole" style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#334155', border: '1px solid #1e293b', boxShadow: 'inset 0 1.5px 3px rgba(0,0,0,0.3)' }}></div>
+                              </div>
+
+                              <div className="flashcard-badge-row" style={{ position: 'absolute', top: '32px', display: 'flex', gap: '8px', justifyContent: 'center', width: 'auto', left: '50%', transform: 'translateX(-50%)', zIndex: 5 }}>
+                                <span className="flashcard-badge flashcard-badge--back" style={{ position: 'static', background: '#ffffff', color: '#0ea5e9', borderColor: '#ffffff', fontSize: '10px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', padding: '4px 12px', borderRadius: '99px', border: '1px solid #ffffff', whiteSpace: 'nowrap' }}>ĐỊNH NGHĨA</span>
+                                {lessonFlashcards[currentCardIdx]?.partOfSpeech && lessonFlashcards[currentCardIdx]?.partOfSpeech !== 'Khái niệm' && lessonFlashcards[currentCardIdx]?.partOfSpeech !== 'Định nghĩa' && (
+                                  <span className="flashcard-badge flashcard-badge--back" style={{ position: 'static', background: 'rgba(255, 255, 255, 0.2)', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.3)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', padding: '4px 12px', borderRadius: '99px', border: '1px solid rgba(255, 255, 255, 0.3)', whiteSpace: 'nowrap' }}>
+                                    {lessonFlashcards[currentCardIdx].partOfSpeech}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="flashcard-content flashcard-content--back">{lessonFlashcards[currentCardIdx]?.back}</p>
+                              <span className="flashcard-hint flashcard-hint--back">🔄 Nhấp để lật thẻ</span>
+                            </div>
                           </div>
                         </div>
                       </div>

@@ -34,6 +34,9 @@ function processLines(buffer: string, res: Response): string {
         const text = parsed.choices?.[0]?.delta?.content || '';
         if (text) {
           res.write(`data: ${JSON.stringify({ text })}\n\n`);
+          if (typeof (res as any).flush === 'function') {
+            (res as any).flush();
+          }
         }
       } catch (e) {
         // Ignored, might be incomplete JSON chunk
@@ -44,7 +47,7 @@ function processLines(buffer: string, res: Response): string {
 }
 
 export async function streamAIChat(req: AuthRequest, res: Response) {
-  const { message, lessonId, history } = req.body;
+  const { message, lessonId, history, imageUrl } = req.body;
   const studentId = req.user?.id;
   const role = req.user?.role?.toUpperCase();
 
@@ -84,9 +87,9 @@ export async function streamAIChat(req: AuthRequest, res: Response) {
           // Limit the documents scanned to a maximum of 5 to optimize CPU/Memory performance
           const docsToScan = allDocs.slice(0, 5);
           
-          // Extract and cache text for the selected documents
+          // Extract and cache text for the selected documents in parallel
           const docTexts: { title: string, text: string, isCurrentLesson: boolean }[] = [];
-          for (const doc of docsToScan) {
+          await Promise.all(docsToScan.map(async (doc) => {
             try {
               const docText = await getCachedDocumentText(doc.id, doc.fileUrl);
               if (docText && docText.trim()) {
@@ -99,7 +102,7 @@ export async function streamAIChat(req: AuthRequest, res: Response) {
             } catch (docErr: any) {
               console.error(`[streamAIChat] Error parsing doc #${doc.id}:`, docErr.message);
             }
-          }
+          }));
 
           // If we extracted text from course documents, perform multi-doc RAG search
           if (docTexts.length > 0) {
@@ -126,7 +129,7 @@ export async function streamAIChat(req: AuthRequest, res: Response) {
         ];
 
         const docTexts: { title: string, text: string, isCurrentLesson: boolean }[] = [];
-        for (const doc of mockDocs) {
+        await Promise.all(mockDocs.map(async (doc) => {
           try {
             const docText = await getCachedDocumentText(doc.id, doc.fileUrl);
             if (docText && docText.trim()) {
@@ -139,7 +142,7 @@ export async function streamAIChat(req: AuthRequest, res: Response) {
           } catch (docErr: any) {
             console.error(`[streamAIChat Mock] Error parsing doc #${doc.id}:`, docErr.message);
           }
-        }
+        }));
 
         if (docTexts.length > 0) {
           ragContext = getMultiDocRAGContext(docTexts, rawQuery || '');
@@ -160,14 +163,17 @@ export async function streamAIChat(req: AuthRequest, res: Response) {
     }
   }
 
+  const userOpenRouterKey = req.headers['x-user-openrouter-key'] as string | undefined;
+  const userOpenRouterModel = req.headers['x-user-openrouter-model'] as string | undefined;
+
   const rawKeys = process.env.OPENROUTER_API_KEYS || process.env.OPENROUTER_API_KEY || '';
-  const apiKeys = rawKeys.split(',').map(k => k.trim()).filter(Boolean);
-  const model = process.env.OPENROUTER_MODEL || 'openrouter/free';
+  const apiKeys = userOpenRouterKey ? [userOpenRouterKey] : rawKeys.split(',').map(k => k.trim()).filter(Boolean);
+  const model = userOpenRouterKey ? (userOpenRouterModel || 'google/gemini-2.5-pro') : (process.env.OPENROUTER_MODEL || 'openrouter/free');
 
   // Check free AI question limits for non-PRO student
   let isFreeLimitReached = false;
   let maxLimit = 20;
-  if (studentId && role === 'STUDENT') {
+  if (!userOpenRouterKey && studentId && role === 'STUDENT') {
     const user = await prisma.user.findUnique({ where: { id: studentId } });
     if (user && !user.isPro) {
       const todayStr = new Date().toISOString().split('T')[0];
@@ -243,6 +249,36 @@ Hãy ưu tiên trích dẫn và sử dụng các thông tin chính xác từ tà
   });
 
   const slicedMessage = message ? String(message).substring(0, 1000) : '';
+  
+  let finalImageUrl = imageUrl;
+  if (imageUrl && (imageUrl.includes('localhost') || imageUrl.includes('127.0.0.1') || !imageUrl.startsWith('http'))) {
+    try {
+      const filename = imageUrl.split('/').pop();
+      if (filename) {
+        const uploadsDir = path.resolve(process.cwd(), 'uploads');
+        const filePath = path.join(uploadsDir, filename);
+        if (fs.existsSync(filePath)) {
+          const fileBuffer = fs.readFileSync(filePath);
+          const ext = path.extname(filename).toLowerCase();
+          const mimeType = ext === '.png' ? 'image/png' : 
+                           ext === '.gif' ? 'image/gif' : 
+                           ext === '.webp' ? 'image/webp' : 'image/jpeg';
+          const base64Data = fileBuffer.toString('base64');
+          finalImageUrl = `data:${mimeType};base64,${base64Data}`;
+          console.log(`[AI Tutor] Local image converted to base64 successfully for filename: ${filename}`);
+        }
+      }
+    } catch (err: any) {
+      console.error('[AI Tutor] Error converting local image to base64:', err.message);
+    }
+  }
+
+  const userMessageContent = finalImageUrl 
+    ? [
+        { type: 'text', text: slicedMessage || 'Hãy giải thích và giải bài tập trong bức ảnh này.' },
+        { type: 'image_url', image_url: { url: finalImageUrl } }
+      ]
+    : slicedMessage;
 
   try {
     let response: any = null;
@@ -267,7 +303,7 @@ Hãy ưu tiên trích dẫn và sử dụng các thông tin chính xác từ tà
             messages: [
               systemPrompt,
               ...formattedHistory,
-              { role: 'user', content: slicedMessage }
+              { role: 'user', content: userMessageContent }
             ],
             stream: true,
             temperature: 0.7,
@@ -296,7 +332,7 @@ Hãy ưu tiên trích dẫn và sử dụng các thông tin chính xác từ tà
                 messages: [
                   systemPrompt,
                   ...formattedHistory,
-                  { role: 'user', content: slicedMessage }
+                  { role: 'user', content: userMessageContent }
                 ],
                 stream: true,
                 temperature: 0.7,
@@ -322,6 +358,9 @@ Hãy ưu tiên trích dẫn và sử dụng các thông tin chính xác từ tà
       console.error(`[AI Tutor SSE Error] All keys failed. Last error: ${lastErrorMsg}. Falling back to local RAG answer...`);
       const localAnswer = generateLocalRAGAnswer(ragContext, message || '', lesson?.title || '');
       res.write(`data: ${JSON.stringify({ text: localAnswer })}\n\n`);
+      if (typeof (res as any).flush === 'function') {
+        (res as any).flush();
+      }
       res.write('data: [DONE]\n\n');
       res.end();
       return;
@@ -334,6 +373,9 @@ Hãy ưu tiên trích dẫn và sử dụng các thông tin chính xác từ tà
       console.warn('[AI Tutor SSE Error] OpenRouter body is null. Falling back to local RAG answer...');
       const localAnswer = generateLocalRAGAnswer(ragContext, message || '', lesson?.title || '');
       res.write(`data: ${JSON.stringify({ text: localAnswer })}\n\n`);
+      if (typeof (res as any).flush === 'function') {
+        (res as any).flush();
+      }
       res.write('data: [DONE]\n\n');
       res.end();
       return;
@@ -377,6 +419,9 @@ Hãy ưu tiên trích dẫn và sử dụng các thông tin chính xác từ tà
     console.error('[AI Tutor SSE Exception]', err, '. Falling back to local RAG answer...');
     const localAnswer = generateLocalRAGAnswer(ragContext, message || '', lesson?.title || '');
     res.write(`data: ${JSON.stringify({ text: localAnswer })}\n\n`);
+    if (typeof (res as any).flush === 'function') {
+      (res as any).flush();
+    }
     res.write('data: [DONE]\n\n');
     res.end();
   }
@@ -1224,7 +1269,7 @@ function cleanAIResponseContent(content: string): string {
   return filteredLines.join('\n').trim();
 }
 
-async function generateAiFlashcardsFromText(extractedText: string): Promise<{ front: string; back: string }[]> {
+async function generateAiFlashcardsFromText(extractedText: string, customApiKey?: string, customModel?: string): Promise<{ front: string; back: string }[]> {
   const isTopicRequest = extractedText.length < 350 && (
     /tạo|làm|sinh|thiết kế|bộ thẻ|flashcard|chủ đề|về/i.test(extractedText) ||
     extractedText.split(/\s+/).length < 40
@@ -1266,7 +1311,7 @@ Yêu cầu chi tiết:
 
   let content = '';
   try {
-    content = await callOpenRouter(prompt, 1000, 0.4);
+    content = await callOpenRouter(prompt, 1000, 0.4, customApiKey, customModel);
   } catch (err: any) {
     console.error(`[AI Flashcard] callOpenRouter failed:`, err.message);
   }
@@ -1356,8 +1401,11 @@ export async function generateFlashcards(req: AuthRequest, res: Response) {
     return res.status(400).json({ success: false, error: 'Nội dung văn bản để tạo flashcard không được để trống.' });
   }
 
+  const userApiKey = req.headers['x-user-openrouter-key'] as string | undefined;
+  const userModel = req.headers['x-user-openrouter-model'] as string | undefined;
+
   try {
-    const cards = await generateAiFlashcardsFromText(text);
+    const cards = await generateAiFlashcardsFromText(text, userApiKey, userModel);
     return res.status(200).json({ success: true, data: cards });
   } catch (err: any) {
     console.error('[OCR Controller] generateFlashcards failed:', err.message);
@@ -1372,11 +1420,8 @@ export async function generateFlashcardMnemonic(req: AuthRequest, res: Response)
     return res.status(400).json({ success: false, error: 'Thiếu nội dung Mặt trước hoặc Mặt sau của thẻ.' });
   }
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    const fallback = generateLocalMnemonic(front, back);
-    return res.status(200).json({ success: true, mnemonic: fallback });
-  }
+  const userApiKey = req.headers['x-user-openrouter-key'] as string | undefined;
+  const userModel = req.headers['x-user-openrouter-model'] as string | undefined;
 
   try {
     const prompt = `Bạn là chuyên gia siêu trí nhớ hàng đầu thế giới. Hãy thiết kế đúng 1 mẹo ghi nhớ (mnemonic memory trick) cực ngắn gọn (dưới 15 từ) bằng tiếng Việt để giúp người học liên tưởng và nhớ ngay khái niệm này:
@@ -1387,7 +1432,7 @@ Yêu cầu:
 - Hãy làm cho mẹo này thật vui nhộn, tạo âm thanh tương tự, có vần điệu hoặc liên tưởng hình ảnh độc đáo.
 - Chỉ trả về duy nhất nội dung mẹo ghi nhớ, không kèm theo bất cứ giải thích, lời chào hay tiêu đề nào khác.`;
 
-    const content = await callOpenRouter(prompt, 100, 0.7);
+    const content = await callOpenRouter(prompt, 100, 0.7, userApiKey, userModel);
     const cleaned = cleanAIResponseContent(content).replace(/^(mẹo ghi nhớ|mẹo|mnemonic)[:\s-]*/i, '').trim();
     return res.status(200).json({ success: true, mnemonic: cleaned || generateLocalMnemonic(front, back) });
   } catch (err: any) {
@@ -1490,15 +1535,21 @@ export async function generateFlashcardsOCR(req: AuthRequest, res: Response) {
 // MINDMAP SYSTEM UPGRADES - CONTROLLERS
 // =========================================================================
 
-async function callOpenRouter(prompt: string, maxTokens = 1500, temp = 0.5) {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  const primaryModel = process.env.OPENROUTER_MODEL || 'openrouter/free';
+async function callOpenRouter(prompt: string, maxTokens = 1500, temp = 0.5, customApiKey?: string, customModel?: string) {
+  const userOpenRouterKey = customApiKey;
+  const userOpenRouterModel = customModel;
+
+  const rawKeys = process.env.OPENROUTER_API_KEYS || process.env.OPENROUTER_API_KEY || '';
+  const apiKeys = userOpenRouterKey ? [userOpenRouterKey] : rawKeys.split(',').map(k => k.trim()).filter(Boolean);
+  const apiKey = apiKeys[0];
+  const model = userOpenRouterKey ? (userOpenRouterModel || 'google/gemini-2.5-pro') : (process.env.OPENROUTER_MODEL || 'openrouter/free');
+
   if (!apiKey) {
     throw new Error('API Key OpenRouter chưa được cấu hình.');
   }
 
   const candidateModels = [
-    primaryModel,
+    model,
     'google/gemma-2-9b-it:free',
     'meta-llama/llama-3-8b-instruct:free',
     'google/gemma-4-31b-it:free',

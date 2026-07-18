@@ -7,13 +7,22 @@ export const aiService = {
    * @param {object} lesson - The current lesson context
    * @returns {Promise<string>} Response from AI Tutor
    */
-  async sendAiMessage(content, lesson = null, history = [], onChunk = null) {
+  async sendAiMessage(content, lesson = null, history = [], onChunk = null, imageUrl = null) {
     const token = localStorage.getItem('access_token');
     const headers = {
       'Content-Type': 'application/json'
     };
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const userApiKey = localStorage.getItem('user_openrouter_api_key');
+    const userModel = localStorage.getItem('user_openrouter_model');
+    if (userApiKey) {
+      headers['X-User-OpenRouter-Key'] = userApiKey;
+    }
+    if (userModel) {
+      headers['X-User-OpenRouter-Model'] = userModel;
     }
 
     try {
@@ -23,7 +32,8 @@ export const aiService = {
         body: JSON.stringify({ 
           message: content,
           lessonId: lesson?.id || null,
-          history: history
+          history: history,
+          imageUrl: imageUrl
         })
       });
 

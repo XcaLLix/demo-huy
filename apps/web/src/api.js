@@ -7,10 +7,14 @@ let refreshPromise = null;
 
 async function request(path, options = {}) {
   let token = localStorage.getItem('access_token');
+  const userApiKey = localStorage.getItem('user_openrouter_api_key');
+  const userModel = localStorage.getItem('user_openrouter_model');
   const isFormData = options.body instanceof FormData;
   const headers = {
     ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(userApiKey ? { 'X-User-OpenRouter-Key': userApiKey } : {}),
+    ...(userModel ? { 'X-User-OpenRouter-Model': userModel } : {}),
     ...(options.headers || {})
   };
   

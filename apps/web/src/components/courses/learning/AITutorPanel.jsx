@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { HiSparkles, HiChevronRight, HiDatabase, HiTerminal, HiTrash, HiOutlineLightBulb } from 'react-icons/hi';
+import { HiSparkles, HiChevronRight, HiDatabase, HiTerminal, HiTrash, HiOutlineLightBulb, HiOutlineCog, HiOutlineQuestionMarkCircle, HiOutlinePhotograph, HiX } from 'react-icons/hi';
 import { aiService } from '../../../services/aiService';
+import { API_BASE } from '../../../api';
 
 export default function AITutorPanel({ lesson, onClose, initialQuery }) {
   const [messages, setMessages] = useState([]);
@@ -11,6 +12,19 @@ export default function AITutorPanel({ lesson, onClose, initialQuery }) {
 
   const lessonId = lesson?.id || 'default';
   const lessonTitle = lesson?.title || 'Bài học';
+
+  // Personal API Settings state
+  const [showSettings, setShowSettings] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
+  const [userApiKey, setUserApiKey] = useState(() => localStorage.getItem('user_openrouter_api_key') || '');
+  const [userModel, setUserModel] = useState(() => localStorage.getItem('user_openrouter_model') || 'google/gemini-2.5-flash');
+
+  const handleSaveSettings = () => {
+    localStorage.setItem('user_openrouter_api_key', userApiKey.trim());
+    localStorage.setItem('user_openrouter_model', userModel);
+    setShowSettings(false);
+    alert('Đã lưu cấu hình API Key cá nhân!');
+  };
 
   // Load chat history from localStorage (Simulating DB history)
   useEffect(() => {
@@ -63,6 +77,14 @@ Thầy đang đồng hành cùng em trong bài học: **"${lessonTitle}"**. Em h
     }
   }, [messages, loading]);
 
+  const cleanStreamedContent = (text) => {
+    if (!text) return '';
+    return text
+      .replace(/^(User Safety:\s*safe|Response Safety:\s*safe|Moderation:\s*safe)\s*\n?/gi, '')
+      .replace(/\n(User Safety:\s*safe|Response Safety:\s*safe|Moderation:\s*safe)\s*\n?/gi, '\n')
+      .trim();
+  };
+
   const handleSendQuery = async (queryText) => {
     if (!queryText.trim() || loading) return;
 
@@ -93,6 +115,8 @@ Thầy đang đồng hành cùng em trong bài học: **"${lessonTitle}"**. Em h
         lesson,
         historyToSend,
         (chunkText) => {
+          const cleanedChunk = cleanStreamedContent(chunkText);
+          if (!cleanedChunk) return;
           setLoading(false); // Stop loading indicator immediately as we receive the first token
           setMessages(prev => {
             const updated = [...prev];
@@ -100,13 +124,13 @@ Thầy đang đồng hành cùng em trong bài học: **"${lessonTitle}"**. Em h
               hasAppendedAssistant = true;
               updated.push({
                 role: 'assistant',
-                content: chunkText,
+                content: cleanedChunk,
                 timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
               });
             } else {
               const lastMsg = updated[updated.length - 1];
               if (lastMsg.role === 'assistant') {
-                lastMsg.content = chunkText;
+                lastMsg.content = cleanedChunk;
               }
             }
             return updated;
@@ -116,19 +140,20 @@ Thầy đang đồng hành cùng em trong bài học: **"${lessonTitle}"**. Em h
 
       // Finalize and calculate token consumption
       setLoading(false);
+      const cleanedFinal = cleanStreamedContent(response);
       setMessages(prev => {
         const updated = [...prev];
         const lastMsg = updated[updated.length - 1];
         
         let finalMessages = updated;
         if (lastMsg && lastMsg.role === 'assistant') {
-          lastMsg.content = response;
+          lastMsg.content = cleanedFinal;
         } else {
           finalMessages = [
             ...updated,
             {
               role: 'assistant',
-              content: response,
+              content: cleanedFinal,
               timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
             }
           ];
@@ -336,7 +361,42 @@ Thầy đang đồng hành cùng em trong bài học: **"${lessonTitle}"**. Em h
             <p style={{ fontSize: '11px', color: '#64748b', margin: '2px 0 0 0', fontWeight: '600' }}>Trợ lý học tập thông minh 24/7</p>
           </div>
         </div>
-        <div className="ai-tutor-header-actions">
+        <div className="ai-tutor-header-actions" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <button 
+            type="button" 
+            onClick={() => {
+              setShowGuide(!showGuide);
+              setShowSettings(false);
+            }} 
+            className="btn-guide"
+            title="Hướng dẫn cấu hình AI Miễn phí"
+            style={{ 
+              background: 'none', 
+              border: 'none', 
+              color: showGuide ? '#6366f1' : '#f59e0b', 
+              cursor: 'pointer', 
+              fontSize: '19px', 
+              display: 'flex', 
+              alignItems: 'center',
+              animation: 'attention-rotate 3s infinite ease-in-out'
+            }}
+          >
+            <HiOutlineQuestionMarkCircle />
+          </button>
+          <button 
+            type="button" 
+            onClick={() => {
+              setShowSettings(!showSettings);
+              setShowGuide(false);
+            }} 
+            className="btn-settings"
+            title="Cấu hình API Key cá nhân"
+            style={{ background: 'none', border: 'none', color: showSettings ? '#6366f1' : '#94a3b8', cursor: 'pointer', fontSize: '18px', transition: 'color 0.2s', display: 'flex', alignItems: 'center' }}
+            onMouseEnter={(e) => e.currentTarget.style.color = '#6366f1'}
+            onMouseLeave={(e) => e.currentTarget.style.color = showSettings ? '#6366f1' : '#94a3b8'}
+          >
+            <HiOutlineCog />
+          </button>
           <button 
             type="button" 
             onClick={handleClearHistory} 
@@ -350,6 +410,149 @@ Thầy đang đồng hành cùng em trong bài học: **"${lessonTitle}"**. Em h
           </button>
         </div>
       </div>
+
+      {/* Free AI configuration guide panel */}
+      {showGuide && (
+        <div style={{
+          background: '#fef3c7',
+          borderBottom: '1px solid #fde68a',
+          padding: '16px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px',
+          textAlign: 'left'
+        }}>
+          <h4 style={{ fontSize: '13px', fontWeight: '800', color: '#92400e', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            💡 Hướng dẫn cấu hình AI Miễn phí 100%
+          </h4>
+          <p style={{ fontSize: '11px', color: '#78350f', margin: 0, lineHeight: '1.5' }}>
+            Học sinh có thể cấu hình API Key cá nhân để trò chuyện với Gia sư AI hoàn toàn miễn phí mà không lo giới hạn hàng ngày:
+          </p>
+          <ol style={{ fontSize: '11.5px', color: '#78350f', margin: '0 0 0 16px', padding: 0, display: 'flex', flexDirection: 'column', gap: '4px', fontWeight: '600' }}>
+            <li>Đăng ký tài khoản miễn phí tại OpenRouter.</li>
+            <li>Tạo khóa API Key (miễn phí, không yêu cầu thẻ).</li>
+            <li>Bấm bánh răng ⚙️ bên cạnh, dán Key và chọn model Gemini 2.5 Flash (Miễn phí).</li>
+          </ol>
+          <a 
+            href="https://openrouter.ai/settings/keys" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={{
+              background: '#d97706',
+              color: '#fff',
+              textDecoration: 'none',
+              padding: '8px 12px',
+              borderRadius: '8px',
+              fontSize: '11.5px',
+              fontWeight: '800',
+              textAlign: 'center',
+              marginTop: '4px',
+              boxShadow: '0 2px 4px rgba(217, 119, 6, 0.2)'
+            }}
+          >
+            Tạo API Key miễn phí ngay 🔑
+          </a>
+        </div>
+      )}
+
+      {/* Personal API settings panel */}
+      {showSettings && (
+        <div style={{
+          background: '#f8fafc',
+          borderBottom: '1px solid #e2e8f0',
+          padding: '16px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+          textAlign: 'left'
+        }}>
+          <h4 style={{ fontSize: '13px', fontWeight: '800', color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            ⚙️ Cấu hình API Key cá nhân (Pay-as-you-go)
+          </h4>
+          <p style={{ fontSize: '11px', color: '#64748b', margin: 0, lineHeight: '1.4' }}>
+            Nhập API Key OpenRouter cá nhân của em để gọi mô hình AI cao cấp và bỏ qua giới hạn lượt hỏi miễn phí hàng ngày.
+          </p>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569' }}>OpenRouter API Key:</label>
+            <input 
+              type="password"
+              placeholder="sk-or-v1-..."
+              value={userApiKey}
+              onChange={e => setUserApiKey(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                border: '1px solid #cbd5e1',
+                fontSize: '12px',
+                fontFamily: 'monospace'
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569' }}>Mô hình AI thông minh:</label>
+            <select
+              value={userModel}
+              onChange={e => setUserModel(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                border: '1px solid #cbd5e1',
+                fontSize: '12.5px',
+                background: '#fff'
+              }}
+            >
+              <option value="google/gemini-2.5-flash">⚡ Google Gemini 2.5 Flash (Khuyên dùng - Rất nhanh & Đọc ảnh)</option>
+              <option value="google/gemini-2.5-pro">🚀 Google Gemini 2.5 Pro (Cao cấp - Rất thông minh & Đọc ảnh)</option>
+              <option value="meta-llama/llama-3.2-11b-vision-instruct:free">🖼️ Llama 3.2 Vision (Miễn phí hoàn toàn - Đọc ảnh cực nhanh)</option>
+              <option value="google/gemini-2.5-flash:free">⚡ Google Gemini 2.5 Flash (Miễn phí - Chỉ chat chữ)</option>
+              <option value="qwen/qwen-2.5-72b-instruct:free">🤖 Qwen 2.5 72B (Miễn phí - Logic xuất sắc)</option>
+              <option value="deepseek/deepseek-chat">🧠 DeepSeek Chat V3 (Trả phí - Cực thông minh)</option>
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+            <button
+              onClick={handleSaveSettings}
+              style={{
+                flex: 1,
+                background: 'linear-gradient(135deg, #818cf8, #6366f1)',
+                color: '#fff',
+                border: 'none',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: '700',
+                cursor: 'pointer'
+              }}
+            >
+              Lưu cấu hình
+            </button>
+            <button
+              onClick={() => {
+                setUserApiKey('');
+                localStorage.removeItem('user_openrouter_api_key');
+                alert('Đã xóa API Key cá nhân, hệ thống sẽ sử dụng key dùng chung của lớp học.');
+              }}
+              style={{
+                background: '#ef4444',
+                color: '#fff',
+                border: 'none',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: '700',
+                cursor: 'pointer'
+              }}
+            >
+              Xóa Key
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Stats bar */}
       <div className="ai-tutor-stats" style={{ display: 'flex', background: '#f8fafc', padding: '10px 20px', borderBottom: '1px solid #f1f5f9', justifyContent: 'space-between' }}>
@@ -398,26 +601,37 @@ Thầy đang đồng hành cùng em trong bài học: **"${lessonTitle}"**. Em h
               >
                 {isUser ? 'U' : <HiSparkles />}
               </div>
-              <div className="bubble-content-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: isUser ? 'flex-end' : 'flex-start' }}>
-                <div 
-                  className="bubble-text animate-in" 
-                  style={{ 
-                    padding: '12px 16px', 
-                    borderRadius: '18px', 
-                    fontSize: '13.5px', 
-                    lineHeight: '1.6', 
-                    wordBreak: 'break-word',
-                    textAlign: 'left',
-                    background: isUser ? '#eff6ff' : '#f8fafc',
-                    color: isUser ? '#1e40af' : '#334155',
-                    border: isUser ? '1px solid rgba(59, 130, 246, 0.15)' : '1px solid rgba(226, 232, 240, 0.8)',
-                    borderTopRightRadius: isUser ? 0 : '18px',
-                    borderTopLeftRadius: isUser ? '18px' : 0,
-                    boxShadow: isUser ? 'none' : '0 2px 8px rgba(0, 0, 0, 0.01)'
-                  }}
-                >
-                  {renderFormattedContent(msg.content)}
-                </div>
+              <div className="bubble-content-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: isUser ? 'flex-end' : 'flex-start' }}>
+                {msg.imageUrl && (
+                  <div style={{ position: 'relative', maxWidth: '240px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #cbd5e1', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+                    <img 
+                      src={msg.imageUrl} 
+                      alt="Uploaded exercise illustration" 
+                      style={{ width: '100%', height: 'auto', display: 'block', maxHeight: '180px', objectFit: 'cover' }} 
+                    />
+                  </div>
+                )}
+                {msg.content && (
+                  <div 
+                    className="bubble-text animate-in" 
+                    style={{ 
+                      padding: '12px 16px', 
+                      borderRadius: '18px', 
+                      fontSize: '13.5px', 
+                      lineHeight: '1.6', 
+                      wordBreak: 'break-word',
+                      textAlign: 'left',
+                      background: isUser ? '#eff6ff' : '#f8fafc',
+                      color: isUser ? '#1e40af' : '#334155',
+                      border: isUser ? '1px solid rgba(59, 130, 246, 0.15)' : '1px solid rgba(226, 232, 240, 0.8)',
+                      borderTopRightRadius: isUser ? 0 : '18px',
+                      borderTopLeftRadius: isUser ? '18px' : 0,
+                      boxShadow: isUser ? 'none' : '0 2px 8px rgba(0, 0, 0, 0.01)'
+                    }}
+                  >
+                    {renderFormattedContent(msg.content)}
+                  </div>
+                )}
                 <span className="bubble-time" style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>{msg.timestamp}</span>
               </div>
             </div>
@@ -453,13 +667,19 @@ Thầy đang đồng hành cùng em trong bài học: **"${lessonTitle}"**. Em h
                   borderRadius: '18px', 
                   background: '#f8fafc',
                   border: '1px solid rgba(226, 232, 240, 0.8)',
-                  borderTopLeftRadius: 0
+                  borderTopLeftRadius: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px'
                 }}
               >
                 <div className="ai-typing-indicator">
                   <span></span>
                   <span></span>
                   <span></span>
+                </div>
+                <div className="ai-loading-text">
+                  Gia sư AI đang kết nối & soạn bài giải...
                 </div>
               </div>
             </div>
@@ -470,43 +690,6 @@ Thầy đang đồng hành cùng em trong bài học: **"${lessonTitle}"**. Em h
 
       {/* Input area */}
       <div className="ai-tutor-footer" style={{ padding: '16px 20px', borderTop: '1px solid #f1f5f9', background: '#ffffff' }}>
-        <div className="ai-presets-rail" style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px', marginBottom: '10px' }}>
-          {presetActions.map((action, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => handleSendQuery(action.query)}
-              className="preset-chip"
-              disabled={loading}
-              style={{
-                flexShrink: 0,
-                background: '#f1f5f9',
-                border: '1px solid rgba(226, 232, 240, 0.8)',
-                padding: '6px 14px',
-                borderRadius: '20px',
-                fontSize: '11.5px',
-                fontWeight: '700',
-                color: '#475569',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#e2e8f0';
-                e.currentTarget.style.color = '#0f172a';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#f1f5f9';
-                e.currentTarget.style.color = '#475569';
-              }}
-            >
-              {action.label}
-            </button>
-          ))}
-        </div>
-
         <form 
           onSubmit={(e) => {
             e.preventDefault();
@@ -558,7 +741,8 @@ Thầy đang đồng hành cùng em trong bài học: **"${lessonTitle}"**. Em h
               justifyContent: 'center',
               fontSize: '20px',
               transition: 'all 0.2s',
-              boxShadow: loading || !inputText.trim() ? 'none' : '0 4px 10px rgba(99, 102, 241, 0.2)'
+              boxShadow: loading || !inputText.trim() ? 'none' : '0 4px 10px rgba(99, 102, 241, 0.2)',
+              flexShrink: 0
             }}
             onMouseEnter={(e) => {
               if (!loading && inputText.trim()) {

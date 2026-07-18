@@ -3233,6 +3233,7 @@ export default function App() {
                 currentUser={currentUser}
                 onSelectLesson={(courseId, lessonId) => navigateTo(`/learn/${courseId}/lesson/${lessonId}${window.location.search}`)}
                 onBackToCourse={(targetPath) => navigateTo(targetPath || `/courses/${parsedRoute.courseId}`)}
+                navigateTo={navigateTo}
               />
             </div>
           )}
