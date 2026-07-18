@@ -272,6 +272,173 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
     toast('Đã lưu cấu hình API Key cá nhân thành công!', 'success');
   };
 
+  // Game states for Match & Pop Speedrun Mode
+  const [gameItems, setGameItems] = useState([]);
+  const [selectedGameItem, setSelectedGameItem] = useState(null);
+  const [matchedGameIds, setMatchedGameIds] = useState(new Set());
+  const [gameTime, setGameTime] = useState(0);
+  const [isGameCompleted, setIsGameCompleted] = useState(false);
+  const [gameTimerInterval, setGameTimerInterval] = useState(null);
+  const [wrongMatchedIds, setWrongMatchedIds] = useState(new Set());
+
+  const handleLaunchGameForDeck = (deckCards, title, id) => {
+    if (!deckCards || deckCards.length === 0) {
+      toast('Bộ thẻ học rỗng, không thể chơi game!', 'warning');
+      return;
+    }
+
+    // Load deck states first
+    setCards(deckCards);
+    setDeckTitle(title);
+    setActiveDeckId(id);
+    setCurrentIdx(0);
+    setIsFlipped(false);
+    setIsFinished(false);
+
+    // Select up to 6 random cards from the deck for a quick match challenge
+    const shuffledCards = [...deckCards].sort(() => 0.5 - Math.random());
+    const selectedCards = shuffledCards.slice(0, 6); // Play with 6 pairs (12 cards total)
+
+    // Build the 12 matching items (6 front, 6 back)
+    const items = [];
+    selectedCards.forEach((card, index) => {
+      // Front item
+      items.push({
+        id: `front-${index}`,
+        pairIndex: index,
+        type: 'front',
+        text: card.front,
+      });
+      // Back item
+      items.push({
+        id: `back-${index}`,
+        pairIndex: index,
+        type: 'back',
+        text: card.back,
+      });
+    });
+
+    // Shuffle the items for the game board grid
+    const shuffledItems = items.sort(() => 0.5 - Math.random());
+
+    setGameItems(shuffledItems);
+    setSelectedGameItem(null);
+    setMatchedGameIds(new Set());
+    setWrongMatchedIds(new Set());
+    setGameTime(0);
+    setIsGameCompleted(false);
+    setCurrentView('game');
+
+    // Start stopwatch
+    if (gameTimerInterval) clearInterval(gameTimerInterval);
+    const interval = setInterval(() => {
+      setGameTime(prev => prev + 1);
+    }, 100);
+    setGameTimerInterval(interval);
+  };
+
+  const handleStartGameMode = () => {
+    if (!cards || cards.length === 0) {
+      toast('Bộ thẻ học rỗng, không thể bắt đầu chơi game!', 'warning');
+      return;
+    }
+
+    // Select up to 6 random cards from the deck for a quick match challenge
+    const shuffledCards = [...cards].sort(() => 0.5 - Math.random());
+    const selectedCards = shuffledCards.slice(0, 6); // Play with 6 pairs (12 cards total)
+
+    // Build the 12 matching items (6 front, 6 back)
+    const items = [];
+    selectedCards.forEach((card, index) => {
+      // Front item
+      items.push({
+        id: `front-${index}`,
+        pairIndex: index,
+        type: 'front',
+        text: card.front,
+      });
+      // Back item
+      items.push({
+        id: `back-${index}`,
+        pairIndex: index,
+        type: 'back',
+        text: card.back,
+      });
+    });
+
+    // Shuffle the items for the game board grid
+    const shuffledItems = items.sort(() => 0.5 - Math.random());
+
+    setGameItems(shuffledItems);
+    setSelectedGameItem(null);
+    setMatchedGameIds(new Set());
+    setWrongMatchedIds(new Set());
+    setGameTime(0);
+    setIsGameCompleted(false);
+    setCurrentView('game');
+
+    // Start stopwatch
+    if (gameTimerInterval) clearInterval(gameTimerInterval);
+    const interval = setInterval(() => {
+      setGameTime(prev => prev + 1);
+    }, 100); // 100ms precision (ticks 10 times per second!)
+    setGameTimerInterval(interval);
+  };
+
+  const handleSelectGameItem = (item) => {
+    // Ignore already matched items or wrong selection freeze
+    if (matchedGameIds.has(item.id) || wrongMatchedIds.has(item.id)) return;
+
+    if (!selectedGameItem) {
+      // First item selected
+      setSelectedGameItem(item);
+    } else {
+      // Second item selected
+      if (selectedGameItem.id === item.id) {
+        // Clicked same item twice, deselect it
+        setSelectedGameItem(null);
+        return;
+      }
+
+      if (selectedGameItem.pairIndex === item.pairIndex && selectedGameItem.type !== item.type) {
+        // Match!
+        const nextMatched = new Set(matchedGameIds);
+        nextMatched.add(selectedGameItem.id);
+        nextMatched.add(item.id);
+        setMatchedGameIds(nextMatched);
+        setSelectedGameItem(null);
+
+        // Check completion
+        if (nextMatched.size === gameItems.length) {
+          if (gameTimerInterval) clearInterval(gameTimerInterval);
+          setIsGameCompleted(true);
+          toast(`Chúc mừng! Bạn đã hoàn thành game trong ${(gameTime / 10).toFixed(1)} giây!`, 'success');
+        }
+      } else {
+        // Mismatch!
+        setWrongMatchedIds(new Set([selectedGameItem.id, item.id]));
+        setSelectedGameItem(null);
+        
+        // Remove wrong styling after 600ms
+        setTimeout(() => {
+          setWrongMatchedIds(new Set());
+        }, 600);
+      }
+    }
+  };
+
+  const handleStopGame = () => {
+    if (gameTimerInterval) clearInterval(gameTimerInterval);
+    setCurrentView('study');
+  };
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (gameTimerInterval) clearInterval(gameTimerInterval);
+    };
+  }, [gameTimerInterval]);
+
   // AI Chatbot Resizer States and Handlers
   const [sidebarWidth, setSidebarWidth] = useState(320); // Default to 320px
   const isDraggingRef = useRef(false);
@@ -1502,297 +1669,22 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
                 <span>Thống kê</span>
               </span>
             </button>
-          </div>
 
-          {/* Left panel inputs inside sidebar */}
-          {activeTab === 'create' ? (
-            <div 
-              style={{ 
-                marginTop: '12px', 
-                display: 'flex', 
-                flexDirection: 'column', 
-                gap: '12px', 
-                background: 'rgba(255, 255, 255, 0.01)', 
-                border: '1.5px solid var(--fc-border-dark)', 
-                borderRadius: '18px', 
-                padding: '14px',
-                boxSizing: 'border-box'
+            <button 
+              className={`flashcard-menu-item ${currentView === 'game_hub' ? 'flashcard-menu-item--active' : ''}`}
+              onClick={() => {
+                setCurrentView('game_hub');
+                setIsFinished(false);
               }}
             >
-              <h5 style={{ margin: 0, fontSize: '11px', fontWeight: '850', color: 'var(--fc-text-secondary)', letterSpacing: '0.8px', textTransform: 'uppercase', textAlign: 'left' }}>
-                🪄 TRÌNH TẠO THẺ AI
-              </h5>
+              <span className="flashcard-menu-item-left">
+                <span className="flashcard-menu-item-icon">🎮</span>
+                <span>Trò chơi</span>
+              </span>
+            </button>
+          </div>
 
-              {/* Upload zone */}
-              <div 
-                className={`aitutor-dropzone ${isDraggingFile ? 'aitutor-dropzone--active' : ''} ocr-scanner-zone`}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                onClick={() => !selectedFile && fileInputRef.current?.click()}
-                style={{ 
-                  padding: selectedFile ? '0' : '14px 10px', 
-                  minHeight: selectedFile ? 'auto' : '85px',
-                  background: selectedFile ? 'transparent' : 'rgba(255, 255, 255, 0.01)',
-                  border: selectedFile ? 'none' : '2px dashed rgba(255, 255, 255, 0.1)',
-                  cursor: selectedFile ? 'default' : 'pointer',
-                  borderRadius: '12px',
-                  transition: 'all 0.2s ease',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  width: '100%',
-                  boxSizing: 'border-box'
-                }}
-              >
-                {isLoading && <div className="ocr-laser-line" />}
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={handleFileChange}
-                  accept="image/*,text/plain,.txt,.md,.pdf,.docx,.doc"
-                  style={{ display: 'none' }} 
-                />
-                
-                {selectedFile ? (
-                  <div 
-                    onClick={(e) => e.stopPropagation()} 
-                    style={{ 
-                      position: 'relative', 
-                      width: '100%', 
-                      borderRadius: '12px', 
-                      background: 'rgba(30, 41, 59, 0.7)', 
-                      border: '1.5px solid rgba(245, 158, 11, 0.3)', 
-                      padding: '10px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px',
-                      boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
-                      animation: 'fadeIn 0.2s ease-out',
-                      boxSizing: 'border-box'
-                    }}
-                  >
-                    {/* Clear Button */}
-                    <button 
-                      onClick={clearSelectedFile}
-                      style={{
-                        position: 'absolute',
-                        top: '8px',
-                        right: '8px',
-                        width: '22px',
-                        height: '22px',
-                        borderRadius: '50%',
-                        background: 'rgba(239, 68, 68, 0.1)',
-                        border: 'none',
-                        color: '#f87171',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        zIndex: 10
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#ef4444';
-                        e.currentTarget.style.color = '#ffffff';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
-                        e.currentTarget.style.color = '#f87171';
-                      }}
-                    >
-                      <HiX size={12} />
-                    </button>
 
-                    {/* File Content Preview */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {imagePreview ? (
-                        <div style={{ position: 'relative', width: '40px', height: '40px', borderRadius: '6px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', background: '#0f172a' }}>
-                          <img src={imagePreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        </div>
-                      ) : (
-                        <div style={{ width: '40px', height: '40px', borderRadius: '6px', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#818cf8' }}>
-                          <HiDocumentText size={20} />
-                        </div>
-                      )}
-                      
-                      <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-                        <p style={{ margin: 0, fontSize: '11px', fontWeight: '600', color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {selectedFile.name}
-                        </p>
-                        <p style={{ margin: '1px 0 0 0', fontSize: '10px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span style={{ background: selectedFile.type.startsWith('image/') ? 'rgba(245, 158, 11, 0.15)' : 'rgba(99, 102, 241, 0.15)', color: selectedFile.type.startsWith('image/') ? '#fbbf24' : '#a5b4fc', padding: '1px 4px', borderRadius: '4px', fontSize: '8.5px', fontWeight: 'bold' }}>
-                            {selectedFile.name.split('.').pop().toUpperCase()}
-                          </span>
-                          <span>{selectedFile.size < 1024 ? `${selectedFile.size} B` : selectedFile.size < 1048576 ? `${(selectedFile.size / 1024).toFixed(1)} KB` : `${(selectedFile.size / 1048576).toFixed(1)} MB`}</span>
-                        </p>
-                      </div>
-                    </div>
-
-                    <div style={{ fontSize: '9.5px', color: '#fbbf24', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.12)', padding: '5px 8px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px', textAlign: 'left' }}>
-                      <HiSparkles size={10} style={{ flexShrink: 0 }} />
-                      <span>Sẵn sàng để trích xuất thẻ học.</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
-                    <div className="upload-cloud-icon-wrapper" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.1)' }}>
-                      <HiUpload style={{ fontSize: '15px', color: '#94a3b8' }} />
-                    </div>
-                    <p style={{ fontSize: '11px', fontWeight: '700', margin: '4px 0 2px 0', color: '#e2e8f0' }}>Chọn tệp tài liệu / ảnh</p>
-                    <p style={{ fontSize: '9px', color: '#64748b', margin: 0 }}>Hỗ trợ PDF, Word, Ảnh, TXT</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Textarea */}
-              <textarea
-                className="aitutor-textarea"
-                placeholder="Dán tóm tắt kiến thức vào đây để tạo bộ thẻ..."
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                disabled={isLoading}
-                style={{ 
-                  minHeight: '70px',
-                  borderRadius: '10px',
-                  border: '1px solid var(--fc-border-dark)',
-                  background: 'rgba(255,255,255,0.02)',
-                  fontSize: '11.5px',
-                  padding: '6px 8px',
-                  color: '#e2e8f0',
-                  resize: 'none',
-                  boxSizing: 'border-box',
-                  width: '100%'
-                }}
-              />
-
-              {/* Action buttons */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
-                <button
-                  className="aitutor-action-btn"
-                  onClick={handleGenerateFlashcards}
-                  disabled={isLoading || !inputText.trim()}
-                  style={{ 
-                    padding: '8px 12px', 
-                    background: 'linear-gradient(135deg, #6366f1, #4f46e5)', 
-                    border: 'none', 
-                    color: '#ffffff',
-                    borderRadius: '10px',
-                    fontWeight: '700',
-                    fontSize: '11.5px',
-                    boxShadow: '0 4px 10px rgba(99, 102, 241, 0.12)',
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '4px',
-                    width: '100%',
-                    boxSizing: 'border-box'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, #4f46e5, #3730a3)';
-                    e.currentTarget.style.transform = 'translateY(-1px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, #6366f1, #4f46e5)';
-                    e.currentTarget.style.transform = 'none';
-                  }}
-                >
-                  {isLoading ? <span className="spinner" /> : <><HiSparkles /> Tạo thẻ từ Text 🪄</>}
-                </button>
-
-                <button
-                  className="aitutor-action-btn btn-ocr-noai"
-                  onClick={handleGenerateOCRNoAI}
-                  disabled={isLoading || (!selectedFile && !inputText.trim())}
-                  style={{ 
-                    padding: '8px 12px', 
-                    background: 'linear-gradient(135deg, #f59e0b, #d97706)', 
-                    border: 'none', 
-                    color: '#ffffff',
-                    borderRadius: '10px',
-                    fontWeight: '700',
-                    fontSize: '11.5px',
-                    boxShadow: '0 4px 10px rgba(217, 119, 6, 0.12)',
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '4px',
-                    width: '100%',
-                    boxSizing: 'border-box'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, #d97706, #b45309)';
-                    e.currentTarget.style.transform = 'translateY(-1px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
-                    e.currentTarget.style.transform = 'none';
-                  }}
-                >
-                  {isLoading ? <span className="spinner" /> : <>Trích xuất từ File ⚡</>}
-                </button>
-              </div>
-
-              {/* Progress feedback */}
-              {isLoading && loadingStep && (
-                <div style={{ 
-                  padding: '8px 10px', 
-                  borderRadius: '10px', 
-                  background: 'rgba(245, 158, 11, 0.05)', 
-                  border: '1px solid rgba(245, 158, 11, 0.15)', 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  gap: '4px',
-                  width: '100%',
-                  boxSizing: 'border-box'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span className="spinner-mini" style={{ 
-                        width: '8px', 
-                        height: '8px', 
-                        border: '1px solid #f59e0b', 
-                        borderTopColor: 'transparent', 
-                        borderRadius: '50%', 
-                        display: 'inline-block', 
-                        animation: 'spin 0.8s linear infinite' 
-                      }} />
-                      Đang xử lý...
-                    </span>
-                  </div>
-                  <p style={{ fontSize: '10px', color: '#e2e8f0', margin: 0, fontWeight: '500', textAlign: 'left' }}>{loadingStep}</p>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div style={{ marginTop: '16px', borderTop: '1px solid var(--fc-border-dark)', paddingTop: '16px', maxHeight: '220px', overflowY: 'auto' }}>
-              <h5 style={{ fontSize: '11px', margin: '0 0 8px 0', color: 'var(--fc-text-secondary)' }}>BỘ THẺ ĐÃ LƯU</h5>
-              {savedDecks.length === 0 ? (
-                <p style={{ fontSize: '11px', color: 'var(--fc-text-secondary)', textAlign: 'center' }}>Chưa có bộ thẻ nào.</p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {savedDecks.map(deck => (
-                    <div 
-                      key={deck.id}
-                      onClick={() => handleLoadDeck(deck)}
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', cursor: 'pointer', border: '1px solid var(--fc-border-dark)' }}
-                    >
-                      <span style={{ fontSize: '11.5px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '160px' }}>
-                        {deck.title}
-                      </span>
-                      <button 
-                        onClick={(e) => handleDeleteDeck(e, deck.id)}
-                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '12px' }}
-                      >
-                        <HiTrash />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Spaced Repetition & Streak Unified Progress Dashboard Card */}
           <div 
@@ -1998,7 +1890,335 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
                 )}
               </div>
             );
-          })() : (
+          })() : currentView === 'game_hub' ? (
+            /* ================= GAME SELECTION HUB VIEW ================= */
+            <div className="flashcard-decks-selector animate-in" style={{ padding: '8px 4px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#d946ef', textTransform: 'uppercase', letterSpacing: '0.8px' }}>🎮 KHU VUI CHƠI ÔN TẬP</span>
+                  <h2 style={{ fontSize: '22px', fontWeight: '900', color: '#ffffff', margin: '4px 0 0 0' }}>Chọn một bộ từ để đua tốc độ</h2>
+                </div>
+              </div>
+
+              {/* Game Hub Decks Grid */}
+              <div className="new-fc-decks-grid">
+                {/* Default Deck (Green Theme) */}
+                <div 
+                  className="new-fc-card new-fc-card--green animate-in"
+                  onClick={() => handleLaunchGameForDeck(DEFAULT_DECK, 'Chủ đề Lịch sử & Khảo cổ học', 'default')}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <div className="new-fc-card-pattern" />
+                  <div className="new-fc-card-cloud-watermark">
+                    <svg viewBox="0 0 200 120" fill="currentColor" width="100" height="70">
+                      <path d="M150,60 A30,30 0 0,0 120,35 A45,45 0 0,0 55,45 A35,35 0 0,0 60,100 L150,100 A25,25 0 0,0 150,60 Z" opacity="0.45" />
+                      <path d="M135,70 A22,22 0 0,0 112,50 A32,32 0 0,0 65,58 A25,25 0 0,0 70,100 L135,100 A18,18 0 0,0 135,70 Z" opacity="0.65" />
+                    </svg>
+                  </div>
+                  <div className="new-fc-card-header">
+                    <span className="new-fc-card-meta">Lịch sử • {DEFAULT_DECK.length} từ</span>
+                    <span className="new-fc-card-icon-badge">🎯</span>
+                  </div>
+                  <div className="new-fc-card-body">
+                    <h3 className="new-fc-card-title">Chủ đề Lịch sử & Khảo cổ học</h3>
+                    <p className="new-fc-card-description">
+                      Học từ vựng và các thuật ngữ lịch sử khảo cổ học nổi bật thế giới.
+                    </p>
+                  </div>
+                  <div className="new-fc-card-footer" style={{ marginTop: '16px' }}>
+                    <button 
+                      className="new-fc-card-btn-add" 
+                      style={{ background: 'linear-gradient(135deg, #ec4899, #d946ef)', color: '#fff', border: 'none', width: '100%', padding: '10px', borderRadius: '12px', fontWeight: 'bold' }}
+                    >
+                      Bắt đầu chơi 🎮
+                    </button>
+                  </div>
+                </div>
+
+                {/* Saved Decks */}
+                {savedDecks.map((deck, idx) => {
+                  const themes = [
+                    { theme: 'orange', icon: 'leaf', defaultDesc: 'Biến đổi khí hậu, tài nguyên và phát triển bền vững.' },
+                    { theme: 'teal', icon: 'computer', defaultDesc: 'Thuật ngữ công nghệ, AI và chuyển đổi số.' },
+                    { theme: 'red', icon: 'group', defaultDesc: 'Cộng đồng, bản sắc và các vấn đề xã hội.' },
+                    { theme: 'gold', icon: 'urn', defaultDesc: 'Văn minh, di sản và khám phá khảo cổ học.' },
+                    { theme: 'pink', icon: 'chart', defaultDesc: 'Thị trường, thương mại và tài chính.' },
+                    { theme: 'blue', icon: 'stethoscope', defaultDesc: 'Y học, dịch tễ và lối sống lành mạnh.' },
+                    { theme: 'purple', icon: 'graduation', defaultDesc: 'Học tập, nhận thức và hành vi con người.' },
+                    { theme: 'seagreen', icon: 'bank', defaultDesc: 'Quy hoạch, xây dựng và không gian sống.' }
+                  ];
+                  const themeCfg = themes[idx % themes.length];
+                  
+                  return (
+                    <div 
+                      key={deck.id} 
+                      className={`new-fc-card new-fc-card--${themeCfg.theme} animate-in`}
+                      onClick={() => handleLaunchGameForDeck(deck.cards, deck.title, deck.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <div className="new-fc-card-pattern" />
+                      <div className="new-fc-card-cloud-watermark">
+                        <svg viewBox="0 0 200 120" fill="currentColor" width="100" height="70">
+                          <path d="M150,60 A30,30 0 0,0 120,35 A45,45 0 0,0 55,45 A35,35 0 0,0 60,100 L150,100 A25,25 0 0,0 150,60 Z" opacity="0.45" />
+                          <path d="M135,70 A22,22 0 0,0 112,50 A32,32 0 0,0 65,58 A25,25 0 0,0 70,100 L135,100 A18,18 0 0,0 135,70 Z" opacity="0.65" />
+                        </svg>
+                      </div>
+                      <div className="new-fc-card-header">
+                        <span className="new-fc-card-meta">
+                          {(() => {
+                            const raw = deck.cards?.[0]?.hashtag;
+                            if (raw) return raw.replace('#', '').trim();
+                            return 'IELTS';
+                          })()} • {deck.cards?.length || 0} từ
+                        </span>
+                        <span className="new-fc-card-icon-badge">
+                          {getSubjectIcon(themeCfg.icon)}
+                        </span>
+                      </div>
+                      <div className="new-fc-card-body">
+                        <h3 className="new-fc-card-title">{deck.title}</h3>
+                        <p className="new-fc-card-description">
+                          {themeCfg.defaultDesc}
+                        </p>
+                      </div>
+                      <div className="new-fc-card-footer" style={{ marginTop: '16px' }}>
+                        <button 
+                          className="new-fc-card-btn-add" 
+                          style={{ background: 'linear-gradient(135deg, #ec4899, #d946ef)', color: '#fff', border: 'none', width: '100%', padding: '10px', borderRadius: '12px', fontWeight: 'bold' }}
+                        >
+                          Bắt đầu chơi 🎮
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {savedDecks.length === 0 && (
+                <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.01)', border: '1px dashed var(--fc-border-dark)', borderRadius: '20px', padding: '40px', marginTop: '24px' }}>
+                  <p style={{ color: 'var(--fc-text-secondary)', fontSize: '13px', margin: 0 }}>
+                    Bạn chưa tự tạo bộ thẻ học cá nhân nào để chơi game. Hãy nhập tài liệu hoặc chat với EduBot để tạo nhanh nhé!
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : currentView === 'game' ? (
+            /* ================= MATCH & POP SPEEDRUN GAME CANVAS ================= */
+            <div className="flashcard-game-workspace animate-in" style={{ 
+              padding: '32px', 
+              textAlign: 'center', 
+              background: 'radial-gradient(circle at top left, rgba(236, 72, 153, 0.08), rgba(139, 92, 246, 0.06), rgba(15, 23, 42, 0.95))', 
+              borderRadius: '24px', 
+              border: '1.5px solid rgba(255, 255, 255, 0.08)', 
+              width: '100%', 
+              boxSizing: 'border-box',
+              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.15)',
+              backdropFilter: 'blur(20px)',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              {/* Inline CSS animation styles for game mechanics */}
+              <style dangerouslySetInnerHTML={{__html: `
+                @keyframes fcGameShake {
+                  0%, 100% { transform: translateX(0); }
+                  20%, 60% { transform: translateX(-6px); }
+                  40%, 80% { transform: translateX(6px); }
+                }
+                @keyframes fcGamePop {
+                  0% { transform: scale(1); }
+                  50% { transform: scale(1.08); }
+                  100% { transform: scale(1); }
+                }
+                @keyframes fcGamePulseGlow {
+                  0%, 100% { box-shadow: 0 0 12px rgba(236, 72, 153, 0.2); }
+                  50% { box-shadow: 0 0 25px rgba(236, 72, 153, 0.45); }
+                }
+                .fc-game-cell-shake {
+                  animation: fcGameShake 0.4s ease-in-out !important;
+                }
+                .fc-game-cell-pop {
+                  animation: fcGamePop 0.3s ease-out !important;
+                }
+                .fc-game-cell-selected {
+                  animation: fcGamePulseGlow 1.5s infinite alternate !important;
+                }
+              `}} />
+
+              {/* Header Row */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px', flexWrap: 'wrap', gap: '12px' }}>
+                <div style={{ textAlign: 'left' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#ec4899', textTransform: 'uppercase', letterSpacing: '1px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#ec4899', animate: 'ping 1s infinite' }} />
+                    🎮 TRÒ CHƠI ÔN TẬP
+                  </span>
+                  <h2 style={{ fontSize: '22px', fontWeight: '950', color: '#fff', margin: '6px 0 0 0', fontFamily: "'Outfit', sans-serif" }}>Đua tốc độ: Nối cặp Khái niệm & Định nghĩa</h2>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <div style={{ background: 'rgba(255,255,255,0.04)', padding: '10px 20px', borderRadius: '14px', border: '1.5px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ color: 'var(--fc-text-secondary)', fontSize: '12.5px' }}>⏱️ Thời gian: </span>
+                    <strong style={{ fontSize: '20px', color: '#ffd234', fontFamily: 'monospace', fontWeight: '800' }}>{(gameTime / 10).toFixed(1)}s</strong>
+                  </div>
+                  <button 
+                    onClick={handleStopGame}
+                    style={{
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      border: '1.5px solid rgba(239, 68, 68, 0.3)',
+                      color: '#f87171',
+                      padding: '10px 20px',
+                      borderRadius: '14px',
+                      fontSize: '13px',
+                      fontWeight: '800',
+                      cursor: 'pointer',
+                      transition: 'all 0.25s ease'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = '#ef4444'; e.currentTarget.style.color = '#fff'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'; e.currentTarget.style.color = '#f87171'; }}
+                  >
+                    Thoát Game
+                  </button>
+                </div>
+              </div>
+
+              {/* Game Grid */}
+              {!isGameCompleted ? (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                  gap: '18px',
+                  marginTop: '20px'
+                }}>
+                  {gameItems.map((item) => {
+                    const isSelected = selectedGameItem?.id === item.id;
+                    const isMatched = matchedGameIds.has(item.id);
+                    const isWrong = wrongMatchedIds.has(item.id);
+
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => handleSelectGameItem(item)}
+                        className={`
+                          ${isWrong ? 'fc-game-cell-shake' : ''} 
+                          ${isMatched ? 'fc-game-cell-pop' : ''} 
+                          ${isSelected ? 'fc-game-cell-selected' : ''}
+                        `}
+                        style={{
+                          background: isMatched 
+                            ? 'rgba(16, 185, 129, 0.08)' 
+                            : isWrong 
+                            ? 'rgba(239, 68, 68, 0.12)' 
+                            : isSelected 
+                            ? 'linear-gradient(135deg, rgba(236, 72, 153, 0.15), rgba(139, 92, 246, 0.2))' 
+                            : 'rgba(255, 255, 255, 0.02)',
+                          border: isMatched
+                            ? '2px solid rgba(16, 185, 129, 0.8)'
+                            : isWrong
+                            ? '2px solid rgba(239, 68, 68, 0.8)'
+                            : isSelected
+                            ? '2px solid rgba(236, 72, 153, 0.9)'
+                            : '1.5px solid rgba(255, 255, 255, 0.08)',
+                          borderRadius: '18px',
+                          padding: '24px 16px',
+                          minHeight: '110px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: isMatched ? 'default' : 'pointer',
+                          opacity: isMatched ? 0.35 : 1,
+                          transform: isSelected ? 'scale(1.03) translateY(-2px)' : 'none',
+                          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                          textAlign: 'center',
+                          boxSizing: 'border-box',
+                          boxShadow: isMatched 
+                            ? '0 0 15px rgba(16, 185, 129, 0.15)' 
+                            : isWrong 
+                            ? '0 0 15px rgba(239, 68, 68, 0.2)' 
+                            : '0 4px 12px rgba(0, 0, 0, 0.15)',
+                          backdropFilter: 'blur(8px)'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isMatched && !isSelected && !isWrong) {
+                            e.currentTarget.style.border = '1.5px solid rgba(139, 92, 246, 0.4)';
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            e.currentTarget.style.transform = 'translateY(-3px)';
+                            e.currentTarget.style.boxShadow = '0 10px 25px rgba(139, 92, 246, 0.15)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isMatched && !isSelected && !isWrong) {
+                            e.currentTarget.style.border = '1.5px solid rgba(255, 255, 255, 0.08)';
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)';
+                            e.currentTarget.style.transform = 'none';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                          }
+                        }}
+                      >
+                        <div style={{
+                          fontSize: '13.5px',
+                          fontWeight: '600',
+                          color: isMatched ? '#a7f3d0' : isSelected ? '#fbcfe8' : '#e2e8f0',
+                          lineHeight: '1.45',
+                          wordBreak: 'break-word'
+                        }}>
+                          {item.text}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                /* Completion Screen */
+                <div style={{ padding: '60px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+                  <div style={{ fontSize: '72px', animation: 'fcGamePop 1s infinite alternate' }}>🏆</div>
+                  <h3 style={{ fontSize: '26px', fontWeight: '950', color: '#fff', margin: 0, fontFamily: "'Outfit', sans-serif" }}>Hoàn thành xuất sắc!</h3>
+                  <p style={{ color: 'var(--fc-text-secondary)', fontSize: '15.5px', margin: 0 }}>
+                    Bạn đã tìm được tất cả các cặp tương ứng trong thời gian kỷ lục:
+                  </p>
+                  <div style={{ background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.15), rgba(217, 70, 239, 0.15))', padding: '16px 36px', borderRadius: '20px', border: '1.5px solid #d946ef', boxShadow: '0 0 30px rgba(217, 70, 239, 0.25)' }}>
+                    <strong style={{ fontSize: '36px', color: '#ffd234', fontFamily: 'monospace', fontWeight: '800' }}>{(gameTime / 10).toFixed(1)} giây</strong>
+                  </div>
+                  <div style={{ display: 'flex', gap: '14px', marginTop: '20px' }}>
+                    <button
+                      onClick={handleStartGameMode}
+                      style={{
+                        background: 'linear-gradient(135deg, #ec4899, #d946ef)',
+                        color: '#fff',
+                        border: 'none',
+                        padding: '12px 28px',
+                        borderRadius: '14px',
+                        fontWeight: '800',
+                        fontSize: '14.5px',
+                        cursor: 'pointer',
+                        transition: 'all 0.25s ease',
+                        boxShadow: '0 8px 20px rgba(217, 70, 239, 0.3)'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                      onMouseLeave={(e) => e.currentTarget.style.transform = 'none'}
+                    >
+                      Chơi Vòng Mới 🎮
+                    </button>
+                    <button
+                      onClick={handleStopGame}
+                      style={{
+                        background: 'rgba(255,255,255,0.06)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        color: '#fff',
+                        padding: '12px 28px',
+                        borderRadius: '14px',
+                        fontWeight: '800',
+                        fontSize: '14.5px',
+                        cursor: 'pointer',
+                        transition: 'all 0.25s ease'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.12)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+                    >
+                      Quay Lại Ôn Tập 📖
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
             /* ================= REGULAR STUDY CANVAS ================= */
             <>
               <div className="flashcard-center-header">
@@ -2024,6 +2244,14 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
                 </div>
 
                 <div className="flashcard-header-actions">
+                  <button 
+                    className="flashcard-header-btn" 
+                    onClick={handleStartGameMode} 
+                    style={{ background: 'linear-gradient(135deg, #ec4899, #d946ef)', color: '#fff', border: 'none' }}
+                    title="Chơi game nối cặp tốc độ với bộ thẻ này"
+                  >
+                    🎮 Chơi Game
+                  </button>
                   <button className="flashcard-header-btn" onClick={handleShuffleDeck} title="Trộn thẻ ngẫu nhiên">
                     Trộn thẻ
                   </button>

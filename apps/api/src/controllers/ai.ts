@@ -1462,7 +1462,10 @@ export async function generateFlashcardsOCR(req: AuthRequest, res: Response) {
   const filePath = req.file.path;
   const ext = path.extname(req.file.originalname).toLowerCase();
 
-  // Parse document files directly in Node to guarantee instant processing without Python dependencies
+  const userApiKey = req.headers['x-user-openrouter-key'] as string | undefined;
+  const userModel = req.headers['x-user-openrouter-model'] as string | undefined;
+
+  // 1. Handle Document Files (.txt, .md, .pdf, .docx, .doc)
   if (['.txt', '.md', '.pdf', '.docx', '.doc'].includes(ext)) {
     try {
       const text = await extractTextFromFile(filePath, ext);
@@ -1476,7 +1479,7 @@ export async function generateFlashcardsOCR(req: AuthRequest, res: Response) {
         return res.status(400).json({ success: false, error: 'Tài liệu rỗng hoặc không thể trích xuất văn bản.' });
       }
 
-      const cards = await generateAiFlashcardsFromText(text);
+      const cards = await generateAiFlashcardsFromText(text, userApiKey, userModel);
       return res.status(200).json({ success: true, data: cards });
     } catch (readErr: any) {
       console.error('[OCR Controller] Read document file error:', readErr.message);
@@ -1484,6 +1487,64 @@ export async function generateFlashcardsOCR(req: AuthRequest, res: Response) {
     }
   }
 
+  // 2. Handle Image Files (.png, .jpg, .jpeg, .webp, .bmp)
+  if (['.png', '.jpg', '.jpeg', '.webp', '.bmp'].includes(ext)) {
+    // Try AI Vision OCR if API Key is present (99.9% reliable and bypasses Python/Tesseract installation)
+    const rawKeys = process.env.OPENROUTER_API_KEYS || process.env.OPENROUTER_API_KEY || '';
+    const hasKey = userApiKey || rawKeys.trim().length > 0;
+    
+    if (hasKey) {
+      try {
+        console.log(`[OCR Controller] Utilizing AI Vision model for image flashcard generation...`);
+        const imageBuffer = fs.readFileSync(filePath);
+        const base64Image = imageBuffer.toString('base64');
+        let mimeType = 'image/jpeg';
+        if (ext === '.png') mimeType = 'image/png';
+        else if (ext === '.webp') mimeType = 'image/webp';
+        else if (ext === '.gif') mimeType = 'image/gif';
+
+        const prompt = `Bạn là một Giáo sư/Chuyên gia giáo dục Việt Nam. Hãy phân tích hình ảnh tài liệu/bài tập được tải lên này và trích xuất/thiết kế một bộ gồm đúng 6-8 thẻ ghi nhớ (flashcards) chất lượng cao để ôn tập.
+Yêu cầu độ chính xác khoa học và kiến thức trong flashcard phải đúng 100% so với hình ảnh gốc, tuyệt đối không bịa đặt hoặc gây hiểu lầm.
+
+Yêu cầu chi tiết:
+- Mặt trước (Front) của mỗi flashcard PHẢI là khái niệm, thuật ngữ, công thức hoặc từ vựng cụ thể xuất hiện trong hình ảnh (ví dụ: "Flo (F)", "Halogen", "Tính oxi hóa" hoặc "HCl").
+- Mặt sau (Back) PHẢI là định nghĩa, ý nghĩa, công thức (sử dụng LaTeX nếu có công thức, ví dụ: $V = \\frac{1}{3} B h$), hoặc giải thích tương ứng ngắn gọn của khái niệm/thuật ngữ đó.
+- Hãy trả về kết quả dưới dạng một mảng JSON duy nhất chứa các đối tượng có thuộc tính "front" và "back". Ví dụ: [{"front": "khái niệm", "back": "định nghĩa"}]. Chỉ trả về chuỗi JSON thô có thể parse được trực tiếp, không kèm lời dẫn giải thích hay bọc trong markdown.`;
+
+        const visionResponse = await callOpenRouterVision(prompt, base64Image, mimeType, userApiKey, userModel);
+        
+        // Clean up file
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+
+        const cleanedResponse = cleanAIResponseContent(visionResponse);
+        
+        // Try parsing JSON array directly
+        try {
+          const jsonStartIndex = cleanedResponse.indexOf('[');
+          const jsonEndIndex = cleanedResponse.lastIndexOf(']') + 1;
+          if (jsonStartIndex !== -1 && jsonEndIndex !== -1) {
+            const cards = JSON.parse(cleanedResponse.substring(jsonStartIndex, jsonEndIndex));
+            if (Array.isArray(cards) && cards.length > 0) {
+              return res.status(200).json({ success: true, data: cards });
+            }
+          }
+        } catch (jsonErr) {
+          console.warn('[OCR Vision Controller] Direct JSON parse failed, trying format fallback:', jsonErr);
+        }
+
+        // Fallback simple line parsing if JSON array is invalid
+        const fallbackCards = generateLocalFlashcards(cleanedResponse);
+        return res.status(200).json({ success: true, data: fallbackCards });
+
+      } catch (visionErr: any) {
+        console.error('[OCR Controller] AI Vision failed, falling back to python script:', visionErr.message);
+      }
+    }
+  }
+
+  // 3. Fallback to Python script OCR if image and AI Vision failed/unconfigured
   const scriptPath = path.resolve(process.cwd(), 'src/scripts/ocr_processor.py');
   const command = `python "${scriptPath}" "${filePath}"`;
 
@@ -1499,7 +1560,7 @@ export async function generateFlashcardsOCR(req: AuthRequest, res: Response) {
 
     if (error) {
       console.error('[OCR Controller] Python exec error:', error.message);
-      return res.status(500).json({ success: false, error: `Không thể thực thi mã phân tích: ${error.message}` });
+      return res.status(500).json({ success: false, error: `Không thể thực thi mã phân tích hình ảnh. Vui lòng thử lại.` });
     }
 
     try {
@@ -1509,7 +1570,7 @@ export async function generateFlashcardsOCR(req: AuthRequest, res: Response) {
         
         // If rawText is successfully extracted from the image, pass it to our AI generator!
         if (rawText && rawText.trim()) {
-          const cards = await generateAiFlashcardsFromText(rawText);
+          const cards = await generateAiFlashcardsFromText(rawText, userApiKey, userModel);
           return res.status(200).json({ success: true, data: cards });
         } else {
           // Fallback if no text extracted
@@ -1534,6 +1595,59 @@ export async function generateFlashcardsOCR(req: AuthRequest, res: Response) {
 // =========================================================================
 // MINDMAP SYSTEM UPGRADES - CONTROLLERS
 // =========================================================================
+
+async function callOpenRouterVision(prompt: string, base64Image: string, mimeType: string, customApiKey?: string, customModel?: string) {
+  const userOpenRouterKey = customApiKey;
+  const userOpenRouterModel = customModel;
+
+  const rawKeys = process.env.OPENROUTER_API_KEYS || process.env.OPENROUTER_API_KEY || '';
+  const apiKeys = userOpenRouterKey ? [userOpenRouterKey] : rawKeys.split(',').map(k => k.trim()).filter(Boolean);
+  const apiKey = apiKeys[0];
+  // Default to a vision model (google/gemini-2.5-flash is extremely fast, cheap, and has vision capabilities!)
+  const model = userOpenRouterKey ? (userOpenRouterModel || 'google/gemini-2.5-flash') : (process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash');
+
+  if (!apiKey) {
+    throw new Error('API Key OpenRouter chưa được cấu hình.');
+  }
+
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://edupath.vn',
+      'X-Title': 'EduPath AI Vision OCR'
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: prompt
+          },
+          {
+            type: 'image_url',
+            image_url: {
+              url: `data:${mimeType};base64,${base64Image}`
+            }
+          }
+        ]
+      }],
+      temperature: 0.4,
+      max_tokens: 1000
+    })
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`OpenRouter Vision API error: ${errText}`);
+  }
+
+  const data = await response.json() as any;
+  return data.choices?.[0]?.message?.content || '';
+}
 
 async function callOpenRouter(prompt: string, maxTokens = 1500, temp = 0.5, customApiKey?: string, customModel?: string) {
   const userOpenRouterKey = customApiKey;
