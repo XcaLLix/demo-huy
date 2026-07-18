@@ -102,10 +102,10 @@ export default function FloatingUserMenu({
             {/* 3. Khóa học của tôi */}
             <div 
               className="fum-item" 
-              onClick={() => handleItemClick('/my-courses')}
+              onClick={() => handleItemClick('/user/courses')}
               role="button"
               tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && handleItemClick('/my-courses')}
+              onKeyDown={(e) => e.key === 'Enter' && handleItemClick('/user/courses')}
             >
               <HiDesktopComputer className="fum-icon" />
               <span>Khóa học của tôi</span>

@@ -3139,28 +3139,13 @@ export default function App() {
               />
               <div style={{ padding: '20px' }}>
               {parsedRoute.route === 'courses-list' && (
-                role === 'student' ? (
-                  <div className="cp-page-container">
-                    <div className="cp-page animate-in">
-                      <CourseMall
-                        courses={courses}
-                        currentUser={currentUser}
-                        onSelectCourse={(course) => navigateTo(`/courses/${course.id}`)}
-                        onLearnCourse={(course) => navigateTo(`/learn/${course.id}`)}
-                        onCheckoutCourse={(course) => setCheckoutCourse(course)}
-                        onRegisterLead={handleRegisterLead}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <CoursesPage
-                    courses={courses}
-                    currentUser={currentUser}
-                    onSelectCourse={(course) => navigateTo(`/courses/${course.id}`)}
-                    onCheckoutCourse={(course) => setCheckoutCourse(course)}
-                    navigateTo={navigateTo}
-                  />
-                )
+                <CoursesPage
+                  courses={courses}
+                  currentUser={currentUser}
+                  onSelectCourse={(course) => navigateTo(`/courses/${course.id}`)}
+                  onCheckoutCourse={(course) => setCheckoutCourse(course)}
+                  navigateTo={navigateTo}
+                />
               )}
 
               {parsedRoute.route === 'course-detail' && (
@@ -3263,7 +3248,7 @@ export default function App() {
                             parsedRoute.tab}
                 setActiveTab={(tab) => {
                   if (tab === 'courses') navigateTo('/user/courses');
-                  else if (tab === 'my-courses') navigateTo('/user/my-courses');
+                  else if (tab === 'store') navigateTo('/courses');
                   else if (tab === 'classrooms') navigateTo('/user/classrooms');
                   else if (tab === 'tests') navigateTo('/user/mock-exams');
                   else if (tab === 'ai-qa') navigateTo('/user/ai-tutor');
@@ -3294,17 +3279,7 @@ export default function App() {
                 />
               )}
 
-              {/* Courses tab */}
-              {parsedRoute.tab === 'courses' && (
-                <CourseMall
-                  courses={courses}
-                  currentUser={currentUser}
-                  onSelectCourse={setActiveCourseDetails}
-                  onLearnCourse={(course) => navigateTo(`/learn/${course.id}`)}
-                  onCheckoutCourse={handleCheckoutCourse}
-                  onRegisterLead={handleRegisterLead}
-                />
-              )}
+
 
               {/* Forum tab */}
               {parsedRoute.tab === 'forum' && (

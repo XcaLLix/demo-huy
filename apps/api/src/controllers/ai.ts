@@ -44,58 +44,124 @@ function processLines(buffer: string, res: Response): string {
 }
 
 export async function streamAIChat(req: AuthRequest, res: Response) {
-  const { message, lessonId } = req.body;
+  const { message, lessonId, history } = req.body;
   const studentId = req.user?.id;
   const role = req.user?.role?.toUpperCase();
 
   // Retrieve lesson context and RAG documents beforehand
   let lesson = null;
   let ragContext = '';
-  if (lessonId && !isNaN(Number(lessonId))) {
-    try {
-      lesson = await prisma.lesson.findUnique({
-        where: { id: Number(lessonId) }
-      });
-      if (lesson) {
+  if (lessonId) {
+    const isMock = String(lessonId).startsWith('def-');
+    if (!isMock && !isNaN(Number(lessonId))) {
+      try {
+        lesson = await prisma.lesson.findUnique({
+          where: { id: Number(lessonId) },
+          include: { course: true }
+        });
+        if (lesson) {
+          const rawQuery = message && message.includes('Học sinh hỏi: ')
+            ? message.split('Học sinh hỏi: ').pop()
+            : message;
+
+          // Fetch all documents for all lessons in this course
+          const allLessonsInCourse = await prisma.lesson.findMany({
+            where: { courseId: lesson.courseId },
+            include: { documents: true }
+          });
+          
+          const allDocs = allLessonsInCourse.flatMap(l => l.documents);
+
+          // Sort documents: Put documents belonging to the current lesson first
+          allDocs.sort((a, b) => {
+            const aIsCurrent = a.lessonId === Number(lessonId);
+            const bIsCurrent = b.lessonId === Number(lessonId);
+            if (aIsCurrent && !bIsCurrent) return -1;
+            if (!aIsCurrent && bIsCurrent) return 1;
+            return 0;
+          });
+
+          // Limit the documents scanned to a maximum of 5 to optimize CPU/Memory performance
+          const docsToScan = allDocs.slice(0, 5);
+          
+          // Extract and cache text for the selected documents
+          const docTexts: { title: string, text: string, isCurrentLesson: boolean }[] = [];
+          for (const doc of docsToScan) {
+            try {
+              const docText = await getCachedDocumentText(doc.id, doc.fileUrl);
+              if (docText && docText.trim()) {
+                docTexts.push({ 
+                  title: doc.title, 
+                  text: docText,
+                  isCurrentLesson: doc.lessonId === Number(lessonId)
+                });
+              }
+            } catch (docErr: any) {
+              console.error(`[streamAIChat] Error parsing doc #${doc.id}:`, docErr.message);
+            }
+          }
+
+          // If we extracted text from course documents, perform multi-doc RAG search
+          if (docTexts.length > 0) {
+            ragContext = getMultiDocRAGContext(docTexts, rawQuery || '');
+          } else if (lesson.content) {
+            // Fallback to searching lesson description/content if no documents found
+            ragContext = getRAGContext(lesson.content, rawQuery || '');
+          }
+        }
+      } catch (err) {
+        console.error('[streamAIChat] Failed to fetch lesson context:', err);
+      }
+    } else if (isMock) {
+      // Mock Lesson Fallback (e.g. Course 64 preview demo)
+      try {
         const rawQuery = message && message.includes('Học sinh hỏi: ')
           ? message.split('Học sinh hỏi: ').pop()
           : message;
 
-        // Fetch all documents for all lessons in this course
-        const allLessonsInCourse = await prisma.lesson.findMany({
-          where: { courseId: lesson.courseId },
-          include: { documents: true }
-        });
-        
-        const allDocs = allLessonsInCourse.flatMap(l => l.documents);
-        
-        // Extract and cache text for all documents in the course
-        const docTexts: { title: string, text: string }[] = [];
-        for (const doc of allDocs) {
+        // Use the actual mock document files present in the uploads folder
+        const mockDocs = [
+          { id: 9991, title: 'Tài liệu ôn tập Vật lý 12 THPTQG.pdf', fileUrl: 'http://localhost:4000/uploads/file-1784019258705-379853910.pdf' },
+          { id: 9992, title: 'Sách giáo khoa Vật lý 12 nâng cao.pdf', fileUrl: 'http://localhost:4000/uploads/file-1781630004240-467870579.pdf' }
+        ];
+
+        const docTexts: { title: string, text: string, isCurrentLesson: boolean }[] = [];
+        for (const doc of mockDocs) {
           try {
             const docText = await getCachedDocumentText(doc.id, doc.fileUrl);
             if (docText && docText.trim()) {
-              docTexts.push({ title: doc.title, text: docText });
+              docTexts.push({ 
+                title: doc.title, 
+                text: docText,
+                isCurrentLesson: true
+              });
             }
           } catch (docErr: any) {
-            console.error(`[streamAIChat] Error parsing doc #${doc.id}:`, docErr.message);
+            console.error(`[streamAIChat Mock] Error parsing doc #${doc.id}:`, docErr.message);
           }
         }
 
-        // If we extracted text from course documents, perform multi-doc RAG search
         if (docTexts.length > 0) {
           ragContext = getMultiDocRAGContext(docTexts, rawQuery || '');
-        } else if (lesson.content) {
-          // Fallback to searching lesson description/content if no documents found
-          ragContext = getRAGContext(lesson.content, rawQuery || '');
         }
+        
+        // Define a fallback mock lesson details for system prompt
+        lesson = {
+          title: String(lessonId) === 'def-l1' ? 'Bài 1: Khái niệm và phương pháp mở đầu' :
+                 String(lessonId) === 'def-l2' ? 'Bài 2: Dao động điều hòa nâng cao' : 
+                 'Bài 3: Tài liệu tóm tắt & Bài tập tự luyện',
+          course: {
+            title: 'Khóa học mẫu: Thủ khoa ôn lý - Đã duyệt'
+          }
+        } as any;
+      } catch (err) {
+        console.error('[streamAIChat Mock Fallback] Error:', err);
       }
-    } catch (err) {
-      console.error('[streamAIChat] Failed to fetch lesson context:', err);
     }
   }
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const rawKeys = process.env.OPENROUTER_API_KEYS || process.env.OPENROUTER_API_KEY || '';
+  const apiKeys = rawKeys.split(',').map(k => k.trim()).filter(Boolean);
   const model = process.env.OPENROUTER_MODEL || 'openrouter/free';
 
   // Check free AI question limits for non-PRO student
@@ -129,7 +195,7 @@ export async function streamAIChat(req: AuthRequest, res: Response) {
   res.flushHeaders();
 
   // Handle limits and missing keys with local RAG fallback
-  if (isFreeLimitReached || !apiKey) {
+  if (isFreeLimitReached || apiKeys.length === 0) {
     const localAnswer = generateLocalRAGAnswer(ragContext, message || '', lesson?.title || '');
     res.write(`data: ${JSON.stringify({ text: localAnswer })}\n\n`);
     res.write('data: [DONE]\n\n');
@@ -137,17 +203,38 @@ export async function streamAIChat(req: AuthRequest, res: Response) {
     return;
   }
 
-  const systemPrompt = ragContext ? {
+  const courseTitle = (lesson as any)?.course?.title || 'Ôn tập THPT Quốc Gia';
+  const lessonTitle = lesson?.title || 'Bài học ôn tập';
+
+  const systemPrompt = {
     role: 'system',
-    content: `Bạn là Gia sư AI EduPath. Hãy trả lời câu hỏi của học sinh ngắn gọn, dễ hiểu dựa trên các tài liệu bài học ôn tập sau:
-    \"\"\"
-    ${ragContext}
-    \"\"\"
-    Hãy chỉ ra hoặc trích dẫn tiêu đề tài liệu ôn tập tương ứng (ví dụ: "[Tài liệu: ...]") khi trả lời nếu tài liệu đó chứa thông tin liên quan. Trả lời bằng tiếng Việt.`
-  } : {
-    role: 'system',
-    content: 'Bạn là EduBot. Trả lời cực ngắn gọn (dưới 10 từ) bằng tiếng Việt.'
+    content: `Bạn là Gia sư AI EduPath, một chuyên gia giáo dục bậc thầy và là gia sư luyện thi đại học hàng đầu Việt Nam. 
+Hãy đóng vai một người Thầy dạy giỏi đầy tâm huyết, trả lời câu hỏi của học sinh một cách cực kỳ chuyên nghiệp, sâu sắc, phân tích rõ bản chất kiến thức học tập liên quan trực tiếp đến khóa học: "${courseTitle}" và bài học: "${lessonTitle}".
+
+Yêu cầu về cấu trúc câu trả lời:
+- Luôn trình bày câu trả lời theo cấu trúc 3 phần rõ ràng sau bằng các tiêu đề đẹp mắt:
+  1. 🎓 **Bản chất kiến thức**: Giải thích lý thuyết cốt lõi một cách khoa học, mạch lạc, dễ hiểu nhất cho học sinh lớp 12.
+  2. 💡 **Mẹo & Phương pháp giải nhanh**: Cung cấp các mẹo giải toán/lý/hóa nhanh, các lỗi sai cần tránh khi làm bài trắc nghiệm thi THPT Quốc Gia.
+  3. 📝 **Ví dụ minh họa**: Đưa ra ít nhất 1 bài tập trắc nghiệm tiêu biểu liên quan và hướng dẫn giải từng bước chi tiết.
+
+Yêu cầu định dạng:
+- Sử dụng định dạng LaTeX cho mọi công thức toán học/vật lý/hóa học. Hãy dùng cặp dấu '$$' ở dòng riêng cho các công thức độc lập (ví dụ: $$N = 2A + 2G$$), và dấu '$' cho các công thức nội dòng (ví dụ: $x = 1$).
+- Sử dụng các định dạng markdown như bảng biểu, danh sách để thông tin trực quan, dễ nhớ.
+- Hãy xưng hô thân mật là 'Thầy' và gọi học sinh là 'em'. TUYỆT ĐỐI không bắt đầu bằng các nhãn giả lập hội thoại như "Thầy:", "Em:" hoặc tự ý đóng vai. Hãy viết nội dung trực tiếp bằng tiếng Việt chuẩn.
+
+${ragContext ? `Dưới đây là tài liệu tham khảo chính thống được trích xuất trực tiếp từ bài học này để hỗ trợ Thầy trả lời:
+\"\"\"
+${ragContext}
+\"\"\"
+Hãy ưu tiên trích dẫn và sử dụng các thông tin chính xác từ tài liệu này.` : ''}`
   };
+
+  const formattedHistory = Array.isArray(history)
+    ? history.map((msg: any) => ({
+        role: msg.role === 'assistant' ? 'assistant' : 'user',
+        content: String(msg.content || '')
+      }))
+    : [];
 
   const abortController = new AbortController();
   req.on('close', () => {
@@ -155,62 +242,86 @@ export async function streamAIChat(req: AuthRequest, res: Response) {
     res.end();
   });
 
-  const slicedMessage = message ? String(message).substring(0, lessonId ? 250 : 60) : '';
+  const slicedMessage = message ? String(message).substring(0, 1000) : '';
 
   try {
-    let response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://edupath.vn',
-        'X-Title': 'EduPath AI Tutor'
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: [
-          systemPrompt,
-          { role: 'user', content: slicedMessage }
-        ],
-        stream: true,
-        temperature: 0.7,
-        max_tokens: ragContext ? 250 : 40
-      }),
-      signal: abortController.signal
-    });
+    let response: any = null;
+    let success = false;
+    let lastErrorMsg = '';
 
-    if (!response.ok) {
-      const errText = await response.text();
-      if (response.status === 402 || response.status === 404 || errText.includes('credits') || errText.includes('402') || errText.includes('unavailable')) {
-        console.warn(`[AI Tutor Fallback] Out of credits or model unavailable. Retrying with free model router...`);
-        const fallbackModel = 'openrouter/free';
+    for (let i = 0; i < apiKeys.length; i++) {
+      const currentKey = apiKeys[i];
+      console.log(`[AI Tutor] Attempting API key #${i + 1}/${apiKeys.length}`);
+      
+      try {
         response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${apiKey}`,
+            'Authorization': `Bearer ${currentKey}`,
             'Content-Type': 'application/json',
             'HTTP-Referer': 'https://edupath.vn',
             'X-Title': 'EduPath AI Tutor'
           },
           body: JSON.stringify({
-            model: fallbackModel,
+            model: model,
             messages: [
               systemPrompt,
+              ...formattedHistory,
               { role: 'user', content: slicedMessage }
             ],
             stream: true,
             temperature: 0.7,
-            max_tokens: 40
+            max_tokens: 1000
           }),
           signal: abortController.signal
         });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          console.warn(`[AI Tutor] Key #${i + 1} failed with status ${response.status}: ${errText}`);
+          lastErrorMsg = errText;
+          
+          if (response.status === 402 || response.status === 404 || errText.includes('credits') || errText.includes('402') || errText.includes('unavailable')) {
+            console.log(`[AI Tutor] Retrying key #${i + 1} with fallback model openrouter/free...`);
+            response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${currentKey}`,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'https://edupath.vn',
+                'X-Title': 'EduPath AI Tutor'
+              },
+              body: JSON.stringify({
+                model: 'openrouter/free',
+                messages: [
+                  systemPrompt,
+                  ...formattedHistory,
+                  { role: 'user', content: slicedMessage }
+                ],
+                stream: true,
+                temperature: 0.7,
+                max_tokens: 1000
+              }),
+              signal: abortController.signal
+            });
+          }
+        }
+
+        if (response.ok) {
+          success = true;
+          console.log(`[AI Tutor] Success with API key #${i + 1}`);
+          break;
+        }
+      } catch (keyErr: any) {
+        console.error(`[AI Tutor] Exception with API key #${i + 1}:`, keyErr.message);
+        lastErrorMsg = keyErr.message;
       }
     }
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error(`[AI Tutor SSE Error] OpenRouter status ${response.status}: ${errText}`);
-      res.write(`data: ${JSON.stringify({ text: `Lỗi kết nối AI (${response.status}). Vui lòng thử lại.` })}\n\n`);
+    if (!response || !response.ok) {
+      console.error(`[AI Tutor SSE Error] All keys failed. Last error: ${lastErrorMsg}. Falling back to local RAG answer...`);
+      const localAnswer = generateLocalRAGAnswer(ragContext, message || '', lesson?.title || '');
+      res.write(`data: ${JSON.stringify({ text: localAnswer })}\n\n`);
       res.write('data: [DONE]\n\n');
       res.end();
       return;
@@ -220,7 +331,9 @@ export async function streamAIChat(req: AuthRequest, res: Response) {
     let buffer = '';
 
     if (!response.body) {
-      res.write(`data: ${JSON.stringify({ text: "Không nhận được phản hồi từ AI." })}\n\n`);
+      console.warn('[AI Tutor SSE Error] OpenRouter body is null. Falling back to local RAG answer...');
+      const localAnswer = generateLocalRAGAnswer(ragContext, message || '', lesson?.title || '');
+      res.write(`data: ${JSON.stringify({ text: localAnswer })}\n\n`);
       res.write('data: [DONE]\n\n');
       res.end();
       return;
@@ -261,8 +374,9 @@ export async function streamAIChat(req: AuthRequest, res: Response) {
       console.log('[AI Tutor SSE] Request aborted by client.');
       return;
     }
-    console.error('[AI Tutor SSE Exception]', err);
-    res.write(`data: ${JSON.stringify({ text: "Đã xảy ra sự cố khi kết nối với máy chủ AI. Vui lòng thử lại sau." })}\n\n`);
+    console.error('[AI Tutor SSE Exception]', err, '. Falling back to local RAG answer...');
+    const localAnswer = generateLocalRAGAnswer(ragContext, message || '', lesson?.title || '');
+    res.write(`data: ${JSON.stringify({ text: localAnswer })}\n\n`);
     res.write('data: [DONE]\n\n');
     res.end();
   }
@@ -1110,58 +1224,93 @@ function cleanAIResponseContent(content: string): string {
   return filteredLines.join('\n').trim();
 }
 
-export async function generateFlashcards(req: AuthRequest, res: Response) {
-  const { text } = req.body;
-  if (!text || !text.trim()) {
-    return res.status(400).json({ success: false, error: 'Nội dung văn bản để tạo flashcard không được để trống.' });
+async function generateAiFlashcardsFromText(extractedText: string): Promise<{ front: string; back: string }[]> {
+  const isTopicRequest = extractedText.length < 350 && (
+    /tạo|làm|sinh|thiết kế|bộ thẻ|flashcard|chủ đề|về/i.test(extractedText) ||
+    extractedText.split(/\s+/).length < 40
+  );
+
+  let prompt = '';
+  if (isTopicRequest) {
+    prompt = `Bạn là một Giáo sư/Chuyên gia giáo dục Việt Nam, chuyên soạn tài liệu luyện thi đại học THPT Quốc gia và chứng chỉ quốc tế (IELTS/SAT).
+Hãy thiết kế một bộ gồm đúng 6-8 thẻ ghi nhớ (flashcards) chất lượng cao, có độ chính xác khoa học tuyệt đối 100% (không được có bất kỳ thông tin hay công thức sai lệch nào) dựa trên yêu cầu sau:
+"${extractedText}"
+
+Yêu cầu chi tiết:
+1. Nếu yêu cầu là về các môn tự nhiên như Toán, Lý, Hóa, Sinh:
+   - Mặt trước (Front): Tên định luật, khái niệm cụ thể, hoặc công thức toán/lý/hóa (ví dụ: "Công thức đạo hàm hàm phân thức", "Nguyên tố Halogen", "Định luật khúc xạ ánh sáng").
+   - Mặt sau (Back): Định nghĩa chính xác, phát biểu định luật hoặc công thức toán/lý/hóa viết bằng ký hiệu LaTeX (ví dụ: $y' = \\frac{ad-bc}{(cx+d)^2}$ hoặc $n_1 \\sin i = n_2 \\sin r$).
+2. Nếu yêu cầu là tiếng Anh hoặc IELTS:
+   - Mặt trước (Front): Từ vựng, cụm từ (collocation) hoặc cấu trúc ngữ pháp (ví dụ: "Profound impact", "Take something for granted").
+   - Mặt sau (Back): Loại từ, nghĩa tiếng Việt chính xác và ví dụ minh họa ngắn gọn.
+3. Nếu yêu cầu là môn xã hội (Sử, Địa, Văn, Giáo dục công dân):
+   - Mặt trước (Front): Sự kiện lịch sử, mốc thời gian, tác phẩm, hoặc định nghĩa (ví dụ: "Chiến dịch Điện Biên Phủ 1954", "Khái niệm lạm phát").
+   - Mặt sau (Back): Ý nghĩa lịch sử, diễn biến tóm tắt hoặc nội dung cốt lõi của sự kiện/khái niệm đó.
+
+TUYỆT ĐỐI không đặt mặt trước là các từ chung chung như "Flashcard 1", "Khái niệm 1".
+Hãy trả về kết quả dưới dạng một mảng JSON duy nhất chứa các đối tượng có thuộc tính "front" và "back". Ví dụ: [{"front": "khái niệm", "back": "định nghĩa"}]. Chỉ trả về chuỗi JSON thô có thể parse được trực tiếp, không kèm lời dẫn giải thích hay bọc trong markdown.`;
+  } else {
+    prompt = `Bạn là một Giáo sư/Chuyên gia giáo dục Việt Nam, chuyên thiết kế tài liệu ôn tập và thẻ ghi nhớ (flashcard).
+Hãy phân tích nội dung tài liệu trích xuất dưới đây và thiết kế đúng 6-8 flashcards ngắn gọn, chất lượng nhất để ôn tập. Yêu cầu độ chính xác khoa học và kiến thức trong flashcard phải đúng 100% so với tài liệu gốc, tuyệt đối không bịa đặt hoặc gây hiểu lầm.
+
+Nội dung tài liệu trích xuất:
+"""
+${extractedText.substring(0, 3500)}
+"""
+
+Yêu cầu chi tiết:
+- Mặt trước (Front) của mỗi flashcard PHẢI là khái niệm, thuật ngữ, công thức hoặc từ vựng cụ thể xuất hiện trong tài liệu (ví dụ: "Flo (F)", "Halogen", "Tính oxi hóa" hoặc "HCl"). TUYỆT ĐỐI KHÔNG ĐƯỢC để mặt trước là các từ chung chung như "Flashcard 1", "Khái niệm 1", v.v.
+- Mặt sau (Back) PHẢI là định nghĩa, ý nghĩa, công thức (sử dụng LaTeX nếu có công thức, ví dụ: $V = \\frac{1}{3} B h$), hoặc giải thích tương ứng ngắn gọn của khái niệm/thuật ngữ đó theo đúng tài liệu.
+- Hãy trả về kết quả dưới dạng một mảng JSON duy nhất chứa các đối tượng có thuộc tính "front" và "back". Ví dụ: [{"front": "khái niệm", "back": "định nghĩa"}]. Chỉ trả về chuỗi JSON thô có thể parse được trực tiếp, không kèm lời dẫn giải thích hay bọc trong markdown.`;
   }
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  const model = process.env.OPENROUTER_MODEL || 'openrouter/free';
-
-  if (!apiKey) {
-    const localCards = generateLocalFlashcards(text);
-    return res.status(200).json({ success: true, data: localCards });
-  }
-
+  let content = '';
   try {
-    const prompt = `Bạn là chuyên gia thiết kế tài liệu học tập và thẻ ghi nhớ (flashcard). Hãy tạo đúng 5 flashcards ngắn gọn từ yêu cầu hoặc văn bản sau: "${text}"
+    content = await callOpenRouter(prompt, 1000, 0.4);
+  } catch (err: any) {
+    console.error(`[AI Flashcard] callOpenRouter failed:`, err.message);
+  }
 
-Yêu cầu cực kỳ quan trọng:
-- Mặt trước (Front) của mỗi flashcard PHẢI là khái niệm, thuật ngữ, công thức hoặc từ vựng cụ thể (ví dụ: "Flo (F)", "Halogen", "Tính oxi hóa" hoặc "HCl"). TUYỆT ĐỐI KHÔNG ĐƯỢC để mặt trước là các từ chung chung như "Flashcard 1", "Khái niệm 1", v.v.
-- Mặt sau (Back) PHẢI là định nghĩa, ý nghĩa, tính chất, hoặc giải thích tương ứng ngắn gọn của khái niệm/thuật ngữ đó.
-- Định dạng trả về CHÍNH XÁC theo cấu trúc sau (mỗi thẻ cách nhau bằng dấu chấm phẩy ";", không kèm thêm bất cứ giải thích, lời chào hay lời dẫn nào khác):
-Mặt trước 1 = Mặt sau 1; Mặt trước 2 = Mặt sau 2; Mặt trước 3 = Mặt sau 3; Mặt trước 4 = Mặt sau 4; Mặt trước 5 = Mặt sau 5`;
+  if (!content) {
+    console.warn(`[AI Flashcard] No content from API. Using local generator fallback...`);
+    return generateLocalFlashcards(extractedText);
+  }
 
-    const content = await callOpenRouter(prompt, 500, 0.5);
+  // Parse JSON response with markdown codeblock stripping
+  let cards: any[] = [];
+  try {
+    let cleaned = content.trim();
+    if (cleaned.startsWith('```json')) {
+      cleaned = cleaned.substring(7);
+    } else if (cleaned.startsWith('```')) {
+      cleaned = cleaned.substring(3);
+    }
+    if (cleaned.endsWith('```')) {
+      cleaned = cleaned.substring(0, cleaned.length - 3);
+    }
+    cleaned = cleaned.trim();
+    cards = JSON.parse(cleaned);
+  } catch (jsonErr: any) {
+    console.warn(`[AI Flashcard] JSON parse failed, trying regex split fallback:`, jsonErr.message);
     const cleanedContent = cleanAIResponseContent(content);
-
-    // Parse outline string to expected flashcards JSON array
     const rawParts = cleanedContent.split(/[;\n]+/).map((p: string) => p.trim());
-    const cards: any[] = [];
-
+    
     for (const rawPart of rawParts) {
       if (!rawPart) continue;
-      
-      // Clean prefixes like "1. ", "Thẻ 1: ", etc.
       let cleanedPart = rawPart.replace(/^\d+[\.\s:]+/, '').replace(/^Thẻ\s+\d+[\.\s:]*/i, '').trim();
       
       const eqIdx = cleanedPart.indexOf('=');
       if (eqIdx !== -1) {
         let front = cleanedPart.substring(0, eqIdx).trim();
         let back = cleanedPart.substring(eqIdx + 1).trim();
-        
-        // Remove prefixes like "Mặt trước:", "Mặt sau:"
         front = front.replace(/^(mặt trước|front)[:\s-]*/i, '').trim();
         back = back.replace(/^(mặt sau|back)[:\s-]*/i, '').trim();
-        
         if (front && back) {
           cards.push({ front, back });
         }
       }
     }
 
-    // Secondary parsing fallback: try using colon as separator if no equal signs parsed
     if (cards.length === 0) {
       for (const rawPart of rawParts) {
         if (!rawPart) continue;
@@ -1178,11 +1327,40 @@ Mặt trước 1 = Mặt sau 1; Mặt trước 2 = Mặt sau 2; Mặt trước 3
         }
       }
     }
+  }
 
-    const parsedFlashcards = cards.length > 0 ? cards : generateLocalFlashcards(text);
-    return res.status(200).json({ success: true, data: parsedFlashcards });
+  // Validate output array structures
+  if (Array.isArray(cards) && cards.length > 0) {
+    const validated = cards
+      .map(c => {
+        const frontVal = c.front || c.Front || c.question || '';
+        const backVal = c.back || c.Back || c.answer || '';
+        return {
+          front: String(frontVal).trim(),
+          back: String(backVal).trim()
+        };
+      })
+      .filter(c => c.front && c.back);
+    
+    if (validated.length > 0) {
+      return validated;
+    }
+  }
+
+  return generateLocalFlashcards(extractedText);
+}
+
+export async function generateFlashcards(req: AuthRequest, res: Response) {
+  const { text } = req.body;
+  if (!text || !text.trim()) {
+    return res.status(400).json({ success: false, error: 'Nội dung văn bản để tạo flashcard không được để trống.' });
+  }
+
+  try {
+    const cards = await generateAiFlashcardsFromText(text);
+    return res.status(200).json({ success: true, data: cards });
   } catch (err: any) {
-    console.warn('[Flashcards AI Error] Falling back to local simulated generator:', err.message);
+    console.error('[OCR Controller] generateFlashcards failed:', err.message);
     const localCards = generateLocalFlashcards(text);
     return res.status(200).json({ success: true, data: localCards });
   }
@@ -1249,52 +1427,11 @@ export async function generateFlashcardsOCR(req: AuthRequest, res: Response) {
         fs.unlinkSync(filePath);
       }
 
-      const cards: { front: string; back: string }[] = [];
-      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-      
-      let hasSeparator = false;
-      for (const line of lines) {
-        for (const sep of [':', '=', '-', '—', '–', '|', '\t', '  ']) {
-          if (line.includes(sep)) {
-            const parts = line.split(sep);
-            if (parts[0].trim() && parts[1].trim()) {
-              hasSeparator = true;
-              break;
-            }
-          }
-        }
+      if (!text || !text.trim()) {
+        return res.status(400).json({ success: false, error: 'Tài liệu rỗng hoặc không thể trích xuất văn bản.' });
       }
 
-      if (hasSeparator) {
-        for (const line of lines) {
-          let separator = null;
-          for (const sep of [':', '=', '-', '—', '–', '|', '\t', '  ']) {
-            if (line.includes(sep)) {
-              separator = sep;
-              break;
-            }
-          }
-          
-          if (separator) {
-            const parts = line.split(separator);
-            const front = parts[0].trim().replace(/\*\*/g, '').replace(/__/g, '');
-            const back = parts.slice(1).join(separator).trim().replace(/\*\*/g, '').replace(/__/g, '');
-            if (front && back) {
-              cards.push({ front, back });
-            }
-          }
-        }
-      } else {
-        // Pair up even and odd lines
-        for (let i = 0; i < lines.length - 1; i += 2) {
-          const front = lines[i].replace(/\*\*/g, '').replace(/__/g, '');
-          const back = lines[i+1].replace(/\*\*/g, '').replace(/__/g, '');
-          if (front && back) {
-            cards.push({ front, back });
-          }
-        }
-      }
-
+      const cards = await generateAiFlashcardsFromText(text);
       return res.status(200).json({ success: true, data: cards });
     } catch (readErr: any) {
       console.error('[OCR Controller] Read document file error:', readErr.message);
@@ -1305,7 +1442,7 @@ export async function generateFlashcardsOCR(req: AuthRequest, res: Response) {
   const scriptPath = path.resolve(process.cwd(), 'src/scripts/ocr_processor.py');
   const command = `python "${scriptPath}" "${filePath}"`;
 
-  exec(command, (error, stdout, stderr) => {
+  exec(command, async (error, stdout, stderr) => {
     // Delete file after processing to save disk space
     try {
       if (fs.existsSync(filePath)) {
@@ -1323,7 +1460,16 @@ export async function generateFlashcardsOCR(req: AuthRequest, res: Response) {
     try {
       const output = JSON.parse(stdout.trim());
       if (output.success) {
-        return res.status(200).json({ success: true, data: output.cards });
+        const rawText = output.raw_text || '';
+        
+        // If rawText is successfully extracted from the image, pass it to our AI generator!
+        if (rawText && rawText.trim()) {
+          const cards = await generateAiFlashcardsFromText(rawText);
+          return res.status(200).json({ success: true, data: cards });
+        } else {
+          // Fallback if no text extracted
+          return res.status(200).json({ success: true, data: output.cards || [] });
+        }
       } else {
         if (output.error === 'dependencies_missing') {
           return res.status(500).json({ 

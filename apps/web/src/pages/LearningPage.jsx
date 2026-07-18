@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { toast } from '../utils/toast';
-import { HiSparkles, HiPlay, HiClock, HiChevronLeft, HiChevronRight, HiAcademicCap, HiMenu, HiX, HiOutlineLightBulb, HiInformationCircle, HiCheckCircle } from 'react-icons/hi';
+import { HiSparkles, HiPlay, HiClock, HiChevronLeft, HiChevronRight, HiAcademicCap, HiMenu, HiX, HiOutlineLightBulb, HiInformationCircle, HiCheckCircle, HiBookOpen } from 'react-icons/hi';
 import useCourseProgress from '../hooks/useCourseProgress';
-import { mapDbCourseToMockFormat } from '../utils/courseMapper';
+import { mapDbCourseToMockFormat, resolveUploadUrl } from '../utils/courseMapper';
 import { api } from '../api';
 import { discussionService } from '../services/discussionService';
 import sunLogo from '../assets/sun_logo.png';
@@ -158,16 +158,28 @@ export default function LearningPage({
     setLoading(true);
 
     const backendDocs = currentLesson.documents || [];
-    if (backendDocs.length > 0) {
-      setMaterials(backendDocs.map(doc => ({
-        id: String(doc.id),
-        title: doc.title,
-        file_type: doc.fileType || 'PDF',
-        file_url: doc.fileUrl
-      })));
-    } else {
-      setMaterials([]);
+    const derivedMaterials = backendDocs.map(doc => ({
+      id: String(doc.id),
+      title: doc.title,
+      file_type: doc.fileType || 'PDF',
+      file_url: resolveUploadUrl(doc.fileUrl)
+    }));
+
+    const lessonContent = currentLesson.content || '';
+    const isFileUrl = lessonContent.startsWith('http') || lessonContent.startsWith('/uploads') || lessonContent.includes('/uploads/');
+    if (isFileUrl) {
+      const fileName = lessonContent.split('/').pop() || 'Tài liệu đính kèm';
+      const fileExt = fileName.split('.').pop()?.toUpperCase() || 'PDF';
+      if (!derivedMaterials.some(m => m.file_url === lessonContent)) {
+        derivedMaterials.push({
+          id: `lesson-content-${currentLesson.id}`,
+          title: `Tài liệu đính kèm bài học`,
+          file_type: fileExt,
+          file_url: resolveUploadUrl(lessonContent)
+        });
+      }
     }
+    setMaterials(derivedMaterials);
 
     const loadDiscussions = async () => {
       try {
@@ -848,24 +860,6 @@ Nội dung bài học: "${currentLesson.content || 'Khái niệm và cách giả
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
                         <button
                           type="button"
-                          onClick={handleGenerateLessonFlashcards}
-                          disabled={isGeneratingFlashcards}
-                          style={{
-                            background: '#eef2ff',
-                            color: '#4f46e5',
-                            border: 'none',
-                            borderRadius: '8px',
-                            padding: '8px 14px',
-                            fontSize: '12.5px',
-                            fontWeight: '700',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {isGeneratingFlashcards ? '⌛ Đang tạo...' : '🔄 Làm mới bằng AI'}
-                        </button>
-
-                        <button
-                          type="button"
                           onClick={() => setShowManualAdd(!showManualAdd)}
                           style={{
                             background: '#ecfdf5',
@@ -900,38 +894,40 @@ Nội dung bài học: "${currentLesson.content || 'Khái niệm và cách giả
                       </div>
                     </div>
                   ) : (
-                    /* AI Flashcard Generator Card */
-                    <div className="ai-flashcard-box animate-in">
-                      <div className="icon-container">
-                        <HiSparkles />
+                    /* Manual Flashcard Creator Card */
+                    <div className="ai-flashcard-box animate-in" style={{ padding: '32px 24px', textAlign: 'center' }}>
+                      <div className="icon-container" style={{ background: '#ecfdf5', color: '#059669', width: '60px', height: '60px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto', fontSize: '24px' }}>
+                        <HiBookOpen />
                       </div>
-                      <h4>Trợ lý AI tạo Bộ Thẻ Ôn Tập Cấp Tốc</h4>
-                      <p>
-                        Hệ thống AI sẽ phân tích nội dung bài học <strong>"{currentLesson.title}"</strong> để thiết kế bộ thẻ ghi nhớ flashcards giúp em ôn tập định nghĩa và công thức, hoặc em có thể tự tạo bộ thẻ học thủ công.
+                      <h4 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: '0 0 8px 0' }}>Tạo Bộ Thẻ Ôn Tập Cá Nhân</h4>
+                      <p style={{ fontSize: '13.5px', color: '#64748b', margin: '0 0 20px 0', lineHeight: 1.5 }}>
+                        Tự tạo bộ thẻ ghi nhớ flashcards cho bài học <strong>"{currentLesson.title}"</strong> để hỗ trợ ôn tập định nghĩa, từ vựng và các công thức quan trọng.
                       </p>
-                      <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '16px' }}>
-                        <button
-                          type="button"
-                          className="btn-generate-ai-flashcards"
-                          onClick={handleGenerateLessonFlashcards}
-                          disabled={isGeneratingFlashcards}
-                          style={{ padding: '10px 20px', fontSize: '13px', fontWeight: 'bold' }}
-                        >
-                          {isGeneratingFlashcards ? '⌛ Đang tạo...' : '⚡ Sinh Flashcards bằng AI'}
-                        </button>
+                      <div style={{ display: 'flex', justifyContent: 'center' }}>
                         <button
                           type="button"
                           onClick={() => setShowManualAdd(!showManualAdd)}
                           style={{
-                            background: '#ecfdf5',
-                            color: '#059669',
-                            border: '1.5px solid #a7f3d0',
-                            borderRadius: '8px',
-                            padding: '10px 20px',
-                            fontSize: '13px',
-                            fontWeight: 'bold',
+                            background: 'linear-gradient(135deg, #10b981, #059669)',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '10px',
+                            padding: '12px 28px',
+                            fontSize: '13.5px',
+                            fontWeight: '700',
                             cursor: 'pointer',
-                            transition: 'all 0.2s'
+                            boxShadow: '0 4px 12px rgba(5, 150, 105, 0.15)',
+                            transition: 'all 0.2s ease-in-out'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'linear-gradient(135deg, #059669, #047857)';
+                            e.currentTarget.style.boxShadow = '0 6px 16px rgba(5, 150, 105, 0.25)';
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(5, 150, 105, 0.15)';
+                            e.currentTarget.style.transform = 'none';
                           }}
                         >
                           ➕ Tự thêm thẻ thủ công

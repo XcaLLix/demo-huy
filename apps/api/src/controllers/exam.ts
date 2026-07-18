@@ -1278,7 +1278,7 @@ export async function createSmartRetake(req: AuthRequest, res: Response) {
             const rightExamQuestions = rightAnswers
               .map(a => exam.examQuestions.find(eq => eq.questionId === a.questionId))
               .filter(Boolean);
-            const selectedRight = rightExamQuestions.slice(0, 10 - selectedWrong.length).map(a => exam.examQuestions.find(eq => eq.questionId === a.questionId)).filter(Boolean);
+            const selectedRight = (rightExamQuestions as any[]).slice(0, 10 - selectedWrong.length).map(a => a && exam.examQuestions.find(eq => eq.questionId === a.questionId)).filter(Boolean);
             baseQuestions = [...selectedWrong, ...selectedRight] as any;
           }
         }

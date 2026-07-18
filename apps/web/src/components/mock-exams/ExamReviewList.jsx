@@ -238,7 +238,14 @@ export default function ExamReviewList({ questions = [], userAnswers = {}, subje
                       >
                         {opt.option_label}
                       </span>
-                      <span style={{ color: 'var(--text-primary)', flex: 1 }}>{opt.option_text}</span>
+                       <span style={{ color: 'var(--text-primary)', flex: 1 }}>
+                        {(() => {
+                          const rawText = opt.option_text || '';
+                          const hasLatex = /\\|\^|_|\{|\}/.test(rawText);
+                          const isWrapped = rawText.trim().startsWith('$') && rawText.trim().endsWith('$');
+                          return (hasLatex && !isWrapped) ? `$${rawText}$` : rawText;
+                        })()}
+                       </span>
                       {showStatus && (
                         <span style={{ 
                           fontSize: '11px', 

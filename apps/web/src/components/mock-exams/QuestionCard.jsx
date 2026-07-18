@@ -125,6 +125,11 @@ export default function QuestionCard({
         <div className="taking-options-list">
           {options.map((opt) => {
             const isSelected = selectedOptionLabel === opt.option_label;
+            const rawText = opt.option_text || '';
+            const hasLatex = /\\|\^|_|\{|\}/.test(rawText);
+            const isWrapped = rawText.trim().startsWith('$') && rawText.trim().endsWith('$');
+            const displayText = (hasLatex && !isWrapped) ? `$${rawText}$` : rawText;
+
             return (
               <div 
                 key={opt.id}
@@ -132,7 +137,7 @@ export default function QuestionCard({
                 onClick={() => onSelectOption(question.id, opt.option_label)}
               >
                 <div className="taking-option-label">{opt.option_label}</div>
-                <div style={{ fontSize: '13.5px', color: 'var(--text-primary)' }}>{opt.option_text}</div>
+                <div style={{ fontSize: '13.5px', color: 'var(--text-primary)' }}>{displayText}</div>
                 {opt.option_image_url && (
                   <img 
                     src={opt.option_image_url} 

@@ -34,31 +34,52 @@ export async function extractTextFromFile(filePath: string, ext: string): Promis
 }
 
 /**
+ * Segment text content into smaller chunks using a sliding window with overlap
+ */
+function chunkText(text: string, chunkSize = 600, overlap = 150): string[] {
+  if (!text || !text.trim()) return [];
+  const paragraphs = text.split(/\n+/).map(p => p.trim()).filter(Boolean);
+  const chunks: string[] = [];
+  
+  let currentChunk = '';
+  for (const para of paragraphs) {
+    if (para.length > chunkSize) {
+      // Split extremely long paragraphs by sentences
+      const sentences = para.split(/(?<=[.!?])\s+/);
+      for (const sentence of sentences) {
+        if (currentChunk.length + sentence.length > chunkSize) {
+          if (currentChunk) chunks.push(currentChunk);
+          const overlapPart = currentChunk.substring(Math.max(0, currentChunk.length - overlap));
+          currentChunk = overlapPart ? overlapPart + ' ' + sentence : sentence;
+        } else {
+          currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
+        }
+      }
+    } else {
+      if (currentChunk.length + para.length > chunkSize) {
+        if (currentChunk) chunks.push(currentChunk);
+        const overlapPart = currentChunk.substring(Math.max(0, currentChunk.length - overlap));
+        currentChunk = overlapPart ? overlapPart + '\n' + para : para;
+      } else {
+        currentChunk = currentChunk ? currentChunk + '\n' + para : para;
+      }
+    }
+  }
+  if (currentChunk) chunks.push(currentChunk);
+  return chunks;
+}
+
+/**
  * Segment document text into smaller chunks and find the most similar chunks based on search query keywords
  */
 export function getRAGContext(documentText: string, query: string): string {
   if (!documentText || !documentText.trim()) return '';
 
-  // Split documentText into paragraphs
-  const paragraphs = documentText.split(/\n+/).map(p => p.trim()).filter(Boolean);
-  const chunks: string[] = [];
-  
-  // Combine paragraphs into chunks of ~400-600 characters
-  let currentChunk = '';
-  for (const para of paragraphs) {
-    if (currentChunk.length + para.length > 500) {
-      chunks.push(currentChunk);
-      currentChunk = para;
-    } else {
-      currentChunk = currentChunk ? currentChunk + '\n' + para : para;
-    }
-  }
-  if (currentChunk) chunks.push(currentChunk);
-
+  const chunks = chunkText(documentText, 600, 150);
   if (chunks.length === 0) return '';
 
   // Tokenize query into lowercase keywords, removing punctuation & Vietnamese common stop words
-  const stopWords = new Set(['và', 'hoặc', 'nhưng', 'là', 'các', 'của', 'để', 'trong', 'cho', 'có', 'một', 'được', 'thì', 'ở', 'tại']);
+  const stopWords = new Set(['và', 'hoặc', 'nhưng', 'là', 'các', 'của', 'để', 'trong', 'cho', 'có', 'một', 'được', 'thì', 'ở', 'tại', 'hỏi', 'ai', 'tôi', 'bài', 'học', 'em']);
   const keywords = query.toLowerCase()
     .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "")
     .split(/\s+/)
@@ -69,7 +90,7 @@ export function getRAGContext(documentText: string, query: string): string {
     return chunks.slice(0, 2).join('\n\n');
   }
 
-  // Score chunks based on keyword matches
+  // Score chunks based on keyword matches (BM25-like term weighting)
   const scoredChunks = chunks.map(chunk => {
     const chunkLower = chunk.toLowerCase();
     let score = 0;
@@ -79,7 +100,9 @@ export function getRAGContext(documentText: string, query: string): string {
       const regex = new RegExp(escapedKeyword, 'g');
       const matches = chunkLower.match(regex);
       if (matches) {
-        score += matches.length;
+        // Specific academic terms (length > 4) get a higher score boost
+        const wordWeight = keyword.length > 4 ? 2.5 : 1.0;
+        score += matches.length * wordWeight;
       }
     });
     return { chunk, score };
@@ -271,70 +294,82 @@ export async function getCachedDocumentText(docId: number, fileUrl: string): Pro
 /**
  * Segment multiple documents text into chunks, and find most similar chunks based on query keywords
  */
-export function getMultiDocRAGContext(docs: { title: string, text: string }[], query: string): string {
-  const allChunks: string[] = [];
-  
-  for (const doc of docs) {
-    if (!doc.text || !doc.text.trim()) continue;
-    
-    // Split document text into paragraphs
-    const paragraphs = doc.text.split(/\n+/).map(p => p.trim()).filter(Boolean);
-    const docChunks: string[] = [];
-    
-    let currentChunk = '';
-    for (const para of paragraphs) {
-      if (currentChunk.length + para.length > 500) {
-        docChunks.push(currentChunk);
-        currentChunk = para;
-      } else {
-        currentChunk = currentChunk ? currentChunk + '\n' + para : para;
-      }
-    }
-    if (currentChunk) docChunks.push(currentChunk);
-    
-    // Prefix each chunk with its document title
-    const prefixedChunks = docChunks.map(chunk => `[Tài liệu: ${doc.title}]\n${chunk}`);
-    allChunks.push(...prefixedChunks);
-  }
-  
-  if (allChunks.length === 0) return '';
+export function getMultiDocRAGContext(docs: { title: string, text: string, isCurrentLesson?: boolean }[], query: string): string {
+  const allChunks: { chunk: string, score: number }[] = [];
   
   // Tokenize query into lowercase keywords
-  const stopWords = new Set(['và', 'hoặc', 'nhưng', 'là', 'các', 'của', 'để', 'trong', 'cho', 'có', 'một', 'được', 'thì', 'ở', 'tại', 'hỏi', 'ai', 'tôi', 'bài', 'học', 'em']);
+  const stopWords = new Set(['và', 'hoặc', 'nhưng', 'là', 'các', 'của', 'để', 'trong', 'cho', 'có', 'một', 'được', 'thì', 'ở', 'tại', 'hỏi', 'ai', 'tôi', 'bài', 'học', 'em', 'gia', 'sư']);
   const keywords = query.toLowerCase()
     .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "")
     .split(/\s+/)
     .filter(word => word.length > 1 && !stopWords.has(word));
+
+  for (const doc of docs) {
+    if (!doc.text || !doc.text.trim()) continue;
     
-  if (keywords.length === 0) {
-    // If no keywords, return first 3 chunks
-    return allChunks.slice(0, 3).join('\n\n');
+    // Chunking text with sliding window
+    const docChunks = chunkText(doc.text, 600, 150);
+    
+    // Prepare document title keywords for Title Boost
+    const titleKeywords = doc.title.toLowerCase()
+      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "")
+      .split(/\s+/)
+      .filter(word => word.length > 1 && !stopWords.has(word));
+
+    for (const chunk of docChunks) {
+      const chunkWithTitle = `[Tài liệu: ${doc.title}]\n${chunk}`;
+      const chunkLower = chunk.toLowerCase();
+      let score = 0;
+      
+      if (keywords.length > 0) {
+        // BM25-like Term Weighting: longer words get higher weights
+        keywords.forEach(keyword => {
+          const escapedKeyword = keyword.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+          const regex = new RegExp(escapedKeyword, 'g');
+          const matches = chunkLower.match(regex);
+          if (matches) {
+            // Specific academic terms (length > 4) get higher weight
+            const wordWeight = keyword.length > 4 ? 2.5 : 1.0;
+            score += matches.length * wordWeight;
+          }
+        });
+
+        // Title Boost: +3 points per matching word from the document title
+        titleKeywords.forEach(keyword => {
+          const escapedKeyword = keyword.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+          const regex = new RegExp(escapedKeyword, 'g');
+          const matches = chunkLower.match(regex);
+          if (matches) {
+            score += matches.length * 3.0;
+          }
+        });
+
+        // Current Lesson Boost: multiply by 1.5
+        if (doc.isCurrentLesson) {
+          score *= 1.5;
+        }
+      }
+      
+      allChunks.push({ chunk: chunkWithTitle, score });
+    }
   }
   
-  // Score chunks
-  const scoredChunks = allChunks.map(chunk => {
-    const chunkLower = chunk.toLowerCase();
-    let score = 0;
-    keywords.forEach(keyword => {
-      const escapedKeyword = keyword.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-      const regex = new RegExp(escapedKeyword, 'g');
-      const matches = chunkLower.match(regex);
-      if (matches) {
-        score += matches.length;
-      }
-    });
-    return { chunk, score };
-  });
+  if (allChunks.length === 0) return '';
   
-  // Take up to 4 chunks with score > 0, ordered descending
-  const relevantChunks = scoredChunks
-    .filter(sc => sc.score > 0)
+  if (keywords.length === 0) {
+    // If no keywords, return first 3 chunks
+    return allChunks.slice(0, 3).map(c => c.chunk).join('\n\n');
+  }
+
+  // Score chunks
+  const relevantChunks = allChunks
+    .filter(c => c.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, 4)
-    .map(sc => sc.chunk);
+    .map(c => c.chunk);
     
   if (relevantChunks.length === 0) {
-    return allChunks.slice(0, 3).join('\n\n');
+    return allChunks.slice(0, 3).map(c => c.chunk).join('\n\n');
   }
   
   return relevantChunks.join('\n\n');

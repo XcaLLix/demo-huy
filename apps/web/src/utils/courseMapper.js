@@ -152,3 +152,25 @@ export function mapDbCourseToMockFormat(c) {
     }))
   };
 }
+
+export const resolveUploadUrl = (url) => {
+  if (!url) return '';
+  if (url.includes('youtube.com') || url.includes('youtu.be') || url.includes('/embed/')) {
+    return url;
+  }
+  if (url.startsWith('/uploads')) {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return `http://localhost:4000${url}`;
+    }
+    return `/api${url}`;
+  }
+  if (url.includes('/uploads/')) {
+    const relativePath = '/uploads/' + url.split('/uploads/')[1];
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return `http://localhost:4000${relativePath}`;
+    }
+    return `/api${relativePath}`;
+  }
+  return url;
+};
+

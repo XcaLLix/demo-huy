@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } f
 import { HiPlay, HiPause, HiVolumeUp, HiVolumeOff, HiArrowsExpand, HiOutlineClock, HiClock } from 'react-icons/hi';
 import { FiMinimize } from 'react-icons/fi';
 import UpNextOverlay from './UpNextOverlay';
+import { resolveUploadUrl } from '../../../utils/courseMapper';
 
 const getYouTubeEmbedUrl = (url) => {
   if (!url) return '';
@@ -31,6 +32,7 @@ const getYouTubeVideoId = (url) => {
 };
 
 const VideoPlayer = forwardRef(({ videoUrl, title, onEnded, onTimeUpdate, lessonId, nextLessonName, chapters = [] }, ref) => {
+  const resolvedUrl = resolveUploadUrl(videoUrl);
   const videoRef = useRef(null);
   const iframeRef = useRef(null);
   const ytPlayerRef = useRef(null);
@@ -49,7 +51,7 @@ const VideoPlayer = forwardRef(({ videoUrl, title, onEnded, onTimeUpdate, lesson
   const [showUpNext, setShowUpNext] = useState(false);
   const controlsTimeoutRef = useRef(null);
 
-  const isYouTube = videoUrl && (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be') || videoUrl.includes('/embed/'));
+  const isYouTube = resolvedUrl && (resolvedUrl.includes('youtube.com') || resolvedUrl.includes('youtu.be') || resolvedUrl.includes('/embed/'));
 
   // Expose a custom handle that mimics the HTML5 Video Element properties & methods
   useImperativeHandle(ref, () => ({
@@ -112,7 +114,7 @@ const VideoPlayer = forwardRef(({ videoUrl, title, onEnded, onTimeUpdate, lesson
     let intervalId;
 
     const initPlayer = () => {
-      const videoId = getYouTubeVideoId(videoUrl);
+      const videoId = getYouTubeVideoId(resolvedUrl);
       if (!videoId || !iframeRef.current) return;
 
       player = new window.YT.Player(iframeRef.current, {
@@ -190,7 +192,7 @@ const VideoPlayer = forwardRef(({ videoUrl, title, onEnded, onTimeUpdate, lesson
       }
       ytPlayerRef.current = null;
     };
-  }, [videoUrl, lessonId, isYouTube]);
+  }, [resolvedUrl, lessonId, isYouTube]);
 
   const handleTimeUpdate = (e) => {
     const time = e.target.currentTime;
@@ -427,8 +429,8 @@ const VideoPlayer = forwardRef(({ videoUrl, title, onEnded, onTimeUpdate, lesson
       ) : (
         <video
           ref={videoRef}
-          key={videoUrl}
-          src={videoUrl}
+          key={resolvedUrl}
+          src={resolvedUrl}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
           onTimeUpdate={handleTimeUpdate}

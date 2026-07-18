@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from '../utils/toast';
 import { api } from '../api';
-import { HiArrowRight, HiCheck, HiStar, HiLightningBolt, HiMenuAlt3, HiX, HiTrendingUp, HiSparkles, HiLockClosed, HiClock, HiPlay, HiShoppingCart, HiBookOpen, HiShare, HiUser, HiMail, HiPhone, HiAcademicCap, HiCode, HiUserGroup, HiBell } from 'react-icons/hi';
+import { HiArrowRight, HiCheck, HiStar, HiLightningBolt, HiMenuAlt3, HiX, HiTrendingUp, HiSparkles, HiLockClosed, HiClock, HiPlay, HiShoppingCart, HiBookOpen, HiShare, HiUser, HiMail, HiPhone, HiAcademicCap, HiCode, HiUserGroup, HiBell, HiCog, HiLogout, HiDesktopComputer } from 'react-icons/hi';
 import FooterSunMascot from './FooterSunMascot';
 import Forum from './Forum';
 import SubjectsPage from './SubjectsPage';
@@ -1953,63 +1953,76 @@ export default function LandingPage({
                           className="lp-dropdown-menu animate-in"
                           style={{
                             position: 'absolute',
-                            top: '46px',
+                            top: '52px',
                             right: 0,
-                            width: '260px',
-                            background: 'var(--bg-card, #ffffff)',
-                            borderRadius: '14px',
-                            boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
-                            border: '1px solid var(--border, #e2e8f0)',
+                            width: '270px',
+                            background: '#ffffff',
+                            borderRadius: '20px',
+                            boxShadow: '0 20px 40px -10px rgba(15, 23, 42, 0.12), 0 10px 20px -10px rgba(15, 23, 42, 0.04)',
+                            border: '1px solid rgba(226, 232, 240, 0.8)',
                             padding: '16px',
                             zIndex: 999,
                             textAlign: 'left'
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '12px', borderBottom: '1px solid var(--border, #f1f5f9)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', paddingBottom: '14px', borderBottom: '1px solid #f1f5f9' }}>
                             <div
                               style={{
-                                width: '40px',
-                                height: '40px',
+                                width: '46px',
+                                height: '46px',
                                 borderRadius: '50%',
-                                background: 'linear-gradient(135deg, #6c5ce7, #a29bfe)',
-                                color: '#fff',
+                                background: 'linear-gradient(135deg, #818cf8, #6366f1)',
+                                padding: '2px',
+                                flexShrink: 0,
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                fontWeight: 'bold',
-                                fontSize: '14px',
-                                flexShrink: 0,
-                                overflow: 'hidden'
+                                boxShadow: '0 4px 10px rgba(99, 102, 241, 0.1)'
                               }}
                             >
-                              {currentUser.avatar && (currentUser.avatar.startsWith('data:') || currentUser.avatar.startsWith('http') || currentUser.avatar.length > 10) ? (
-                                <img
-                                  src={currentUser.avatar.startsWith('data:') || currentUser.avatar.startsWith('http') ? currentUser.avatar : `data:image/png;base64,${currentUser.avatar}`}
-                                  alt="Avatar"
-                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                />
-                              ) : (
-                                (currentUser.avatar && currentUser.avatar.length <= 10) ? currentUser.avatar : (currentUser.fullName || currentUser.name || 'U').slice(0, 2).toUpperCase()
-                              )}
+                              <div style={{
+                                width: '100%',
+                                height: '100%',
+                                borderRadius: '50%',
+                                background: '#fff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                overflow: 'hidden',
+                                fontSize: '15px',
+                                fontWeight: 'bold',
+                                color: '#4f46e5'
+                              }}>
+                                {currentUser.avatar && (currentUser.avatar.startsWith('data:') || currentUser.avatar.startsWith('http') || currentUser.avatar.length > 10) ? (
+                                  <img
+                                    src={currentUser.avatar.startsWith('data:') || currentUser.avatar.startsWith('http') ? currentUser.avatar : `data:image/png;base64,${currentUser.avatar}`}
+                                    alt="Avatar"
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  />
+                                ) : (
+                                  (currentUser.avatar && currentUser.avatar.length <= 10) ? currentUser.avatar : (currentUser.fullName || currentUser.name || 'U').slice(0, 2).toUpperCase()
+                                )}
+                              </div>
                             </div>
                             <div style={{ minWidth: 0 }}>
-                              <h4 style={{ margin: 0, fontSize: '13.5px', fontWeight: '700', color: 'var(--text-main, #1e293b)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              <h4 style={{ margin: 0, fontSize: '14.5px', fontWeight: '700', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {currentUser.fullName || currentUser.name}
                               </h4>
-                              <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--text-muted, #64748b)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              <p style={{ margin: '2px 0 0', fontSize: '11.5px', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {currentUser.email}
                               </p>
                               <span
                                 style={{
                                   display: 'inline-block',
-                                  background: 'rgba(108,92,231,0.12)',
-                                  color: 'var(--primary, #6c5ce7)',
-                                  fontSize: '8.5px',
+                                  background: 'rgba(99, 102, 241, 0.08)',
+                                  color: '#4f46e5',
+                                  fontSize: '9.5px',
                                   fontWeight: '800',
-                                  padding: '1px 6px',
-                                  borderRadius: '10px',
-                                  marginTop: '4px',
-                                  textTransform: 'uppercase'
+                                  padding: '3px 8px',
+                                  borderRadius: '20px',
+                                  marginTop: '6px',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.5px'
                                 }}
                               >
                                 {currentUser.role === 'student' ? 'Học sinh' : (currentUser.role === 'teacher' ? 'Giáo viên' : 'Admin')}
@@ -2017,28 +2030,36 @@ export default function LandingPage({
                             </div>
                           </div>
 
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '10px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '12px' }}>
                             <button
                               onClick={() => { setProfileDropdownOpen(false); onBackToDashboard('home'); }}
                               style={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '10px',
+                                gap: '12px',
                                 width: '100%',
-                                padding: '9px 10px',
+                                padding: '10px 12px',
                                 background: 'none',
                                 border: 'none',
-                                borderRadius: '8px',
-                                color: 'var(--text-secondary, #334155)',
-                                fontSize: '13px',
+                                borderRadius: '12px',
+                                color: '#334155',
+                                fontSize: '13.5px',
                                 fontWeight: '600',
                                 cursor: 'pointer',
                                 textAlign: 'left',
-                                transition: 'background 0.2s'
+                                transition: 'all 0.2s ease-in-out'
                               }}
-                              className="lp-dropdown-item"
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#f1f5f9';
+                                e.currentTarget.style.color = '#6366f1';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'none';
+                                e.currentTarget.style.color = '#334155';
+                              }}
                             >
-                              💻 Bảng điều khiển
+                              <HiDesktopComputer style={{ fontSize: '18px', color: '#6366f1' }} />
+                              <span>Bảng điều khiển</span>
                             </button>
 
                             <button
@@ -2046,47 +2067,63 @@ export default function LandingPage({
                               style={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '10px',
+                                gap: '12px',
                                 width: '100%',
-                                padding: '9px 10px',
+                                padding: '10px 12px',
                                 background: 'none',
                                 border: 'none',
-                                borderRadius: '8px',
-                                color: 'var(--text-secondary, #334155)',
-                                fontSize: '13px',
+                                borderRadius: '12px',
+                                color: '#334155',
+                                fontSize: '13.5px',
                                 fontWeight: '600',
                                 cursor: 'pointer',
                                 textAlign: 'left',
-                                transition: 'background 0.2s'
+                                transition: 'all 0.2s ease-in-out'
                               }}
-                              className="lp-dropdown-item"
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#f1f5f9';
+                                e.currentTarget.style.color = '#6366f1';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'none';
+                                e.currentTarget.style.color = '#334155';
+                              }}
                             >
-                              ⚙️ Thiết lập hồ sơ
+                              <HiCog style={{ fontSize: '18px', color: '#6366f1' }} />
+                              <span>Thiết lập hồ sơ</span>
                             </button>
 
-                            <div style={{ height: '1px', background: 'var(--border, #f1f5f9)', margin: '4px 0' }} />
+                            <div style={{ height: '1px', background: '#f1f5f9', margin: '6px 0' }} />
 
                             <button
                               onClick={() => { setProfileDropdownOpen(false); onLogout(); }}
                               style={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '10px',
+                                gap: '12px',
                                 width: '100%',
-                                padding: '9px 10px',
+                                padding: '10px 12px',
                                 background: 'none',
                                 border: 'none',
-                                borderRadius: '8px',
-                                color: '#ef4444',
-                                fontSize: '13px',
+                                borderRadius: '12px',
+                                color: '#f87171',
+                                fontSize: '13.5px',
                                 fontWeight: '600',
                                 cursor: 'pointer',
                                 textAlign: 'left',
-                                transition: 'background 0.2s'
+                                transition: 'all 0.2s ease-in-out'
                               }}
-                              className="lp-dropdown-item lp-dropdown-item--logout"
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#fff5f5';
+                                e.currentTarget.style.color = '#ef4444';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'none';
+                                e.currentTarget.style.color = '#f87171';
+                              }}
                             >
-                              🚪 Đăng xuất
+                              <HiLogout style={{ fontSize: '18px', color: '#f87171' }} />
+                              <span>Đăng xuất</span>
                             </button>
                           </div>
                         </div>

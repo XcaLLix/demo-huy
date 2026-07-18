@@ -7,7 +7,7 @@ export const aiService = {
    * @param {object} lesson - The current lesson context
    * @returns {Promise<string>} Response from AI Tutor
    */
-  async sendAiMessage(content, lesson = null) {
+  async sendAiMessage(content, lesson = null, history = [], onChunk = null) {
     const token = localStorage.getItem('access_token');
     const headers = {
       'Content-Type': 'application/json'
@@ -22,42 +22,68 @@ export const aiService = {
         headers: headers,
         body: JSON.stringify({ 
           message: content,
-          lessonId: lesson?.id || null
+          lessonId: lesson?.id || null,
+          history: history
         })
       });
 
       if (response.ok) {
         const contentType = response.headers.get('content-type');
-          if (contentType && contentType.includes('application/json')) {
-            const data = await response.json();
-            return data.data?.text || data.text || data.message || '';
-          } else {
-            // It might be a stream (SSE). Let's decode it
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder('utf-8');
-            let resultText = '';
-            while (true) {
-              const { value, done } = await reader.read();
-              if (done) break;
-              const chunk = decoder.decode(value, { stream: true });
-              const lines = chunk.split('\n');
-              for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                  const dataStr = line.slice(6).trim();
-                  if (dataStr === '[DONE]') break;
-                  try {
-                    const parsed = JSON.parse(dataStr);
-                    if (parsed.text) resultText += parsed.text;
-                  } catch (e) { /* ignore chunk boundary error */ }
-                }
+        if (contentType && contentType.includes('application/json')) {
+          const data = await response.json();
+          const fullText = data.data?.text || data.text || data.message || '';
+          if (onChunk) onChunk(fullText);
+          return fullText;
+        } else {
+          // It might be a stream (SSE). Let's decode it
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          let resultText = '';
+          let buffer = '';
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || ''; // Keep partial line in buffer
+            
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const dataStr = line.slice(6).trim();
+                if (dataStr === '[DONE]') break;
+                try {
+                  const parsed = JSON.parse(dataStr);
+                  if (parsed.text) {
+                    resultText += parsed.text;
+                    if (onChunk) {
+                      onChunk(resultText);
+                    }
+                  }
+                } catch (e) { /* ignore chunk boundary error */ }
               }
             }
-            if (resultText) return resultText;
           }
+          // Process final buffer if any
+          if (buffer.startsWith('data: ')) {
+            const dataStr = buffer.slice(6).trim();
+            if (dataStr !== '[DONE]') {
+              try {
+                const parsed = JSON.parse(dataStr);
+                if (parsed.text) {
+                  resultText += parsed.text;
+                  if (onChunk) {
+                    onChunk(resultText);
+                  }
+                }
+              } catch (e) { /* ignore */ }
+            }
+          }
+          if (resultText) return resultText;
         }
-      } catch (err) {
-        console.warn('[aiService] Failed to call backend AI API, using local mock response.', err);
       }
+    } catch (err) {
+      console.warn('[aiService] Failed to call backend AI API, using local mock response.', err);
+    }
 
     // Fallback Mock AI Tutor response in Vietnamese tailored to the lesson context!
     return new Promise((resolve) => {

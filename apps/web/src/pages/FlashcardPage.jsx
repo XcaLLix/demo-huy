@@ -102,6 +102,16 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
     }
   }, [currentUser]);
 
+  // Trigger MathJax rendering when active card, flipped state, or view changes
+  useEffect(() => {
+    if (window.MathJax) {
+      const timer = setTimeout(() => {
+        window.MathJax.typesetPromise?.().catch(e => console.warn('MathJax error:', e));
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [currentIdx, isFlipped, cards, currentView]);
+
   // Attendance state loaded from localStorage
   const [attendance, setAttendance] = useState(() => {
     try {
@@ -600,6 +610,18 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
   // Input states
   const [inputText, setInputText] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+
+  useEffect(() => {
+    if (selectedFile && selectedFile.type.startsWith('image/')) {
+      const url = URL.createObjectURL(selectedFile);
+      setImagePreview(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setImagePreview(null);
+    }
+  }, [selectedFile]);
+
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [autoPronounce, setAutoPronounce] = useState(false);
 
@@ -741,24 +763,11 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
   const processFile = async (file) => {
     setSelectedFile(file);
     setIsLoading(true);
-    
+    setLoadingStep('Đang nạp file...');
     try {
       if (file.type.startsWith('image/')) {
-        setLoadingStep('Đang khởi tạo OCR nhận diện chữ trong ảnh...');
-        const result = await Tesseract.recognize(file, 'vie+eng', {
-          logger: m => {
-            if (m.status === 'recognizing') {
-              setLoadingStep(`Nhận diện chữ trong ảnh: ${Math.round(m.progress * 100)}%`);
-            }
-          }
-        });
-        const text = result.data.text;
-        if (!text || !text.trim()) {
-          toast('Không tìm thấy văn bản nào trong ảnh này!', 'warning');
-        } else {
-          setInputText(text);
-          toast('Nhận diện chữ thành công từ hình ảnh!', 'success');
-        }
+        setInputText(`[Hình ảnh: ${file.name} - Đã sẵn sàng để trích xuất bằng AI]`);
+        toast('Đã nạp hình ảnh thành công! Nhấn nút màu vàng bên dưới để AI trích xuất thẻ học nhé.', 'success');
       } else if (file.type === 'text/plain' || file.name.endsWith('.txt') || file.name.endsWith('.md')) {
         setLoadingStep('Đang đọc file văn bản...');
         const text = await new Promise((resolve, reject) => {
@@ -770,11 +779,8 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
         setInputText(text);
         toast('Đã nạp văn bản thành công!', 'success');
       } else {
-        setLoadingStep('Đang đọc cấu trúc tệp...');
-        await new Promise(r => setTimeout(r, 1000));
-        const promptText = `Tài liệu: ${file.name}. Hãy tạo các thẻ flashcard ôn tập.`;
-        setInputText(promptText);
-        toast(`Đã nhận diện file ${file.name}.`, 'success');
+        setInputText(`[Tài liệu: ${file.name} - Đã sẵn sàng để trích xuất bằng AI]`);
+        toast(`Đã nhận diện file ${file.name}. Nhấn nút màu vàng bên dưới để AI trích xuất thẻ học nhé.`, 'success');
       }
     } catch (err) {
       console.error(err);
@@ -910,68 +916,10 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
   };
 
   const handleGenerateOCRNoAI = async () => {
-    // If client OCR is still loading, wait
-    if (selectedFile && selectedFile.type.startsWith('image/') && isLoading) {
-      toast('Hệ thống đang nhận diện chữ trong ảnh, vui lòng đợi giây lát...', 'info');
-      return;
-    }
-
-    const isDocFile = selectedFile && (
-      selectedFile.name.endsWith('.pdf') || 
-      selectedFile.name.endsWith('.docx') || 
-      selectedFile.name.endsWith('.doc')
-    );
-
-    const content = inputText.trim();
-    if (content && !isDocFile) {
-      const parsed = parseTextToCards(content);
-      if (parsed.length > 0) {
-        const formatted = parsed.map((c, index) => ({
-          front: c.front,
-          back: c.back,
-          image: null,
-          partOfSpeech: index % 2 === 0 ? "Khái niệm" : "Định nghĩa",
-          hashtag: "# Học tập"
-        }));
-
-        const extractedTitle = selectedFile ? selectedFile.name.split('.')[0] : ('Bộ thẻ tự tạo - ' + new Date().toLocaleDateString('vi-VN'));
-        const newId = Date.now().toString();
-        const newDeck = {
-          id: newId,
-          title: extractedTitle,
-          cards: formatted,
-          createdAt: new Date().toISOString()
-        };
-
-        const nextDecks = [newDeck, ...savedDecks];
-        setSavedDecks(nextDecks);
-        localStorage.setItem('edupath_saved_flashcard_decks', JSON.stringify(nextDecks));
-
-        setCards(formatted);
-        setDeckTitle(extractedTitle);
-        setActiveDeckId(newId);
-        setCurrentIdx(0);
-        setIsFlipped(false);
-        setIsFinished(false);
-        setIsEditingCurrent(false);
-        setLearnedCards(new Set());
-        setReviewCards(new Set());
-        setCurrentView('study');
-
-        toast(`Phân tách bộ thẻ thành công từ dữ liệu chữ đã nhận diện!`, 'success');
-        return;
-      }
-    }
-
-    // 2. Call backend document extractor for PDF, DOC, DOCX and text documents
+    // 1. If a file is selected (both image and document), ALWAYS call backend API for AI-driven structure extraction
     if (selectedFile) {
-      if (selectedFile.type.startsWith('image/')) {
-        toast('Không thể phân tách văn bản trong hình ảnh. Vui lòng kiểm tra lại cấu trúc chữ nhận diện được.', 'warning');
-        return;
-      }
-
       setIsLoading(true);
-      setLoadingStep('Đang tải tài liệu lên và trích xuất cấu trúc...');
+      setLoadingStep('Đang tải tài liệu lên và trích xuất cấu trúc bằng AI...');
       try {
         const response = await api.generateFlashcardsOCR(selectedFile);
         if (response && response.success && response.data && response.data.length > 0) {
@@ -1007,19 +955,65 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
           setReviewCards(new Set());
           setCurrentView('study');
 
-          toast(`Đã tạo thành công bộ thẻ "${extractedTitle}" với ${formatted.length} thẻ!`, 'success');
+          toast(`Đã tạo thành công bộ thẻ "${extractedTitle}" với ${formatted.length} thẻ bằng AI!`, 'success');
         } else {
-          throw new Error(response?.error || 'Không tìm thấy cấu trúc thẻ học hợp lệ trong tệp.');
+          toast(response?.error || 'Không trích xuất được cấu trúc thẻ học từ tệp này.', 'warning');
         }
       } catch (err) {
-        toast(err.message || 'Lỗi xử lý tệp bằng Python!', 'error');
+        console.error(err);
+        toast('Lỗi khi tải lên và phân tích tài liệu bằng AI!', 'error');
       } finally {
         setIsLoading(false);
         setLoadingStep('');
       }
-    } else {
-      toast('Vui lòng chọn 1 tệp hoặc nhập văn bản trước khi tạo bộ thẻ!', 'warning');
+      return;
     }
+
+    // 2. If NO file is selected, but there is text in the textarea, parse it locally
+    const content = inputText.trim();
+    if (content) {
+      const parsed = parseTextToCards(content);
+      if (parsed.length > 0) {
+        const formatted = parsed.map((c, index) => ({
+          front: c.front,
+          back: c.back,
+          image: null,
+          partOfSpeech: index % 2 === 0 ? "Khái niệm" : "Định nghĩa",
+          hashtag: "# Học tập"
+        }));
+
+        const extractedTitle = 'Bộ thẻ tự tạo - ' + new Date().toLocaleDateString('vi-VN');
+        const newId = Date.now().toString();
+        const newDeck = {
+          id: newId,
+          title: extractedTitle,
+          cards: formatted,
+          createdAt: new Date().toISOString()
+        };
+
+        const nextDecks = [newDeck, ...savedDecks];
+        setSavedDecks(nextDecks);
+        localStorage.setItem('edupath_saved_flashcard_decks', JSON.stringify(nextDecks));
+
+        setCards(formatted);
+        setDeckTitle(extractedTitle);
+        setActiveDeckId(newId);
+        setCurrentIdx(0);
+        setIsFlipped(false);
+        setIsFinished(false);
+        setIsEditingCurrent(false);
+        setLearnedCards(new Set());
+        setReviewCards(new Set());
+        setCurrentView('study');
+
+        toast(`Phân tách bộ thẻ thành công từ dữ liệu chữ!`, 'success');
+      } else {
+        toast('Không thể phân tách dữ liệu chữ. Hãy sử dụng dấu hai chấm (:) hoặc dấu bằng (=) giữa mặt trước và mặt sau nhé.', 'warning');
+      }
+      return;
+    }
+
+    toast('Vui lòng chọn tài liệu hoặc nhập văn bản trước.', 'warning');
   };
 
   // Manual Card Operations
@@ -1345,13 +1339,13 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
       <div 
         className="flashcard-workspace-grid"
         style={{ 
-          gridTemplateColumns: `220px 1fr 6px ${sidebarWidth}px`,
+          gridTemplateColumns: `250px 1fr 6px ${sidebarWidth}px`,
           gap: '12px'
         }}
       >
         
         {/* ================= LEFT SIDEBAR ================= */}
-        <aside className="flashcard-left-sidebar">
+        <aside className="flashcard-left-sidebar" style={{ width: '250px', boxSizing: 'border-box' }}>
           <div 
             onClick={() => navigateTo('/')}
             style={{ 
@@ -1470,14 +1464,43 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
 
           {/* Left panel inputs inside sidebar */}
           {activeTab === 'create' ? (
-            <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid var(--fc-border-dark)', paddingTop: '16px' }}>
+            <div 
+              style={{ 
+                marginTop: '12px', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '12px', 
+                background: 'rgba(255, 255, 255, 0.01)', 
+                border: '1.5px solid var(--fc-border-dark)', 
+                borderRadius: '18px', 
+                padding: '14px',
+                boxSizing: 'border-box'
+              }}
+            >
+              <h5 style={{ margin: 0, fontSize: '11px', fontWeight: '850', color: 'var(--fc-text-secondary)', letterSpacing: '0.8px', textTransform: 'uppercase', textAlign: 'left' }}>
+                🪄 TRÌNH TẠO THẺ AI
+              </h5>
+
+              {/* Upload zone */}
               <div 
                 className={`aitutor-dropzone ${isDraggingFile ? 'aitutor-dropzone--active' : ''} ocr-scanner-zone`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                style={{ padding: '12px 6px', minHeight: '100px' }}
+                onClick={() => !selectedFile && fileInputRef.current?.click()}
+                style={{ 
+                  padding: selectedFile ? '0' : '14px 10px', 
+                  minHeight: selectedFile ? 'auto' : '85px',
+                  background: selectedFile ? 'transparent' : 'rgba(255, 255, 255, 0.01)',
+                  border: selectedFile ? 'none' : '2px dashed rgba(255, 255, 255, 0.1)',
+                  cursor: selectedFile ? 'default' : 'pointer',
+                  borderRadius: '12px',
+                  transition: 'all 0.2s ease',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                }}
               >
                 {isLoading && <div className="ocr-laser-line" />}
                 <input 
@@ -1487,59 +1510,221 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
                   accept="image/*,text/plain,.txt,.md,.pdf,.docx,.doc"
                   style={{ display: 'none' }} 
                 />
-                <HiUpload style={{ fontSize: '18px', color: '#9CA3AF' }} />
-                <p style={{ fontSize: '11px', fontWeight: 'bold', margin: '4px 0 0 0' }}>Tải ảnh/tệp trích xuất</p>
                 
-                {selectedFile && (
-                  <div className="aitutor-uploaded-tag" onClick={(e) => e.stopPropagation()} style={{ width: '90%', fontSize: '10px' }}>
-                    <span>{selectedFile.name}</span>
-                    <button className="aitutor-clear-file" onClick={clearSelectedFile}><HiX /></button>
+                {selectedFile ? (
+                  <div 
+                    onClick={(e) => e.stopPropagation()} 
+                    style={{ 
+                      position: 'relative', 
+                      width: '100%', 
+                      borderRadius: '12px', 
+                      background: 'rgba(30, 41, 59, 0.7)', 
+                      border: '1.5px solid rgba(245, 158, 11, 0.3)', 
+                      padding: '10px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
+                      animation: 'fadeIn 0.2s ease-out',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    {/* Clear Button */}
+                    <button 
+                      onClick={clearSelectedFile}
+                      style={{
+                        position: 'absolute',
+                        top: '8px',
+                        right: '8px',
+                        width: '22px',
+                        height: '22px',
+                        borderRadius: '50%',
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        border: 'none',
+                        color: '#f87171',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        zIndex: 10
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#ef4444';
+                        e.currentTarget.style.color = '#ffffff';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                        e.currentTarget.style.color = '#f87171';
+                      }}
+                    >
+                      <HiX size={12} />
+                    </button>
+
+                    {/* File Content Preview */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {imagePreview ? (
+                        <div style={{ position: 'relative', width: '40px', height: '40px', borderRadius: '6px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', background: '#0f172a' }}>
+                          <img src={imagePreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                      ) : (
+                        <div style={{ width: '40px', height: '40px', borderRadius: '6px', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#818cf8' }}>
+                          <HiDocumentText size={20} />
+                        </div>
+                      )}
+                      
+                      <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                        <p style={{ margin: 0, fontSize: '11px', fontWeight: '600', color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {selectedFile.name}
+                        </p>
+                        <p style={{ margin: '1px 0 0 0', fontSize: '10px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ background: selectedFile.type.startsWith('image/') ? 'rgba(245, 158, 11, 0.15)' : 'rgba(99, 102, 241, 0.15)', color: selectedFile.type.startsWith('image/') ? '#fbbf24' : '#a5b4fc', padding: '1px 4px', borderRadius: '4px', fontSize: '8.5px', fontWeight: 'bold' }}>
+                            {selectedFile.name.split('.').pop().toUpperCase()}
+                          </span>
+                          <span>{selectedFile.size < 1024 ? `${selectedFile.size} B` : selectedFile.size < 1048576 ? `${(selectedFile.size / 1024).toFixed(1)} KB` : `${(selectedFile.size / 1048576).toFixed(1)} MB`}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div style={{ fontSize: '9.5px', color: '#fbbf24', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.12)', padding: '5px 8px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px', textAlign: 'left' }}>
+                      <HiSparkles size={10} style={{ flexShrink: 0 }} />
+                      <span>Sẵn sàng để trích xuất thẻ học.</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                    <div className="upload-cloud-icon-wrapper" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.1)' }}>
+                      <HiUpload style={{ fontSize: '15px', color: '#94a3b8' }} />
+                    </div>
+                    <p style={{ fontSize: '11px', fontWeight: '700', margin: '4px 0 2px 0', color: '#e2e8f0' }}>Chọn tệp tài liệu / ảnh</p>
+                    <p style={{ fontSize: '9px', color: '#64748b', margin: 0 }}>Hỗ trợ PDF, Word, Ảnh, TXT</p>
                   </div>
                 )}
               </div>
 
+              {/* Textarea */}
               <textarea
                 className="aitutor-textarea"
-                placeholder="Dán tóm tắt kiến thức vào đây để AI phân tích tạo thẻ học..."
+                placeholder="Dán tóm tắt kiến thức vào đây để tạo bộ thẻ..."
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 disabled={isLoading}
-                style={{ minHeight: '90px' }}
+                style={{ 
+                  minHeight: '70px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--fc-border-dark)',
+                  background: 'rgba(255,255,255,0.02)',
+                  fontSize: '11.5px',
+                  padding: '6px 8px',
+                  color: '#e2e8f0',
+                  resize: 'none',
+                  boxSizing: 'border-box',
+                  width: '100%'
+                }}
               />
 
-              <button
-                className="aitutor-action-btn"
-                onClick={handleGenerateFlashcards}
-                disabled={isLoading || !inputText.trim()}
-                style={{ padding: '8px' }}
-              >
-                {isLoading ? <span className="spinner" /> : <><HiSparkles /> Tạo bộ thẻ AI</>}
-              </button>
+              {/* Action buttons */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
+                <button
+                  className="aitutor-action-btn"
+                  onClick={handleGenerateFlashcards}
+                  disabled={isLoading || !inputText.trim()}
+                  style={{ 
+                    padding: '8px 12px', 
+                    background: 'linear-gradient(135deg, #6366f1, #4f46e5)', 
+                    border: 'none', 
+                    color: '#ffffff',
+                    borderRadius: '10px',
+                    fontWeight: '700',
+                    fontSize: '11.5px',
+                    boxShadow: '0 4px 10px rgba(99, 102, 241, 0.12)',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #4f46e5, #3730a3)';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #6366f1, #4f46e5)';
+                    e.currentTarget.style.transform = 'none';
+                  }}
+                >
+                  {isLoading ? <span className="spinner" /> : <><HiSparkles /> Tạo thẻ từ Text 🪄</>}
+                </button>
 
-              <button
-                className="aitutor-action-btn btn-ocr-noai"
-                onClick={handleGenerateOCRNoAI}
-                disabled={isLoading || (!selectedFile && !inputText.trim())}
-                style={{ 
-                  padding: '8px', 
-                  background: 'transparent', 
-                  border: '1.5px solid var(--fc-gold)', 
-                  color: 'var(--fc-gold)',
-                  marginTop: '4px',
-                  boxShadow: 'none'
-                }}
-              >
-                {isLoading ? <span className="spinner" /> : <>⚡ Tạo từ File (OCR không AI)</>}
-              </button>
+                <button
+                  className="aitutor-action-btn btn-ocr-noai"
+                  onClick={handleGenerateOCRNoAI}
+                  disabled={isLoading || (!selectedFile && !inputText.trim())}
+                  style={{ 
+                    padding: '8px 12px', 
+                    background: 'linear-gradient(135deg, #f59e0b, #d97706)', 
+                    border: 'none', 
+                    color: '#ffffff',
+                    borderRadius: '10px',
+                    fontWeight: '700',
+                    fontSize: '11.5px',
+                    boxShadow: '0 4px 10px rgba(217, 119, 6, 0.12)',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #d97706, #b45309)';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+                    e.currentTarget.style.transform = 'none';
+                  }}
+                >
+                  {isLoading ? <span className="spinner" /> : <>Trích xuất từ File ⚡</>}
+                </button>
+              </div>
 
+              {/* Progress feedback */}
               {isLoading && loadingStep && (
-                <div className="aitutor-step-progress" style={{ fontSize: '10px', padding: '6px' }}>
-                  <p>{loadingStep}</p>
+                <div style={{ 
+                  padding: '8px 10px', 
+                  borderRadius: '10px', 
+                  background: 'rgba(245, 158, 11, 0.05)', 
+                  border: '1px solid rgba(245, 158, 11, 0.15)', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '4px',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span className="spinner-mini" style={{ 
+                        width: '8px', 
+                        height: '8px', 
+                        border: '1px solid #f59e0b', 
+                        borderTopColor: 'transparent', 
+                        borderRadius: '50%', 
+                        display: 'inline-block', 
+                        animation: 'spin 0.8s linear infinite' 
+                      }} />
+                      Đang xử lý...
+                    </span>
+                  </div>
+                  <p style={{ fontSize: '10px', color: '#e2e8f0', margin: 0, fontWeight: '500', textAlign: 'left' }}>{loadingStep}</p>
                 </div>
               )}
             </div>
           ) : (
-            <div style={{ marginTop: '16px', borderTop: '1px solid var(--fc-border-dark)', paddingTop: '16px', maxHeight: '250px', overflowY: 'auto' }}>
+            <div style={{ marginTop: '16px', borderTop: '1px solid var(--fc-border-dark)', paddingTop: '16px', maxHeight: '220px', overflowY: 'auto' }}>
               <h5 style={{ fontSize: '11px', margin: '0 0 8px 0', color: 'var(--fc-text-secondary)' }}>BỘ THẺ ĐÃ LƯU</h5>
               {savedDecks.length === 0 ? (
                 <p style={{ fontSize: '11px', color: 'var(--fc-text-secondary)', textAlign: 'center' }}>Chưa có bộ thẻ nào.</p>
@@ -1567,38 +1752,63 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
             </div>
           )}
 
-          {/* Spaced Repetition Dashboard Widget */}
-          {cards.length > 0 && (
-            <div className="srs-dashboard-card animate-in">
-              <div className="srs-stats-row">
-                <span className="srs-stat-title">Trí nhớ Spaced Repetition</span>
-                <span className="srs-stat-value">
-                  {Math.max(15, Math.min(100, Math.round((learnedCards.size / cards.length) * 100 || 0)))}%
-                </span>
+          {/* Spaced Repetition & Streak Unified Progress Dashboard Card */}
+          <div 
+            className="animate-in"
+            style={{ 
+              background: 'rgba(30, 30, 24, 0.5)',
+              border: '1.5px solid var(--fc-border-dark)',
+              borderRadius: '18px',
+              padding: '14px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2)',
+              marginTop: '12px',
+              boxSizing: 'border-box',
+              width: '100%'
+            }}
+          >
+            <h5 style={{ margin: 0, fontSize: '11px', fontWeight: '850', color: 'var(--fc-text-secondary)', letterSpacing: '0.8px', textTransform: 'uppercase', textAlign: 'left' }}>
+              📊 TIẾN TRÌNH CỦA BẠN
+            </h5>
+
+            {cards.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', fontWeight: '700' }}>
+                  <span style={{ color: 'var(--fc-text-secondary)' }}>Trí nhớ Spaced</span>
+                  <span style={{ color: 'var(--fc-gold)', fontWeight: '850' }}>
+                    {Math.max(15, Math.min(100, Math.round((learnedCards.size / cards.length) * 100 || 0)))}%
+                  </span>
+                </div>
+                <div className="srs-progress-bar-bg" style={{ margin: '2px 0' }}>
+                  <div 
+                    className="srs-progress-bar-fill" 
+                    style={{ width: `${Math.max(15, Math.min(100, Math.round((learnedCards.size / cards.length) * 100 || 0)))}%` }}
+                  />
+                </div>
               </div>
-              <div className="srs-progress-bar-bg">
-                <div 
-                  className="srs-progress-bar-fill" 
-                  style={{ width: `${Math.max(15, Math.min(100, Math.round((learnedCards.size / cards.length) * 100 || 0)))}%` }}
-                />
-              </div>
-              <div className="srs-stats-row" style={{ marginTop: '4px' }}>
-                <span style={{ fontSize: '10.5px', color: 'var(--fc-text-secondary)' }}>Chu kỳ ôn tập:</span>
-                <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#fff' }}>3 ngày / lượt</span>
-              </div>
-              <div className="srs-stats-row">
-                <span style={{ fontSize: '10.5px', color: 'var(--fc-text-secondary)' }}>Lịch học kế tiếp:</span>
-                <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--fc-gold)' }}>Ngày mai (Trong 24h)</span>
+            )}
+
+            {/* Streak row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.02)', padding: '8px 10px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.03)' }}>
+              <span style={{ fontSize: '20px' }}>🔥</span>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '1px' }}>
+                <span style={{ fontSize: '13px', fontWeight: '800', color: '#ffffff' }}>{streakDays} ngày</span>
+                <span style={{ fontSize: '9.5px', color: 'var(--fc-text-secondary)' }}>Chuỗi học liên tục</span>
               </div>
             </div>
-          )}
 
-          {/* Streak Flame card at bottom left */}
-          <div className="flashcard-streak-card">
-            <span className="flashcard-streak-icon">🔥</span>
-            <div className="flashcard-streak-text">
-              <span className="flashcard-streak-value">{streakDays} ngày</span>
-              <span className="flashcard-streak-label">Chuỗi học liên tục</span>
+            {/* Session schedule */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '8px', fontSize: '10.5px', textAlign: 'left' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--fc-text-secondary)' }}>Chu kỳ ôn tập:</span>
+                <span style={{ fontWeight: '700', color: '#ffffff' }}>3 ngày / lượt</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--fc-text-secondary)' }}>Lịch học kế tiếp:</span>
+                <span style={{ fontWeight: '700', color: 'var(--fc-gold)' }}>Ngày mai (Trong 24h)</span>
+              </div>
             </div>
           </div>
         </aside>
@@ -1894,6 +2104,49 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
 
                         <div className="flashcard-card-word-title" style={{ fontSize: '22px', fontWeight: '500', padding: '0 12px', lineHeight: '1.6' }}>
                           {activeCards[currentIdx]?.card?.back}
+                        </div>
+
+                        {/* AI Mnemonic memory tip */}
+                        <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '100%', padding: '0 20px' }} onClick={e => e.stopPropagation()}>
+                          {activeCards[currentIdx]?.card?.mnemonic ? (
+                            <div style={{
+                              background: 'rgba(255, 226, 89, 0.08)',
+                              border: '1.5px dashed var(--fc-gold)',
+                              padding: '10px 14px',
+                              borderRadius: '10px',
+                              fontSize: '12.5px',
+                              color: '#fff',
+                              maxWidth: '480px',
+                              textAlign: 'center',
+                              lineHeight: '1.5',
+                              boxShadow: '0 0 15px rgba(255, 226, 89, 0.08)'
+                            }}>
+                              💡 <strong>Mẹo nhớ từ AI:</strong> &quot;{activeCards[currentIdx]?.card?.mnemonic}&quot;
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleGenerateMnemonic(activeCards[currentIdx]?.card)}
+                              disabled={isGeneratingMnemonic}
+                              style={{
+                                background: 'transparent',
+                                border: '1px solid var(--fc-border-dark)',
+                                color: 'var(--fc-text-secondary)',
+                                padding: '6px 14px',
+                                borderRadius: '20px',
+                                fontSize: '11.5px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--fc-gold)'; e.currentTarget.style.color = 'var(--fc-gold)'; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--fc-border-dark)'; e.currentTarget.style.color = 'var(--fc-text-secondary)'; }}
+                            >
+                              {isGeneratingMnemonic ? '🤖 Đang tạo mẹo nhớ...' : '💡 Gợi ý mẹo nhớ AI'}
+                            </button>
+                          )}
                         </div>
 
 
@@ -2422,6 +2675,19 @@ export default function FlashcardPage({ currentUser, navigateTo, addLog }) {
           </div>
         </div>
       )}
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        @keyframes pulse-width {
+          from { width: 30%; }
+          to { width: 95%; }
+        }
+      `}</style>
     </div>
   );
 }

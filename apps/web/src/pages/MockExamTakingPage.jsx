@@ -307,6 +307,16 @@ export default function MockExamTakingPage({ examId, currentUser, onFinished, na
     return Math.max(0, 100 - tabs * 15 - copies * 10 - fullscreen * 8);
   };
 
+  // Trigger MathJax rendering when current question changes
+  useEffect(() => {
+    if (window.MathJax) {
+      const timer = setTimeout(() => {
+        window.MathJax.typesetPromise?.().catch(e => console.warn('MathJax error:', e));
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [currentIdx, questions]);
+
   // Visibility & Tab-blur violation triggers (enhanced with per-type tracking)
   const triggerViolation = (violationType, reason) => {
     if (showViolationModalRef.current) return;
@@ -928,54 +938,73 @@ export default function MockExamTakingPage({ examId, currentUser, onFinished, na
 
       {/* ── SECURITY VIOLATION ALERT MODAL ── */}
       {showViolationModal && (
-        <div className="checkout-overlay" style={{ zIndex: 11000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="checkout-modal animate-in" style={{ maxWidth: '460px', border: '3px solid var(--exams-red)', boxShadow: '0 10px 40px rgba(214, 48, 49, 0.2)' }}>
-            <div style={{ textAlign: 'center', padding: '10px 0' }}>
-              <div style={{ fontSize: '48px', color: 'var(--exams-red)', animation: 'pulse 0.5s infinite alternate' }}><HiOutlineShieldExclamation style={{ display: 'block', margin: '0 auto' }} /></div>
-              <h3 style={{ fontSize: '17px', fontWeight: '950', color: 'var(--exams-red)', marginTop: '16px', letterSpacing: '-0.5px' }}>
-                CẢNH BÁO VI PHẠM NỘI QUY THI
+        <div className="checkout-overlay" style={{ zIndex: 11000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(8px)' }}>
+          <div className="checkout-modal animate-in" style={{ maxWidth: '460px', background: 'rgba(30, 41, 59, 0.95)', border: '2px solid #ef4444', borderRadius: '20px', boxShadow: '0 20px 50px rgba(239, 68, 68, 0.15)', color: '#f8fafc', padding: '24px' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '56px', color: '#ef4444', animation: 'pulse 1s infinite alternate', margin: '0 auto 12px' }}>
+                <HiOutlineShieldExclamation style={{ display: 'block', margin: '0 auto' }} />
+              </div>
+              <h3 style={{ fontSize: '18px', fontWeight: '950', color: '#ef4444', letterSpacing: '0.5px', textTransform: 'uppercase', margin: '0 0 16px 0', fontFamily: "'Outfit', sans-serif" }}>
+                CẢNH BÁO AN NINH PHÒNG THI
               </h3>
               
-              <div style={{ background: 'var(--bg-main)', padding: '16px', borderRadius: '10px', border: '1px solid var(--border)', margin: '18px 0', fontSize: '13px', color: 'var(--text-primary)', textAlign: 'left', lineHeight: 1.5 }}>
-                <p>🔴 <strong>Lý do vi phạm:</strong> {violationReason}</p>
-                <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                    <span>↔️ Rời tab / cửa sổ</span>
-                    <strong style={{ color: tabViolRef.current >= 2 ? 'var(--exams-red)' : 'var(--text-primary)' }}>{tabViolRef.current}/3 lần</strong>
+              <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '18px', borderRadius: '14px', border: '1.5px solid rgba(255, 255, 255, 0.08)', margin: '18px 0', fontSize: '13.5px', textAlign: 'left', lineHeight: 1.6 }}>
+                <p style={{ margin: '0 0 12px 0' }}>🔴 <strong>Lý do vi phạm:</strong> <span style={{ color: '#fca5a5' }}>{violationReason}</span></p>
+                
+                {/* Stats rows */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '12px', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px' }}>
+                    <span style={{ color: '#94a3b8' }}>↔️ Rời tab / cửa sổ</span>
+                    <strong style={{ color: tabViolRef.current >= 2 ? '#ef4444' : '#f8fafc' }}>{tabViolRef.current}/3 lần</strong>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                    <span>🖥️ Thoát toàn màn hình</span>
-                    <strong style={{ color: fullscreenViolRef.current >= 2 ? 'var(--exams-red)' : 'var(--text-primary)' }}>{fullscreenViolRef.current}/3 lần</strong>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px' }}>
+                    <span style={{ color: '#94a3b8' }}>🖥️ Thoát toàn màn hình</span>
+                    <strong style={{ color: fullscreenViolRef.current >= 2 ? '#ef4444' : '#f8fafc' }}>{fullscreenViolRef.current}/3 lần</strong>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                    <span>📋 Copy/Paste</span>
-                    <strong style={{ color: copyPasteViolRef.current >= 4 ? 'var(--exams-red)' : 'var(--text-primary)' }}>{copyPasteViolRef.current}/5 lần</strong>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px' }}>
+                    <span style={{ color: '#94a3b8' }}>📋 Sao chép/Dán (Copy/Paste)</span>
+                    <strong style={{ color: copyPasteViolRef.current >= 4 ? '#ef4444' : '#f8fafc' }}>{copyPasteViolRef.current}/5 lần</strong>
                   </div>
                 </div>
-                <p style={{ marginTop: '10px', fontSize: '11.5px', color: 'var(--text-secondary)' }}>Điểm tin cậy hiện tại: <strong style={{ color: estimatedTrustScore < 70 ? 'var(--exams-red)' : '#00b894' }}>{Math.round(estimatedTrustScore)}/100</strong>. Vượt giới hạn sẽ tự động nộp bài.</p>
+
+                {/* Progress bar of Trust score */}
+                <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', marginBottom: '6px' }}>
+                    <span style={{ color: '#94a3b8' }}>Chỉ số tin cậy bài làm:</span>
+                    <strong style={{ color: estimatedTrustScore < 70 ? '#ef4444' : '#10b981' }}>{Math.round(estimatedTrustScore)}/100</strong>
+                  </div>
+                  <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ width: `${estimatedTrustScore}%`, height: '100%', background: estimatedTrustScore >= 80 ? '#10b981' : estimatedTrustScore >= 50 ? '#f59e0b' : '#ef4444', transition: 'width 0.3s ease' }}></div>
+                  </div>
+                  <p style={{ fontSize: '11px', color: '#94a3b8', margin: '8px 0 0 0', fontStyle: 'italic' }}>*Lưu ý: Nếu một trong các chỉ số vượt quá giới hạn tối đa, hệ thống sẽ tự động nộp bài làm của bạn.</p>
+                </div>
               </div>
 
               <button
                 className="btn-primary"
                 onClick={() => {
                   setShowViolationModal(false);
-                  // Request fullscreen back if they exited
                   if (!document.fullscreenElement) {
                     document.documentElement.requestFullscreen().catch(() => {});
                   }
                 }}
                 style={{
                   width: '100%',
-                  padding: '12px',
-                  background: 'var(--text-primary)',
+                  padding: '14px',
+                  background: 'linear-gradient(135deg, #ef4444, #b91c1c)',
                   color: '#fff',
                   border: 'none',
-                  borderRadius: '8px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer'
+                  borderRadius: '10px',
+                  fontWeight: '800',
+                  fontSize: '13.5px',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
+                  transition: 'all 0.2s'
                 }}
+                onMouseEnter={(e) => e.currentTarget.style.filter = 'brightness(1.15)'}
+                onMouseLeave={(e) => e.currentTarget.style.filter = 'none'}
               >
-                TÔI ĐÃ HIỂU VÀ QUAY LẠI LÀM BÀI
+                XÁC NHẬN & QUAY LẠI LÀM BÀI THI
               </button>
             </div>
           </div>

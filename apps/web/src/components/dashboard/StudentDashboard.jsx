@@ -28,7 +28,8 @@ import {
   HiEyeOff,
   HiExclamationCircle,
   HiCheckCircle,
-  HiX
+  HiX,
+  HiTrash
 } from 'react-icons/hi';
 import { HiTrophy } from 'react-icons/hi2';
 import { api } from '../../api';
@@ -40,6 +41,18 @@ import ContinueLearningRail from '../courses/catalog/ContinueLearningRail';
 export default function StudentDashboard({ currentUser, setActiveTab, navigateTo, onUpdateUser, activeTab, currentTab: passedCurrentTab, onLogout, unreadCount = 0, notifications = [], children }) {
   // --- STATES & STORES ---
   const currentTab = activeTab || passedCurrentTab || 'home';
+  const formatFileName = (title) => {
+    if (!title) return '';
+    let clean = title.replace(/^\d{2}_\d{2}_\d{4}___/, '');
+    clean = clean.replace(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}_+/, '');
+    const parts = clean.split('.');
+    const ext = parts.pop();
+    const base = parts.join('.');
+    if (base.length > 24) {
+      return base.substring(0, 16) + '...' + base.slice(-6) + '.' + ext;
+    }
+    return clean;
+  };
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const [notifDropdownPos, setNotifDropdownPos] = useState({ top: 0, left: 0 });
   const notifRef = useRef(null);
@@ -154,10 +167,13 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
         const progressMap = {};
         try {
           const { enrollmentService } = await import('../../services/enrollmentService');
+          let completed = [];
+          if (currentUser) {
+            completed = await enrollmentService.getEnrolledCourseProgress(currentUser.id);
+          }
           for (const course of courses) {
             let calculated = 0;
             if (currentUser) {
-              const completed = await enrollmentService.getEnrolledCourseProgress(currentUser.id, course.id);
               const totalLessons = course.lessons?.length || 5;
               const completedInCourse = completed.filter(id => {
                 return course.lessons?.some(l => l.id.toString() === id.toString());
@@ -668,8 +684,8 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
           {/* HỌC TẬP CỦA TÔI */}
           <div className="sdb-menu-category-title">Học tập của tôi</div>
           <button 
-            className={`sdb-menu-item ${currentTab === 'my-courses' || currentTab === 'courses' ? 'active' : ''}`}
-            onClick={() => navigateTo('/user/my-courses')}
+            className={`sdb-menu-item ${currentTab === 'courses' ? 'active' : ''}`}
+            onClick={() => navigateTo('/user/courses')}
           >
             <span className="sdb-menu-icon"><HiBookOpen /></span>
             <span>Khóa học của tôi</span>
@@ -784,95 +800,135 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
                 className="animate-in"
                 style={{
                   background: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '20px',
+                  border: '1px solid rgba(226, 232, 240, 0.8)',
+                  borderRadius: '24px',
                   padding: '24px',
-                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.03)',
-                  marginBottom: '16px',
+                  boxShadow: '0 10px 30px -10px rgba(100, 116, 139, 0.05)',
+                  marginBottom: '20px',
                   textAlign: 'left'
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <h3 className="sdb-card-title" style={{ fontSize: '16px', fontWeight: '700' }}>Khóa học của tôi</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <h3 className="sdb-card-title" style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>📚</span> Khóa học của tôi
+                  </h3>
                   <button 
-                    onClick={() => navigateTo('/user/my-courses')} 
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '600', color: '#6366f1' }}
+                    onClick={() => navigateTo('/user/courses')} 
+                    style={{ 
+                      background: 'none', 
+                      border: 'none', 
+                      cursor: 'pointer', 
+                      fontSize: '13px', 
+                      fontWeight: '700', 
+                      color: '#6366f1',
+                      transition: 'color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#4f46e5'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = '#6366f1'}
                   >
-                    Xem tất cả
+                    Xem tất cả ➔
                   </button>
                 </div>
 
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <div style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
                     <thead>
-                      <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
-                        <th style={{ padding: '12px 8px', fontSize: '12px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase' }}>Tên khóa học</th>
-                        <th style={{ padding: '12px 8px', fontSize: '12px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase', width: '120px' }}>Môn học</th>
-                        <th style={{ padding: '12px 8px', fontSize: '12px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase', width: '110px', textAlign: 'center' }}>Số bài học</th>
-                        <th style={{ padding: '12px 8px', fontSize: '12px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase', width: '220px' }}>Tiến độ</th>
-                        <th style={{ padding: '12px 8px', fontSize: '12px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase', width: '120px', textAlign: 'right' }}>Thao tác</th>
+                      <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                        <th style={{ padding: '14px 16px', fontSize: '11px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Tên khóa học</th>
+                        <th style={{ padding: '14px 16px', fontSize: '11px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.8px', width: '130px' }}>Môn học</th>
+                        <th style={{ padding: '14px 16px', fontSize: '11px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.8px', width: '120px', textAlign: 'center' }}>Số bài học</th>
+                        <th style={{ padding: '14px 16px', fontSize: '11px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.8px', width: '220px' }}>Tiến độ</th>
+                        <th style={{ padding: '14px 16px', fontSize: '11px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.8px', width: '120px', textAlign: 'right' }}>Thao tác</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {coursesToRender.map((course) => (
-                        <tr 
-                          key={course.id} 
-                          style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s' }}
-                          className="sdb-table-row"
-                        >
-                          <td style={{ padding: '16px 8px', fontSize: '14px', fontWeight: '600', color: '#0f172a' }}>
-                            {course.title}
-                          </td>
-                          <td style={{ padding: '16px 8px', fontSize: '13px', fontWeight: '500' }}>
-                            <span style={{
-                              background: course.subject === 'Toán' || course.subject === 'Toán học' ? '#f3e8ff' : course.subject === 'Vật lý' ? '#ccfbf1' : course.subject === 'Hóa học' ? '#dbeafe' : '#ffedd5',
-                              color: course.subject === 'Toán' || course.subject === 'Toán học' ? '#7c3aed' : course.subject === 'Vật lý' ? '#0d9488' : course.subject === 'Hóa học' ? '#2563eb' : '#ea580c',
-                              padding: '4px 10px',
-                              borderRadius: '12px',
-                              fontSize: '11px',
-                              fontWeight: '600'
-                            }}>
-                              {course.subject}
-                            </span>
-                          </td>
-                          <td style={{ padding: '16px 8px', fontSize: '13px', fontWeight: '500', textAlign: 'center', color: '#475569' }}>
-                            {course.lessons?.length || course.lessonsCount || 10} bài
-                          </td>
-                          <td style={{ padding: '16px 8px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <div style={{ flex: 1, height: '6px', background: '#f1f5f9', borderRadius: '3px', overflow: 'hidden' }}>
-                                <div style={{ width: `${course.progress}%`, height: '100%', background: 'linear-gradient(90deg, #6366f1, #4f46e5)' }}></div>
+                      {coursesToRender.map((course) => {
+                        const getSubjectTag = (subject) => {
+                          const s = subject?.toLowerCase() || '';
+                          if (s.includes('toán')) return { bg: '#f5f3ff', color: '#6d28d9', border: '#ddd6fe' };
+                          if (s.includes('lý') || s.includes('vật lý')) return { bg: '#ecfdf5', color: '#059669', border: '#a7f3d0' };
+                          if (s.includes('hóa') || s.includes('hóa học')) return { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' };
+                          if (s.includes('anh') || s.includes('tiếng anh')) return { bg: '#fff7ed', color: '#ea580c', border: '#ffedd5' };
+                          if (s.includes('văn') || s.includes('ngữ văn')) return { bg: '#fff1f2', color: '#e11d48', border: '#ffe4e6' };
+                          return { bg: '#faf5ff', color: '#7c3aed', border: '#f3e8ff' }; // default
+                        };
+                        const tag = getSubjectTag(course.subject);
+                        return (
+                          <tr 
+                            key={course.id} 
+                            style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.25s ease' }}
+                            className="sdb-table-row"
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#fafbfc'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                          >
+                            <td style={{ padding: '16px 16px', fontSize: '13.5px', fontWeight: '600', color: '#0f172a', verticalAlign: 'middle' }}>
+                              {course.title}
+                            </td>
+                            <td style={{ padding: '16px 16px', fontSize: '13px', verticalAlign: 'middle' }}>
+                              <span style={{
+                                background: tag.bg,
+                                color: tag.color,
+                                border: `1px solid ${tag.border}`,
+                                padding: '4px 10px',
+                                borderRadius: '20px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.3px',
+                                display: 'inline-block'
+                              }}>
+                                {course.subject}
+                              </span>
+                            </td>
+                            <td style={{ padding: '16px 16px', fontSize: '13px', fontWeight: '600', textAlign: 'center', color: '#475569', verticalAlign: 'middle' }}>
+                              {course.lessons?.length || course.lessonsCount || 10} bài
+                            </td>
+                            <td style={{ padding: '16px 16px', verticalAlign: 'middle' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div style={{ flex: 1, height: '8px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
+                                  <div style={{ width: `${course.progress}%`, height: '100%', background: 'linear-gradient(90deg, #818cf8, #6366f1)', borderRadius: '4px' }}></div>
+                                </div>
+                                <span style={{ fontSize: '12px', fontWeight: '700', color: '#6366f1', minWidth: '35px', textAlign: 'right' }}>{course.progress}%</span>
                               </div>
-                              <span style={{ fontSize: '12px', fontWeight: '600', color: '#4f46e5', minWidth: '35px', textAlign: 'right' }}>{course.progress}%</span>
-                            </div>
-                          </td>
-                          <td style={{ padding: '16px 8px', textAlign: 'right' }}>
-                            <button
-                              onClick={() => {
-                                if (course.id && !String(course.id).startsWith('def')) {
-                                  navigateTo(`/courses/${course.id}`);
-                                } else {
-                                  navigateTo('/user/courses');
-                                }
-                              }}
-                              style={{
-                                background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: '8px',
-                                padding: '6px 14px',
-                                fontWeight: '600',
-                                fontSize: '12px',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s ease',
-                                boxShadow: '0 2px 4px rgba(99, 102, 241, 0.15)'
-                              }}
-                            >
-                              Vào học
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td style={{ padding: '16px 16px', textAlign: 'right', verticalAlign: 'middle' }}>
+                              <button
+                                onClick={() => {
+                                  if (course.id && !String(course.id).startsWith('def')) {
+                                    navigateTo(`/courses/${course.id}`);
+                                  } else {
+                                    navigateTo('/user/courses');
+                                  }
+                                }}
+                                style={{
+                                  background: 'linear-gradient(135deg, #818cf8, #6366f1)',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '10px',
+                                  padding: '7px 18px',
+                                  fontWeight: '700',
+                                  fontSize: '12px',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s ease',
+                                  boxShadow: '0 4px 10px rgba(99, 102, 241, 0.15)'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = 'linear-gradient(135deg, #6366f1, #4f46e5)';
+                                  e.currentTarget.style.boxShadow = '0 6px 14px rgba(99, 102, 241, 0.25)';
+                                  e.currentTarget.style.transform = 'translateY(-1px)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = 'linear-gradient(135deg, #818cf8, #6366f1)';
+                                  e.currentTarget.style.boxShadow = '0 4px 10px rgba(99, 102, 241, 0.15)';
+                                  e.currentTarget.style.transform = 'none';
+                                }}
+                              >
+                                Vào học
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -893,7 +949,7 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
                   Hãy đăng ký khóa học Premium để mở khóa bài học và bắt đầu lộ trình học cá nhân hóa ngay nhé!
                 </p>
                 <button
-                  onClick={() => navigateTo('/user/courses')}
+                  onClick={() => navigateTo('/courses')}
                   style={{
                     background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
                     color: '#ffffff',
@@ -918,78 +974,126 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
                 className="animate-in"
                 style={{
                   background: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '20px',
+                  border: '1px solid rgba(226, 232, 240, 0.8)',
+                  borderRadius: '24px',
                   padding: '24px',
-                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.03)',
-                  marginBottom: '16px',
+                  boxShadow: '0 10px 30px -10px rgba(100, 116, 139, 0.05)',
+                  marginBottom: '20px',
                   textAlign: 'left'
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <h3 className="sdb-card-title" style={{ fontSize: '16px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <h3 className="sdb-card-title" style={{ fontSize: '17px', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                     📜 Bài thi gần đây
                   </h3>
                   <button
                     onClick={() => navigateTo('/user/exam-history')}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '600', color: '#6c5ce7' }}
+                    style={{ 
+                      background: 'none', 
+                      border: 'none', 
+                      cursor: 'pointer', 
+                      fontSize: '13px', 
+                      fontWeight: '700', 
+                      color: '#6366f1',
+                      transition: 'color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#4f46e5'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = '#6366f1'}
                   >
-                    Xem tất cả →
+                    Xem tất cả ➔
                   </button>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {dashboardData.attempts
                     .filter(a => a.status === 'SUBMITTED')
                     .slice(0, 4)
                     .map((att) => {
                       const score = att.score ?? 0;
-                      const scoreColor = score >= 8 ? '#00b894' : score >= 5 ? '#e17055' : '#d63031';
-                      const scoreBg = score >= 8 ? 'rgba(0,184,148,0.1)' : score >= 5 ? 'rgba(225,112,85,0.1)' : 'rgba(214,48,49,0.1)';
+                      const scoreColor = '#ffffff';
+                      const scoreBg = score >= 8 ? 'linear-gradient(135deg, #10b981, #059669)' : score >= 5 ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #f87171, #ef4444)';
+                      const scoreShadow = score >= 8 ? '0 4px 10px rgba(16, 185, 129, 0.2)' : score >= 5 ? '0 4px 10px rgba(245, 158, 11, 0.2)' : '0 4px 10px rgba(239, 68, 68, 0.2)';
                       const totalQs = (att.correctCount || 0) + (att.wrongCount || 0) + (att.skippedCount || 0);
                       const dateStr = att.submittedAt
                         ? new Date(att.submittedAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
                         : '';
+                      
+                      const getSubjectTag = (subject) => {
+                        const s = subject?.toLowerCase() || '';
+                        if (s.includes('toán')) return { bg: '#f5f3ff', color: '#6d28d9', border: '#ddd6fe' };
+                        if (s.includes('lý') || s.includes('vật lý')) return { bg: '#ecfdf5', color: '#059669', border: '#a7f3d0' };
+                        if (s.includes('hóa') || s.includes('hóa học')) return { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' };
+                        if (s.includes('anh') || s.includes('tiếng anh')) return { bg: '#fff7ed', color: '#ea580c', border: '#ffedd5' };
+                        if (s.includes('văn') || s.includes('ngữ văn')) return { bg: '#fff1f2', color: '#e11d48', border: '#ffe4e6' };
+                        return { bg: '#faf5ff', color: '#7c3aed', border: '#f3e8ff' };
+                      };
+                      const subTag = getSubjectTag(att.exam?.subject || '');
+
                       return (
                         <div
                           key={att.id}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '14px',
-                            padding: '12px 14px',
-                            borderRadius: '12px',
-                            border: '1px solid #e2e8f0',
-                            background: '#fafafa',
-                            transition: 'background 0.15s',
+                            gap: '16px',
+                            padding: '14px 16px',
+                            borderRadius: '16px',
+                            border: '1px solid rgba(226, 232, 240, 0.6)',
+                            background: 'rgba(248, 250, 252, 0.6)',
+                            transition: 'all 0.2s ease',
                             cursor: 'pointer'
                           }}
                           onClick={() => navigateTo(`/mock-exams/${att.examId}/result/${att.id}`)}
-                          onMouseOver={e => e.currentTarget.style.background = '#f1f5f9'}
-                          onMouseOut={e => e.currentTarget.style.background = '#fafafa'}
+                          onMouseOver={e => {
+                            e.currentTarget.style.background = '#ffffff';
+                            e.currentTarget.style.borderColor = '#cbd5e1';
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                            e.currentTarget.style.boxShadow = '0 6px 15px rgba(100, 116, 139, 0.05)';
+                          }}
+                          onMouseOut={e => {
+                            e.currentTarget.style.background = 'rgba(248, 250, 252, 0.6)';
+                            e.currentTarget.style.borderColor = 'rgba(226, 232, 240, 0.6)';
+                            e.currentTarget.style.transform = 'none';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
                         >
                           {/* Score pill */}
                           <div style={{
-                            minWidth: '52px',
+                            minWidth: '56px',
                             textAlign: 'center',
                             background: scoreBg,
-                            border: `1.5px solid ${scoreColor}`,
-                            borderRadius: '10px',
+                            borderRadius: '12px',
                             padding: '6px 4px',
-                            flexShrink: 0
+                            flexShrink: 0,
+                            boxShadow: scoreShadow
                           }}>
-                            <div style={{ fontSize: '16px', fontWeight: '900', color: scoreColor, lineHeight: 1 }}>{score.toFixed(1)}</div>
-                            <div style={{ fontSize: '9px', fontWeight: 'bold', color: scoreColor, marginTop: '1px' }}>điểm</div>
+                            <div style={{ fontSize: '18px', fontWeight: '900', color: scoreColor, lineHeight: 1 }}>{score.toFixed(1)}</div>
+                            <div style={{ fontSize: '9px', fontWeight: 'bold', color: scoreColor, marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>điểm</div>
                           </div>
 
                           {/* Info */}
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: '13.5px', fontWeight: '700', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                            <div style={{ fontSize: '14px', fontWeight: '700', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {att.exam?.title || 'Đề thi thử'}
                             </div>
-                            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '3px', display: 'flex', gap: '10px' }}>
+                            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '5px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <span>✅ {att.correctCount || 0}/{totalQs} câu</span>
-                              {att.exam?.subject && <span style={{ color: '#6c5ce7', fontWeight: '600' }}>{att.exam.subject}</span>}
+                              <span style={{ color: '#cbd5e1' }}>•</span>
+                              {att.exam?.subject && (
+                                <span style={{
+                                  background: subTag.bg,
+                                  color: subTag.color,
+                                  border: `1px solid ${subTag.border}`,
+                                  padding: '2px 8px',
+                                  borderRadius: '12px',
+                                  fontSize: '10.5px',
+                                  fontWeight: '700',
+                                  textTransform: 'uppercase'
+                                }}>
+                                  {att.exam.subject}
+                                </span>
+                              )}
+                              <span style={{ color: '#cbd5e1' }}>•</span>
                               <span>{dateStr}</span>
                             </div>
                           </div>
@@ -998,7 +1102,28 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
                           <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                             <button
                               onClick={e => { e.stopPropagation(); navigateTo(`/mock-exams/${att.examId}/start`); }}
-                              style={{ padding: '5px 10px', background: '#6c5ce7', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}
+                              style={{ 
+                                padding: '6px 14px', 
+                                background: '#ffffff', 
+                                color: '#4f46e5', 
+                                border: '1px solid rgba(79, 70, 229, 0.2)', 
+                                borderRadius: '10px', 
+                                fontSize: '12px', 
+                                fontWeight: '700', 
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                boxShadow: '0 2px 5px rgba(0,0,0,0.02)'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#4f46e5';
+                                e.currentTarget.style.color = '#ffffff';
+                                e.currentTarget.style.borderColor = '#4f46e5';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = '#ffffff';
+                                e.currentTarget.style.color = '#4f46e5';
+                                e.currentTarget.style.borderColor = 'rgba(79, 70, 229, 0.2)';
+                              }}
                             >
                               Thi lại ⚡
                             </button>
@@ -1014,128 +1139,352 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
             {/* Bottom split: Checklist documents & Stats widgets */}
             <div className="sdb-bottom-split">
               {/* Documents card */}
-                <div className="sdb-documents-card">
-                  <div className="sdb-card-title-row">
-                    <h3 className="sdb-card-title">Tài liệu học tập gần đây</h3>
-                    <button 
-                      onClick={() => navigateTo('/user/documents')} 
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '900', color: '#8b5cf6' }}
-                    >
-                      Xem tất cả
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {userDocuments.length > 0 ? (
-                      userDocuments.slice(0, 3).map((doc, idx) => {
-                        const tagClass = idx % 4 === 0 ? 'purple-tag' : idx % 4 === 1 ? 'teal-tag' : idx % 4 === 2 ? 'orange-tag' : 'blue-tag';
-                        return (
-                          <div key={doc.id} className={`sdb-doc-item ${tagClass}`}>
-                            <div className="sdb-doc-info" onClick={() => window.open(doc.fileUrl, '_blank')} style={{ cursor: 'pointer', flex: 1 }}>
-                              <h4 className="sdb-doc-title">{doc.title}</h4>
-                              <p className="sdb-doc-desc">Định dạng: {doc.fileType} • {new Date(doc.createdAt).toLocaleDateString('vi-VN')}</p>
-                            </div>
-                            <a 
-                              href={doc.fileUrl} 
-                              download
-                              target="_blank"
-                              rel="noreferrer"
-                              className="sdb-doc-action-btn"
-                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}
-                            >
-                              <HiDownload />
-                            </a>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div style={{ textAlign: 'center', padding: '24px', border: '2px dashed var(--border)', borderRadius: '12px' }}>
-                        <span style={{ fontSize: '28px' }}>📂</span>
-                        <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: '8px 0 0 0', fontWeight: 'bold' }}>Chưa có tài liệu tải lên gần đây</p>
-                      </div>
-                    )}
-                  </div>
+              <div className="sdb-documents-card" style={{
+                background: '#ffffff',
+                border: '1px solid rgba(226, 232, 240, 0.8)',
+                borderRadius: '24px',
+                padding: '24px',
+                boxShadow: '0 10px 30px -10px rgba(100, 116, 139, 0.05)',
+                textAlign: 'left'
+              }}>
+                <div className="sdb-card-title-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <h3 className="sdb-card-title" style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', margin: 0 }}>Tài liệu học tập gần đây</h3>
+                  <button 
+                    onClick={() => navigateTo('/user/documents')} 
+                    style={{ 
+                      background: 'none', 
+                      border: 'none', 
+                      cursor: 'pointer', 
+                      fontSize: '13px', 
+                      fontWeight: '700', 
+                      color: '#6366f1',
+                      transition: 'color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#4f46e5'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = '#6366f1'}
+                  >
+                    Xem tất cả
+                  </button>
                 </div>
 
-                {/* Joined Classrooms Quick Widget */}
-                <div className="sdb-documents-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div className="sdb-card-title-row">
-                    <h3 className="sdb-card-title">Lớp học trực tuyến</h3>
-                    <button 
-                      onClick={() => navigateTo('/user/classrooms')} 
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '900', color: '#8b5cf6' }}
-                    >
-                      Xem tất cả
-                    </button>
-                  </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {userDocuments.length > 0 ? (
+                    userDocuments.slice(0, 3).map((doc, idx) => {
+                      const colors = [
+                        { border: '#818cf8', bgHover: '#f5f3ff' }, // violet
+                        { border: '#2dd4bf', bgHover: '#f0fdfa' }, // teal
+                        { border: '#fb923c', bgHover: '#fff7ed' }, // orange
+                        { border: '#60a5fa', bgHover: '#eff6ff' }  // blue
+                      ];
+                      const tagColor = colors[idx % colors.length];
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {studyGroups.filter(g => g.isMember).length > 0 ? (
-                      studyGroups.filter(g => g.isMember).slice(0, 3).map((group, idx) => {
-                        const tagClass = idx % 4 === 0 ? 'purple-tag' : idx % 4 === 1 ? 'teal-tag' : idx % 4 === 2 ? 'orange-tag' : 'blue-tag';
-                        return (
-                          <div 
-                            key={group.id} 
-                            className={`sdb-doc-item ${tagClass}`}
-                            style={{ cursor: 'pointer' }}
-                            onClick={() => {
-                              localStorage.setItem('forum_active_group', JSON.stringify(group));
-                              navigateTo('/user/forum');
-                            }}
-                          >
-                            <div className="sdb-doc-info" style={{ flex: 1 }}>
-                              <h4 className="sdb-doc-title">👥 {group.name}</h4>
-                              <p className="sdb-doc-desc">{group.memberCount} thành viên • Trao đổi học tập</p>
-                            </div>
-                            <span style={{ fontSize: '14px', color: '#8b5cf6', fontWeight: '900' }}>Vào lớp →</span>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div style={{ textAlign: 'center', padding: '24px', border: '2px dashed var(--border)', borderRadius: '12px' }}>
-                        <span style={{ fontSize: '28px' }}>🏫</span>
-                        <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: '8px 0 12px 0', fontWeight: 'bold' }}>Chưa tham gia lớp học nào</p>
-                        <button
-                          onClick={() => navigateTo('/user/classrooms')}
-                          style={{
-                            background: '#eff6ff',
-                            color: '#2563eb',
-                            border: '1px solid #bfdbfe',
-                            borderRadius: '8px',
-                            padding: '6px 14px',
-                            fontWeight: '600',
-                            fontSize: '12px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease'
+                      return (
+                        <div 
+                          key={doc.id} 
+                          style={{ 
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '12px 14px',
+                            borderRadius: '16px',
+                            border: '1px solid rgba(226, 232, 240, 0.6)',
+                            borderLeft: `4px solid ${tagColor.border}`,
+                            background: '#ffffff',
+                            transition: 'all 0.2s ease',
+                            textAlign: 'left'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = tagColor.bgHover;
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                            e.currentTarget.style.boxShadow = '0 4px 10px rgba(100, 116, 139, 0.04)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = '#ffffff';
+                            e.currentTarget.style.transform = 'none';
+                            e.currentTarget.style.boxShadow = 'none';
                           }}
                         >
-                          Khám phá lớp học
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                          <div className="sdb-doc-info" onClick={() => window.open(doc.fileUrl, '_blank')} style={{ cursor: 'pointer', flex: 1, minWidth: 0 }}>
+                            <h4 className="sdb-doc-title" style={{ margin: 0, fontSize: '13.5px', fontWeight: '700', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {formatFileName(doc.title)}
+                            </h4>
+                            <p className="sdb-doc-desc" style={{ margin: '3px 0 0 0', fontSize: '11px', color: '#64748b' }}>
+                              Định dạng: <span style={{ fontWeight: '700', color: '#475569' }}>{doc.fileType?.toUpperCase() || 'FILE'}</span> • {new Date(doc.createdAt).toLocaleDateString('vi-VN')}
+                            </p>
+                          </div>
+                          <a 
+                            href={doc.fileUrl} 
+                            download
+                            target="_blank"
+                            rel="noreferrer"
+                            className="sdb-doc-action-btn"
+                            style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center', 
+                              fontSize: '16px',
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '50%',
+                              background: '#f8fafc',
+                              border: '1px solid rgba(226, 232, 240, 0.8)',
+                              color: '#475569',
+                              transition: 'all 0.2s',
+                              flexShrink: 0,
+                              marginLeft: '10px'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#4f46e5';
+                              e.currentTarget.style.color = '#ffffff';
+                              e.currentTarget.style.borderColor = '#4f46e5';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = '#f8fafc';
+                              e.currentTarget.style.color = '#475569';
+                              e.currentTarget.style.borderColor = 'rgba(226, 232, 240, 0.8)';
+                            }}
+                          >
+                            <HiDownload />
+                          </a>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '32px 24px', border: '1.5px dashed rgba(226, 232, 240, 0.8)', borderRadius: '16px', background: '#f8fafc' }}>
+                      <span style={{ fontSize: '28px' }}>📂</span>
+                      <p style={{ fontSize: '12.5px', color: '#64748b', margin: '8px 0 0 0', fontWeight: '600' }}>Chưa có tài liệu tải lên gần đây</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Joined Classrooms Quick Widget */}
+              <div className="sdb-documents-card" style={{ 
+                background: '#ffffff',
+                border: '1px solid rgba(226, 232, 240, 0.8)',
+                borderRadius: '24px',
+                padding: '24px',
+                boxShadow: '0 10px 30px -10px rgba(100, 116, 139, 0.05)',
+                textAlign: 'left',
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '16px' 
+              }}>
+                <div className="sdb-card-title-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 className="sdb-card-title" style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', margin: 0 }}>Lớp học trực tuyến</h3>
+                  <button 
+                    onClick={() => navigateTo('/user/classrooms')} 
+                    style={{ 
+                      background: 'none', 
+                      border: 'none', 
+                      cursor: 'pointer', 
+                      fontSize: '13px', 
+                      fontWeight: '700', 
+                      color: '#6366f1',
+                      transition: 'color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#4f46e5'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = '#6366f1'}
+                  >
+                    Xem tất cả
+                  </button>
                 </div>
 
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {studyGroups.filter(g => g.isMember).length > 0 ? (
+                    studyGroups.filter(g => g.isMember).slice(0, 3).map((group, idx) => {
+                      const colors = [
+                        { border: '#818cf8', bgHover: '#f5f3ff' }, // violet
+                        { border: '#2dd4bf', bgHover: '#f0fdfa' }, // teal
+                        { border: '#fb923c', bgHover: '#fff7ed' }, // orange
+                        { border: '#60a5fa', bgHover: '#eff6ff' }  // blue
+                      ];
+                      const tagColor = colors[idx % colors.length];
+
+                      return (
+                        <div 
+                          key={group.id} 
+                          className="sdb-group-item"
+                          style={{ 
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '12px 14px',
+                            borderRadius: '16px',
+                            border: '1px solid rgba(226, 232, 240, 0.6)',
+                            borderLeft: `4px solid ${tagColor.border}`,
+                            background: '#ffffff',
+                            transition: 'all 0.2s ease',
+                            cursor: 'pointer',
+                            textAlign: 'left'
+                          }}
+                          onClick={() => {
+                            localStorage.setItem('forum_active_group', JSON.stringify(group));
+                            navigateTo('/user/forum');
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = tagColor.bgHover;
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                            e.currentTarget.style.boxShadow = '0 4px 10px rgba(100, 116, 139, 0.04)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = '#ffffff';
+                            e.currentTarget.style.transform = 'none';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
+                        >
+                          <div className="sdb-doc-info" style={{ flex: 1, minWidth: 0 }}>
+                            <h4 className="sdb-doc-title" style={{ margin: 0, fontSize: '13.5px', fontWeight: '700', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              👥 {group.name}
+                            </h4>
+                            <p className="sdb-doc-desc" style={{ margin: '3px 0 0 0', fontSize: '11px', color: '#64748b' }}>
+                              {group.memberCount} thành viên • Trao đổi học tập
+                            </p>
+                          </div>
+                          <span style={{ fontSize: '12.5px', color: '#4f46e5', fontWeight: '800', flexShrink: 0, marginLeft: '10px' }}>Vào lớp ➔</span>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '24px 16px', border: '1.5px dashed rgba(226, 232, 240, 0.8)', borderRadius: '16px', background: '#f8fafc' }}>
+                      <span style={{ fontSize: '28px' }}>🏫</span>
+                      <p style={{ fontSize: '12.5px', color: '#64748b', margin: '6px 0 10px 0', fontWeight: '600' }}>Chưa tham gia lớp học nào</p>
+                      <button
+                        onClick={() => navigateTo('/user/classrooms')}
+                        style={{
+                          background: '#eff6ff',
+                          color: '#2563eb',
+                          border: '1px solid #bfdbfe',
+                          borderRadius: '10px',
+                          padding: '6px 14px',
+                          fontWeight: '700',
+                          fontSize: '11.5px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          boxShadow: '0 2px 4px rgba(37, 99, 235, 0.05)'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#dbeafe';
+                          e.currentTarget.style.transform = 'translateY(-0.5px)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = '#eff6ff';
+                          e.currentTarget.style.transform = 'none';
+                        }}
+                      >
+                        Khám phá lớp học
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Stats column with widgets and Pro banner */}
-              <div className="sdb-stats-column">
-                <div className="sdb-stats-row">
-                  <div className="sdb-stat-box">
-                    <span className="sdb-stat-label">Thời gian học</span>
-                    <h3 className="sdb-stat-value">28 h</h3>
+              <div className="sdb-stats-column" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div className="sdb-stats-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                  
+                  {/* Stat 1: Study Time */}
+                  <div 
+                    className="sdb-stat-box" 
+                    style={{ 
+                      background: 'rgba(99, 102, 241, 0.04)',
+                      border: '1px solid rgba(99, 102, 241, 0.1)',
+                      borderLeft: '4px solid #6366f1',
+                      borderRadius: '20px',
+                      padding: '16px 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      transition: 'all 0.25s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 6px 15px rgba(99, 102, 241, 0.06)';
+                      e.currentTarget.style.background = 'rgba(99, 102, 241, 0.06)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'none';
+                      e.currentTarget.style.boxShadow = 'none';
+                      e.currentTarget.style.background = 'rgba(99, 102, 241, 0.04)';
+                    }}
+                  >
+                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(99, 102, 241, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4f46e5', flexShrink: 0 }}>
+                      <HiOutlineClock size={20} />
+                    </div>
+                    <div style={{ minWidth: 0, textAlign: 'left' }}>
+                      <span className="sdb-stat-label" style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Thời gian học</span>
+                      <h3 className="sdb-stat-value" style={{ margin: '2px 0 0 0', fontSize: '20px', fontWeight: '800', color: '#1e1b4b' }}>28 h</h3>
+                    </div>
                   </div>
 
-                  <div className="sdb-stat-box">
-                    <span className="sdb-stat-label">Chuỗi học tập</span>
-                    <h3 className="sdb-stat-value">{dashboardData.gamification?.streakDays ?? 7} ngày</h3>
+                  {/* Stat 2: Streak */}
+                  <div 
+                    className="sdb-stat-box" 
+                    style={{ 
+                      background: 'rgba(249, 115, 22, 0.04)',
+                      border: '1px solid rgba(249, 115, 22, 0.1)',
+                      borderLeft: '4px solid #f97316',
+                      borderRadius: '20px',
+                      padding: '16px 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      transition: 'all 0.25s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 6px 15px rgba(249, 115, 22, 0.06)';
+                      e.currentTarget.style.background = 'rgba(249, 115, 22, 0.06)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'none';
+                      e.currentTarget.style.boxShadow = 'none';
+                      e.currentTarget.style.background = 'rgba(249, 115, 22, 0.04)';
+                    }}
+                  >
+                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(249, 115, 22, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ea580c', flexShrink: 0 }}>
+                      <HiFire size={20} />
+                    </div>
+                    <div style={{ minWidth: 0, textAlign: 'left' }}>
+                      <span className="sdb-stat-label" style={{ fontSize: '10px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Chuỗi học tập</span>
+                      <h3 className="sdb-stat-value" style={{ margin: '2px 0 0 0', fontSize: '20px', fontWeight: '800', color: '#431407' }}>{dashboardData.gamification?.streakDays ?? 7} ngày</h3>
+                    </div>
                   </div>
+
                 </div>
 
                 {/* Upgrade to Pro Banner */}
-                <div className="sdb-promo-banner">
-                  <div className="sdb-promo-info">
-                    <span className="sdb-promo-tag">Gói Tài Khoản</span>
-                    <h4 className="sdb-promo-title">Nâng cấp PRO</h4>
-                    <p className="sdb-promo-subtitle">Mở khóa AI phân tích lỗi sai & thi thử không giới hành.</p>
+                <div 
+                  className="sdb-promo-banner"
+                  style={{
+                    background: 'linear-gradient(135deg, #4f46e5 0%, #312e81 100%)',
+                    border: 'none',
+                    borderRadius: '24px',
+                    padding: '22px 24px',
+                    boxShadow: '0 12px 28px rgba(79, 70, 229, 0.22)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '16px',
+                    textAlign: 'left',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    color: '#ffffff',
+                    marginTop: '4px'
+                  }}
+                >
+                  {/* Decorative golden blur circles */}
+                  <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '120px', height: '120px', borderRadius: '50%', background: 'rgba(253, 224, 71, 0.12)', filter: 'blur(30px)', zIndex: 1 }} />
+                  <div style={{ position: 'absolute', bottom: '-30px', left: '-20px', width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(99, 102, 241, 0.2)', filter: 'blur(20px)', zIndex: 1 }} />
+
+                  <div className="sdb-promo-info" style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: 1, zIndex: 2 }}>
+                    <span className="sdb-promo-tag" style={{ fontSize: '9px', fontWeight: '800', color: '#fcd34d', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                      🔥 ĐẶC QUYỀN VIP
+                    </span>
+                    <h4 className="sdb-promo-title" style={{ fontSize: '18px', fontWeight: '800', color: '#ffffff', margin: 0 }}>Nâng cấp PRO</h4>
+                    <p className="sdb-promo-subtitle" style={{ fontSize: '11.5px', color: '#c7d2fe', fontWeight: '400', margin: '2px 0 0 0', lineHeight: 1.4 }}>
+                      Mở khóa AI phân tích lỗi sai & luyện thi thử không giới hạn.
+                    </p>
                   </div>
                   <button 
                     className="sdb-promo-btn"
@@ -1157,7 +1506,7 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
         )}
 
         {/* TAB: KHÓA HỌC CỦA TÔI */}
-        {currentTab === 'my-courses' && (
+        {currentTab === 'courses' && (
           <div className="sdb-my-courses-view animate-in">
             <div className="sdb-docs-header" style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ textAlign: 'left' }}>
@@ -1168,7 +1517,7 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
               </div>
               <button 
                 className="sdb-action-btn"
-                onClick={() => navigateTo('/user/courses')}
+                onClick={() => navigateTo('/courses')}
                 style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: '#ffffff', border: 'none', padding: '10px 20px', borderRadius: '12px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 10px rgba(99, 102, 241, 0.2)' }}
               >
                 Mua thêm khóa học
@@ -1180,6 +1529,7 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
               currentUser={currentUser}
               courses={dashboardData.courses}
               onSelectCourse={(course) => navigateTo(`/learn/${course.id}`)}
+              progresses={progresses}
             />
 
             {coursesToRender.length === 0 && (
@@ -1201,7 +1551,7 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
                   Hãy đăng ký các khóa học chất lượng cao từ EduPath AI để bắt đầu bài học, luyện đề, và chinh phục kỳ thi của mình nhé!
                 </p>
                 <button
-                  onClick={() => navigateTo('/user/courses')}
+                  onClick={() => navigateTo('/courses')}
                   style={{
                     background: '#FFE259',
                     color: '#000',
@@ -1370,16 +1720,40 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
 
         {/* TAB 3: TÀI LIỆU CỦA TÔI */}
         {currentTab === 'documents' && (
-          <div className="sdb-docs-view">
-            <div className="sdb-docs-header">
-              <div style={{ textAlign: 'left' }}>
-                <h3 className="sdb-card-title" style={{ fontSize: '20px' }}>Kho tài liệu của tôi</h3>
-                <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0', fontWeight: '700' }}>Tải lên các tài liệu ôn tập cá nhân dạng PDF, DOCX hoặc ảnh để lưu trữ.</p>
+          <div className="sdb-docs-view" style={{ textAlign: 'left' }}>
+            <div className="sdb-docs-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+              <div>
+                <h3 className="sdb-card-title" style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a', margin: 0 }}>Kho tài liệu của tôi</h3>
+                <p style={{ fontSize: '13.5px', color: '#64748b', margin: '4px 0 0 0', fontWeight: '500' }}>Tải lên các tài liệu ôn tập cá nhân dạng PDF, DOCX hoặc ảnh để lưu trữ.</p>
               </div>
 
               <label 
                 className="sdb-action-btn"
-                style={{ background: '#ffffff', color: '#6366f1', border: '1px solid #ddd6fe', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 2px 4px rgba(99,102,241,0.05)' }}
+                style={{ 
+                  background: 'linear-gradient(135deg, #818cf8, #6366f1)', 
+                  color: '#ffffff', 
+                  border: 'none', 
+                  borderRadius: '12px',
+                  padding: '10px 20px',
+                  fontWeight: '700',
+                  fontSize: '13px',
+                  cursor: 'pointer', 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '8px', 
+                  boxShadow: '0 4px 12px rgba(99, 102, 241, 0.15)',
+                  transition: 'all 0.2s ease-in-out'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #6366f1, #4f46e5)';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(99, 102, 241, 0.25)';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #818cf8, #6366f1)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(99, 102, 241, 0.15)';
+                  e.currentTarget.style.transform = 'none';
+                }}
               >
                 <HiUpload /> Tải tài liệu lên
                 <input 
@@ -1391,59 +1765,188 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
               </label>
             </div>
 
-            <div className="sdb-search-input-wrap">
-              <span className="sdb-search-input-icon"><HiSearch /></span>
+            <div style={{ position: 'relative', maxWidth: '420px', marginBottom: '24px' }}>
+              <span style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '18px', display: 'flex', alignItems: 'center' }}>
+                <HiSearch />
+              </span>
               <input 
                 type="text" 
                 placeholder="Tìm kiếm tài liệu đã tải lên..." 
-                className="sdb-search-input"
+                style={{ 
+                  width: '100%', 
+                  padding: '12px 16px 12px 46px', 
+                  borderRadius: '14px', 
+                  border: '1px solid rgba(226, 232, 240, 0.8)', 
+                  outline: 'none', 
+                  fontSize: '13.5px', 
+                  fontWeight: '500', 
+                  color: '#0f172a', 
+                  background: '#ffffff', 
+                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)',
+                  transition: 'all 0.2s'
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#6366f1';
+                  e.target.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.12)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = 'rgba(226, 232, 240, 0.8)';
+                  e.target.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.02)';
+                }}
                 value={docSearchQuery}
                 onChange={(e) => setDocSearchQuery(e.target.value)}
               />
             </div>
 
-            <div className="sdb-docs-grid">
+            <div className="sdb-docs-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
               {filteredUserDocs.length > 0 ? (
                 filteredUserDocs.map((doc, idx) => {
-                  const tagClass = idx % 4 === 0 ? 'purple-tag' : idx % 4 === 1 ? 'teal-tag' : idx % 4 === 2 ? 'orange-tag' : 'blue-tag';
+                  const colors = [
+                    { border: '#818cf8', bgHover: '#f5f3ff' }, // violet
+                    { border: '#2dd4bf', bgHover: '#f0fdfa' }, // teal
+                    { border: '#fb923c', bgHover: '#fff7ed' }, // orange
+                    { border: '#60a5fa', bgHover: '#eff6ff' }  // blue
+                  ];
+                  const tagColor = colors[idx % colors.length];
+
+                  const getFileTypeBadge = (fileType) => {
+                    const t = fileType?.toLowerCase() || '';
+                    if (t.includes('pdf')) return { bg: '#f5f3ff', color: '#6d28d9', border: '#ddd6fe', label: 'PDF' };
+                    if (t.includes('doc') || t.includes('docx')) return { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe', label: 'DOC' };
+                    if (t.includes('png') || t.includes('jpg') || t.includes('jpeg') || t.includes('webp')) return { bg: '#ecfdf5', color: '#059669', border: '#a7f3d0', label: 'IMAGE' };
+                    return { bg: '#f8fafc', color: '#475569', border: '#e2e8f0', label: t.toUpperCase() || 'FILE' };
+                  };
+                  const badge = getFileTypeBadge(doc.fileType);
+
+
+
                   return (
-                    <div key={doc.id} className={`sdb-doc-item ${tagClass}`} style={{ cursor: 'pointer', position: 'relative' }}>
-                      <div className="sdb-doc-info" style={{ marginRight: '50px' }} onClick={() => window.open(doc.fileUrl, '_blank')}>
-                        <h4 className="sdb-doc-title" style={{ fontSize: '15px' }}>{doc.title}</h4>
-                        <p className="sdb-doc-desc" style={{ fontSize: '12px', marginTop: '4px' }}>
-                          Định dạng: {doc.fileType} • Đã tải lên: {new Date(doc.createdAt).toLocaleDateString('vi-VN')}
-                        </p>
+                    <div 
+                      key={doc.id}
+                      style={{
+                        background: '#ffffff',
+                        border: '1px solid rgba(226, 232, 240, 0.8)',
+                        borderLeft: `4px solid ${tagColor.border}`,
+                        borderRadius: '16px',
+                        padding: '16px 20px',
+                        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.01)',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                        position: 'relative',
+                        cursor: 'pointer'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 10px 20px -5px rgba(100, 116, 139, 0.08)';
+                        e.currentTarget.style.borderColor = '#c7d2fe';
+                        e.currentTarget.style.background = tagColor.bgHover;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'none';
+                        e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.01)';
+                        e.currentTarget.style.borderColor = 'rgba(226, 232, 240, 0.8)';
+                        e.currentTarget.style.background = '#ffffff';
+                      }}
+                      onClick={() => window.open(doc.fileUrl, '_blank')}
+                    >
+                      <div style={{ marginRight: '72px', minWidth: 0, textAlign: 'left' }}>
+                        <h4 style={{ fontSize: '14.5px', fontWeight: '700', color: '#0f172a', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={doc.title}>
+                          {formatFileName(doc.title)}
+                        </h4>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                          <span style={{
+                            background: badge.bg,
+                            color: badge.color,
+                            border: `1px solid ${badge.border}`,
+                            padding: '2px 8px',
+                            borderRadius: '6px',
+                            fontSize: '9.5px',
+                            fontWeight: '800',
+                            letterSpacing: '0.3px'
+                          }}>
+                            {badge.label}
+                          </span>
+                          <span style={{ fontSize: '11.5px', color: '#64748b', fontWeight: '500' }}>
+                            Đã tải lên: {new Date(doc.createdAt).toLocaleDateString('vi-VN')}
+                          </span>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', gap: '6px', position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)' }}>
+                      <div style={{ display: 'flex', gap: '8px', position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)' }}>
                         <a 
                           href={doc.fileUrl} 
                           download
                           target="_blank"
                           rel="noreferrer"
-                          className="sdb-doc-action-btn"
-                          style={{ fontSize: '18px', padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          style={{ 
+                            fontSize: '16px', 
+                            background: '#f8fafc',
+                            color: '#6366f1',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '50%',
+                            width: '36px',
+                            height: '36px',
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#6366f1';
+                            e.currentTarget.style.color = '#ffffff';
+                            e.currentTarget.style.borderColor = '#6366f1';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#f8fafc';
+                            e.currentTarget.style.color = '#6366f1';
+                            e.currentTarget.style.borderColor = '#e2e8f0';
+                          }}
                           onClick={(e) => e.stopPropagation()}
                         >
                           <HiDownload />
                         </a>
                         <button 
-                          className="sdb-doc-action-btn"
-                          style={{ fontSize: '16px', padding: '6px', color: '#ef4444', border: 'none', background: 'none', cursor: 'pointer' }}
+                          style={{ 
+                            fontSize: '15px', 
+                            background: '#fff5f5',
+                            color: '#f87171',
+                            border: '1px solid #fee2e2',
+                            borderRadius: '50%',
+                            width: '36px',
+                            height: '36px',
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#ef4444';
+                            e.currentTarget.style.color = '#ffffff';
+                            e.currentTarget.style.borderColor = '#ef4444';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#fff5f5';
+                            e.currentTarget.style.color = '#f87171';
+                            e.currentTarget.style.borderColor = '#fee2e2';
+                          }}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteDocument(doc.id, doc.title);
                           }}
                         >
-                          🗑️
+                          <HiTrash />
                         </button>
                       </div>
                     </div>
                   );
                 })
               ) : (
-                <div style={{ padding: '40px', textAlign: 'center', border: '2px dashed #cbd5e1', borderRadius: '12px', gridColumn: 'span 2' }}>
-                  <span style={{ fontSize: '32px' }}>📂</span>
-                  <p style={{ fontSize: '13px', fontWeight: '800', color: '#64748b', marginTop: '12px' }}>Không có tài liệu nào phù hợp!</p>
+                <div style={{ padding: '48px 32px', textAlign: 'center', border: '1.5px dashed #cbd5e1', borderRadius: '24px', background: '#f8fafc', gridColumn: 'span 2' }}>
+                  <span style={{ fontSize: '36px', display: 'inline-block', marginBottom: '8px' }}>📂</span>
+                  <p style={{ fontSize: '13.5px', fontWeight: '700', color: '#64748b', margin: 0 }}>Không có tài liệu nào phù hợp!</p>
                 </div>
               )}
             </div>
@@ -1653,41 +2156,127 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
 
         {/* TAB: LỚP HỌC CỦA TÔI */}
         {currentTab === 'classrooms' && (
-          <div className="sdb-classrooms-view animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div className="sdb-classrooms-view animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
             {/* Header info */}
-            <div className="sdb-docs-header" style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="sdb-docs-header" style={{ marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
               <div style={{ textAlign: 'left' }}>
-                <h3 className="sdb-card-title" style={{ fontSize: '20px', margin: 0 }}>Lớp học của tôi</h3>
-                <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0', fontWeight: '600' }}>
+                <h3 className="sdb-card-title" style={{ fontSize: '22px', margin: 0, fontWeight: '800', color: '#0f172a' }}>Lớp học của tôi</h3>
+                <p style={{ fontSize: '13.5px', color: '#64748b', margin: '6px 0 0 0', fontWeight: '500', lineHeight: 1.4 }}>
                   Tham gia vào các lớp học online thực tế để trao đổi bài học, làm đề ôn tập và thảo luận nhóm cùng các bạn học.
                 </p>
               </div>
               <button 
                 className="sdb-action-btn"
                 onClick={() => navigateTo('/user/forum')}
-                style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: '#ffffff', border: 'none', padding: '10px 20px', borderRadius: '12px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 10px rgba(99, 102, 241, 0.2)' }}
+                style={{ 
+                  background: 'linear-gradient(135deg, #818cf8 0%, #6366f1 100%)', 
+                  color: '#ffffff', 
+                  border: 'none', 
+                  padding: '12px 24px', 
+                  borderRadius: '14px', 
+                  fontWeight: '700', 
+                  fontSize: '13.5px',
+                  cursor: 'pointer', 
+                  boxShadow: '0 4px 14px rgba(99, 102, 241, 0.15)',
+                  transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(99, 102, 241, 0.25)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'none';
+                  e.currentTarget.style.boxShadow = '0 4px 14px rgba(99, 102, 241, 0.15)';
+                }}
               >
-                Vào cộng đồng chung
+                <span>Vào cộng đồng chung</span> 👥
               </button>
             </div>
 
             {/* Statistics summary row */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '8px' }}>
-              <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <span style={{ fontSize: '32px' }}>🏫</span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '4px' }}>
+              {/* Card 1: Enrolled Classrooms */}
+              <div style={{ 
+                background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)', 
+                border: '1px solid #ddd6fe', 
+                borderRadius: '20px', 
+                padding: '24px 20px', 
+                boxShadow: '0 10px 25px -5px rgba(109, 40, 217, 0.04)', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '18px',
+                transition: 'all 0.25s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 15px 30px -5px rgba(109, 40, 217, 0.08)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'none';
+                e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(109, 40, 217, 0.04)';
+              }}
+              >
+                <div style={{ 
+                  width: '56px', 
+                  height: '56px', 
+                  borderRadius: '16px', 
+                  background: '#ffffff', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  fontSize: '26px',
+                  boxShadow: '0 4px 12px rgba(109, 40, 217, 0.08)' 
+                }}>
+                  🏫
+                </div>
                 <div style={{ textAlign: 'left' }}>
-                  <h4 style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Đã tham gia</h4>
-                  <strong style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a' }}>
+                  <h4 style={{ margin: '0 0 2px 0', fontSize: '11px', color: '#7c3aed', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Lớp đã tham gia</h4>
+                  <strong style={{ fontSize: '24px', fontWeight: '900', color: '#4c1d95', lineHeight: 1.2 }}>
                     {studyGroups.filter(g => g.isMember).length} lớp học
                   </strong>
                 </div>
               </div>
 
-              <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <span style={{ fontSize: '32px' }}>👥</span>
+              {/* Card 2: Total Available Groups */}
+              <div style={{ 
+                background: 'linear-gradient(135deg, #eff6ff 0%, #e0f2fe 100%)', 
+                border: '1px solid #bae6fd', 
+                borderRadius: '20px', 
+                padding: '24px 20px', 
+                boxShadow: '0 10px 25px -5px rgba(2, 132, 199, 0.04)', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '18px',
+                transition: 'all 0.25s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 15px 30px -5px rgba(2, 132, 199, 0.08)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'none';
+                e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(2, 132, 199, 0.04)';
+              }}
+              >
+                <div style={{ 
+                  width: '56px', 
+                  height: '56px', 
+                  borderRadius: '16px', 
+                  background: '#ffffff', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  fontSize: '26px',
+                  boxShadow: '0 4px 12px rgba(2, 132, 199, 0.08)' 
+                }}>
+                  👥
+                </div>
                 <div style={{ textAlign: 'left' }}>
-                  <h4 style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Tổng số lớp khả dụng</h4>
-                  <strong style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a' }}>
+                  <h4 style={{ margin: '0 0 2px 0', fontSize: '11px', color: '#0284c7', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Tổng số lớp khả dụng</h4>
+                  <strong style={{ fontSize: '24px', fontWeight: '900', color: '#0369a1', lineHeight: 1.2 }}>
                     {studyGroups.length} nhóm học
                   </strong>
                 </div>
@@ -1695,11 +2284,22 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
             </div>
 
             {/* Main grid split */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
               {/* Joined classrooms section */}
               <div style={{ textAlign: 'left' }}>
-                <h4 className="sdb-card-title" style={{ fontSize: '15px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>✓</span> LỚP HỌC ĐANG HỌC TẬP ({studyGroups.filter(g => g.isMember).length})
+                <h4 style={{ 
+                  fontSize: '13.5px', 
+                  fontWeight: '800', 
+                  color: '#475569', 
+                  marginBottom: '16px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.8px'
+                }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', background: '#dcfce7', color: '#16a34a', fontSize: '11px', fontWeight: 'bold' }}>✓</span> 
+                  LỚP HỌC ĐANG HỌC TẬP ({studyGroups.filter(g => g.isMember).length})
                 </h4>
 
                 {studyGroups.filter(g => g.isMember).length > 0 ? (
@@ -1711,80 +2311,143 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
                           background: '#ffffff',
                           border: '1px solid #e2e8f0',
                           borderRadius: '20px',
-                          padding: '24px',
-                          boxShadow: '0 10px 15px -3px rgba(148, 163, 184, 0.05)',
+                          padding: '20px',
+                          boxShadow: '0 10px 25px -10px rgba(100, 116, 139, 0.05)',
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between',
-                          minHeight: '190px'
+                          transition: 'all 0.22s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.boxShadow = '0 15px 30px -10px rgba(99, 102, 241, 0.08)';
+                          e.currentTarget.style.borderColor = '#cbd5e1';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'none';
+                          e.currentTarget.style.boxShadow = '0 10px 25px -10px rgba(100, 116, 139, 0.05)';
+                          e.currentTarget.style.borderColor = '#e2e8f0';
                         }}
                       >
                         <div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                            <h4 style={{ fontSize: '16.5px', fontWeight: '700', color: '#0f172a', margin: 0, textAlign: 'left' }}>
-                              {group.name}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px', gap: '12px' }}>
+                            <h4 style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a', margin: 0, textAlign: 'left', lineHeight: 1.3 }}>
+                              👥 {group.name}
                             </h4>
-                            <span style={{ background: '#eff6ff', color: '#1d4ed8', fontSize: '11px', padding: '4px 10px', borderRadius: '12px', fontWeight: '600' }}>
-                              Đã tham gia
-                            </span>
+                            <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                              <span style={{ 
+                                background: '#ecfdf5', 
+                                color: '#059669', 
+                                fontSize: '10px', 
+                                padding: '2px 8px', 
+                                borderRadius: '10px', 
+                                fontWeight: '800',
+                                border: '1px solid #a7f3d0'
+                              }}>
+                                Đã vào
+                              </span>
+                              <span style={{ 
+                                background: '#eff6ff', 
+                                color: '#2563eb', 
+                                fontSize: '10px', 
+                                padding: '2px 8px', 
+                                borderRadius: '10px', 
+                                fontWeight: '800',
+                                border: '1px solid #bfdbfe'
+                              }}>
+                                {group.memberCount} HS
+                              </span>
+                            </div>
                           </div>
-                          <p style={{ fontSize: '12.5px', color: '#64748b', margin: '0 0 16px 0', lineHeight: '1.4', textAlign: 'left' }}>
+                          <p style={{ 
+                            fontSize: '12.5px', 
+                            color: '#64748b', 
+                            margin: '0 0 16px 0', 
+                            lineHeight: '1.4', 
+                            textAlign: 'left', 
+                            fontWeight: '500',
+                            minHeight: '35px',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}>
                             {group.description || 'Chưa có mô tả chi tiết cho lớp học này. Thảo luận cùng bạn bè ngay để trao đổi thông tin.'}
                           </p>
                         </div>
 
-                        <div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#64748b', fontWeight: '500', borderTop: '1px solid #f1f5f9', paddingTop: '12px', marginBottom: '12px' }}>
-                            <span>Thành viên lớp: {group.memberCount} học sinh</span>
-                          </div>
-                          <div style={{ display: 'flex', gap: '10px' }}>
-                            <button
-                              onClick={() => {
-                                localStorage.setItem('forum_active_group', JSON.stringify(group));
-                                navigateTo('/user/forum');
-                              }}
-                              style={{
-                                flex: 1,
-                                background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: '8px',
-                                padding: '8px',
-                                fontSize: '12.5px',
-                                fontWeight: '700',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s ease'
-                              }}
-                            >
-                              Vào thảo luận nhóm ⚡
-                            </button>
-                            <button
-                              onClick={() => handleLeaveClassroom(group.id, group.name)}
-                              style={{
-                                background: '#fef2f2',
-                                color: '#ef4444',
-                                border: '1px solid #fecaca',
-                                borderRadius: '8px',
-                                padding: '8px 12px',
-                                fontSize: '12.5px',
-                                fontWeight: '700',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s ease'
-                              }}
-                            >
-                              Rời lớp
-                            </button>
-                          </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            onClick={() => {
+                              localStorage.setItem('forum_active_group', JSON.stringify(group));
+                              navigateTo('/user/forum');
+                            }}
+                            style={{
+                              flex: 1,
+                              background: 'linear-gradient(135deg, #818cf8, #6366f1)',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '10px',
+                              padding: '8px 12px',
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                              boxShadow: '0 4px 10px rgba(99, 102, 241, 0.12)'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'linear-gradient(135deg, #6366f1, #4f46e5)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'linear-gradient(135deg, #818cf8, #6366f1)';
+                            }}
+                          >
+                            Thảo luận ⚡
+                          </button>
+                          <button
+                            onClick={() => handleLeaveClassroom(group.id, group.name)}
+                            style={{
+                              background: '#fff5f5',
+                              color: '#f87171',
+                              border: '1px solid #fee2e2',
+                              borderRadius: '10px',
+                              padding: '8px 12px',
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#fee2e2';
+                              e.currentTarget.style.color = '#ef4444';
+                              e.currentTarget.style.borderColor = '#fca5a5';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = '#fff5f5';
+                              e.currentTarget.style.color = '#f87171';
+                              e.currentTarget.style.borderColor = '#fee2e2';
+                            }}
+                          >
+                            Rời lớp
+                          </button>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div style={{ padding: '36px', textAlign: 'center', border: '2.5px dashed #cbd5e1', borderRadius: '16px', background: '#ffffff' }}>
-                    <span style={{ fontSize: '36px' }}>🎒</span>
-                    <h5 style={{ fontSize: '15px', fontWeight: '900', color: '#000', margin: '12px 0 6px 0' }}>Bạn chưa tham gia lớp học nào</h5>
-                    <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 16px 0', fontWeight: '700' }}>
-                      Tham khảo danh sách lớp học khả dụng bên dưới để cùng kết nối nhé!
+                  <div style={{ 
+                    padding: '48px 32px', 
+                    textAlign: 'center', 
+                    border: '1.5px dashed #cbd5e1', 
+                    borderRadius: '24px', 
+                    background: '#f8fafc',
+                    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.01)'
+                  }}>
+                    <span style={{ fontSize: '42px', display: 'inline-block', marginBottom: '12px', filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.03))' }}>🎒</span>
+                    <h5 style={{ fontSize: '16px', fontWeight: '700', color: '#1e293b', margin: '0 0 6px 0' }}>Bạn chưa tham gia lớp học nào</h5>
+                    <p style={{ fontSize: '13px', color: '#64748b', margin: 0, fontWeight: '500', lineHeight: 1.5 }}>
+                      Hãy tham khảo danh sách lớp học khả dụng bên dưới để cùng tham gia kết nối nhé!
                     </p>
                   </div>
                 )}
@@ -1792,8 +2455,19 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
 
               {/* Browse available classrooms */}
               <div style={{ textAlign: 'left' }}>
-                <h4 className="sdb-card-title" style={{ fontSize: '15px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>🌐</span> DANH SÁCH LỚP HỌC KHÁC ({studyGroups.filter(g => !g.isMember).length})
+                <h4 style={{ 
+                  fontSize: '13.5px', 
+                  fontWeight: '800', 
+                  color: '#475569', 
+                  marginBottom: '16px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.8px'
+                }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', background: '#e0f2fe', color: '#0284c7', fontSize: '11px', fontWeight: 'bold' }}>🌐</span> 
+                  DANH SÁCH LỚP HỌC KHÁC ({studyGroups.filter(g => !g.isMember).length})
                 </h4>
 
                 {studyGroups.filter(g => !g.isMember).length > 0 ? (
@@ -1805,54 +2479,100 @@ export default function StudentDashboard({ currentUser, setActiveTab, navigateTo
                           background: '#ffffff',
                           border: '1px solid #e2e8f0',
                           borderRadius: '20px',
-                          padding: '24px',
-                          boxShadow: '0 10px 15px -3px rgba(148, 163, 184, 0.05)',
+                          padding: '20px',
+                          boxShadow: '0 10px 25px -10px rgba(100, 116, 139, 0.05)',
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between',
-                          minHeight: '190px'
+                          transition: 'all 0.22s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.boxShadow = '0 15px 30px -10px rgba(99, 102, 241, 0.08)';
+                          e.currentTarget.style.borderColor = '#cbd5e1';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'none';
+                          e.currentTarget.style.boxShadow = '0 10px 25px -10px rgba(100, 116, 139, 0.05)';
+                          e.currentTarget.style.borderColor = '#e2e8f0';
                         }}
                       >
                         <div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                            <h4 style={{ fontSize: '16.5px', fontWeight: '700', color: '#0f172a', margin: 0, textAlign: 'left' }}>
-                              {group.name}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px', gap: '12px' }}>
+                            <h4 style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a', margin: 0, textAlign: 'left', lineHeight: 1.3 }}>
+                              👥 {group.name}
                             </h4>
+                            <span style={{ 
+                              background: '#eff6ff', 
+                              color: '#2563eb', 
+                              fontSize: '10px', 
+                              padding: '2px 8px', 
+                              borderRadius: '10px', 
+                              fontWeight: '800',
+                              border: '1px solid #bfdbfe',
+                              flexShrink: 0
+                            }}>
+                              {group.memberCount} HS
+                            </span>
                           </div>
-                          <p style={{ fontSize: '12.5px', color: '#64748b', margin: '0 0 16px 0', lineHeight: '1.4', textAlign: 'left' }}>
+                          <p style={{ 
+                            fontSize: '12.5px', 
+                            color: '#64748b', 
+                            margin: '0 0 16px 0', 
+                            lineHeight: '1.4', 
+                            textAlign: 'left', 
+                            fontWeight: '500',
+                            minHeight: '35px',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}>
                             {group.description || 'Chưa có mô tả chi tiết cho lớp học này.'}
                           </p>
                         </div>
 
-                        <div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#64748b', fontWeight: '500', borderTop: '1px solid #f1f5f9', paddingTop: '12px', marginBottom: '12px' }}>
-                            <span>Thành viên lớp: {group.memberCount} học sinh</span>
-                          </div>
-                          <button
-                            onClick={() => handleJoinClassroom(group.id)}
-                            style={{
-                              width: '100%',
-                              background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: '8px',
-                              padding: '10px',
-                              fontSize: '12.5px',
-                              fontWeight: '700',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease'
-                            }}
-                          >
-                            Tham gia lớp học 🤝
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => handleJoinClassroom(group.id)}
+                          style={{
+                            width: '100%',
+                            background: 'linear-gradient(135deg, #a5b4fc, #818cf8)',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '10px',
+                            padding: '8px 12px',
+                            fontSize: '12.5px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            boxShadow: '0 4px 10px rgba(129, 140, 248, 0.1)'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'linear-gradient(135deg, #818cf8, #6366f1)';
+                            e.currentTarget.style.boxShadow = '0 6px 14px rgba(99, 102, 241, 0.18)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'linear-gradient(135deg, #a5b4fc, #818cf8)';
+                            e.currentTarget.style.boxShadow = '0 4px 10px rgba(129, 140, 248, 0.1)';
+                          }}
+                        >
+                          Tham gia lớp học 🤝
+                        </button>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div style={{ padding: '24px', textAlign: 'center', border: '2px dashed #cbd5e1', borderRadius: '12px', background: '#ffffff' }}>
-                    <span style={{ fontSize: '24px' }}>✨</span>
-                    <p style={{ fontSize: '12.5px', color: '#64748b', margin: '8px 0 0 0', fontWeight: '800' }}>Tất cả các lớp học hiện tại đều đã được tham gia!</p>
+                  <div style={{ 
+                    padding: '32px', 
+                    textAlign: 'center', 
+                    border: '1.5px dashed #cbd5e1', 
+                    borderRadius: '20px', 
+                    background: '#f8fafc',
+                    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.01)'
+                  }}>
+                    <span style={{ fontSize: '28px', display: 'inline-block', marginBottom: '8px' }}>✨</span>
+                    <p style={{ fontSize: '13px', color: '#64748b', margin: 0, fontWeight: '600' }}>Tất cả các lớp học hiện tại đều đã được tham gia!</p>
                   </div>
                 )}
               </div>

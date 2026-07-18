@@ -155,7 +155,10 @@
   color: var(--text-muted);
   font-weight: 500;
   margin: 0;
-  word-break: break-all;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .sdb-menu-list {

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { HiPlay } from 'react-icons/hi';
 
-export default function ContinueLearningRail({ currentUser, courses, onSelectCourse }) {
+export default function ContinueLearningRail({ currentUser, courses, onSelectCourse, progresses = {} }) {
   const enrolledCourses = useMemo(() => {
     if (!currentUser || !courses) return [];
     const unlocked = currentUser.unlockedCourses || [];
@@ -16,7 +16,7 @@ export default function ContinueLearningRail({ currentUser, courses, onSelectCou
       <div className="continue-learning-rail">
         {enrolledCourses.map((course) => {
           const progressKey = `course_progress_percent_${course.id}`;
-          const progressPercent = Number(localStorage.getItem(progressKey)) || 0;
+          const progressPercent = (progresses[course.id] ?? Number(localStorage.getItem(progressKey))) || 0;
           
           // Extract next lesson title
           const nextLessonTitle = course.curriculum?.[0]?.lessons?.[0]?.title || 'Bài học tiếp theo';
