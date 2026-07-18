@@ -19,7 +19,8 @@
     "react-icons": "^5.6.0",
     "recharts": "^3.8.1",
     "socket.io-client": "^4.7.5",
-    "tesseract.js": "^7.0.0"
+    "tesseract.js": "^7.0.0",
+    "wmf": "^1.0.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

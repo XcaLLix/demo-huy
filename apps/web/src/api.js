@@ -705,7 +705,69 @@ export const api = {
     if (page) query.append('page', page);
     const qStr = query.toString();
     return request('/announcements/active' + (qStr ? `?${qStr}` : ''));
-  }
+  },
+
+  // --- TEACHER EXAM MANAGEMENT ---
+  getTeacherExamStats: () => request('/statistics/teacher'),
+
+  getTeacherExams: (filters = {}) => {
+    const query = new URLSearchParams();
+    Object.entries(filters).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') {
+        query.append(k, String(v));
+      }
+    });
+    return request(`/exams?${query.toString()}`);
+  },
+
+  getTeacherExamById: (id) => request(`/exams/${id}`),
+
+  createTeacherExam: (payload) => request('/exams', { method: 'POST', body: payload }),
+
+  updateTeacherExam: (id, payload) => request(`/exams/${id}`, { method: 'PUT', body: payload }),
+
+  cloneTeacherExam: (id) => request(`/exams/${id}/clone`, { method: 'POST' }),
+
+  deleteTeacherExam: (id) => request(`/exams/${id}`, { method: 'DELETE' }),
+
+  getTeacherQuestions: (filters = {}) => {
+    const query = new URLSearchParams();
+    Object.entries(filters).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') {
+        query.append(k, String(v));
+      }
+    });
+    return request(`/questions?${query.toString()}`);
+  },
+
+  getQuestionById: (id) => request(`/questions/${id}`),
+
+  createTeacherQuestion: (payload) => request('/questions', { method: 'POST', body: payload }),
+
+  updateTeacherQuestion: (id, payload) => request(`/questions/${id}`, { method: 'PUT', body: payload }),
+
+  reportTeacherQuestion: (id, reason) => request(`/questions/${id}/report`, { method: 'POST', body: { reason } }),
+
+  uploadImportDocument: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return request('/import/upload', { method: 'POST', body: formData });
+  },
+
+  getImportSessions: () => request('/import/sessions'),
+
+  getImportSessionById: (id) => request(`/import/sessions/${id}`),
+
+  updateImportQuestion: (id, payload) => request(`/import/questions/${id}`, { method: 'PUT', body: payload }),
+
+  confirmImportSession: (id, decisions) => request(`/import/sessions/${id}/confirm`, { method: 'POST', body: { decisions } }),
+
+  deleteImportSession: (id) => request(`/import/sessions/${id}`, { method: 'DELETE' }),
+
+  getTeacherReports: () => request('/reports/my-questions'),
+
+  resolveTeacherReport: (id, status) => request(`/reports/${id}/status`, { method: 'PATCH', body: { status } })
 };
+
 
 

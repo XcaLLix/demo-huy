@@ -1,0 +1,483 @@
+/* teacherExams.css - Premium SaaS-style layout for Exams & Tests module */
+
+:root {
+  --saas-primary: #6366f1;
+  --saas-primary-hover: #4f46e5;
+  --saas-primary-light: rgba(99, 102, 241, 0.08);
+  --saas-success: #10b981;
+  --saas-warning: #f59e0b;
+  --saas-error: #ef4444;
+  --saas-bg-card: #ffffff;
+  --saas-bg-container: #f8fafc;
+  --saas-border: #e2e8f0;
+  --saas-text-main: #1e293b;
+  --saas-text-muted: #64748b;
+  --saas-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
+  --saas-shadow-hover: 0 10px 25px -3px rgba(0, 0, 0, 0.08);
+  --saas-radius: 16px;
+}
+
+/* Overall Wrapper */
+.exams-module-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  background-color: var(--saas-bg-container);
+  font-family: 'Outfit', sans-serif;
+  text-align: left;
+}
+
+/* Quick Actions Row */
+.quick-actions-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.quick-action-card {
+  background-color: var(--saas-bg-card);
+  border: 1px solid var(--saas-border);
+  border-radius: var(--saas-radius);
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--saas-shadow);
+}
+
+.quick-action-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--saas-shadow-hover);
+  border-color: var(--saas-primary);
+}
+
+.quick-action-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  background-color: var(--saas-primary-light);
+  color: var(--saas-primary);
+  transition: all 0.2s ease;
+}
+
+.quick-action-card:hover .quick-action-icon {
+  background-color: var(--saas-primary);
+  color: #ffffff;
+}
+
+.quick-action-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.quick-action-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--saas-text-main);
+}
+
+.quick-action-desc {
+  font-size: 11.5px;
+  color: var(--saas-text-muted);
+}
+
+/* Navigation Tabs */
+.saas-tabs-container {
+  display: flex;
+  border-bottom: 2px solid var(--saas-border);
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.saas-tab-btn {
+  background: none;
+  border: none;
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--saas-text-muted);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+  border-radius: 12px 12px 0 0;
+}
+
+.saas-tab-btn:hover {
+  color: var(--saas-text-main);
+  background-color: var(--saas-primary-light);
+}
+
+.saas-tab-btn.active {
+  color: var(--saas-primary);
+  font-weight: 700;
+}
+
+.saas-tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background-color: var(--saas-primary);
+  border-radius: 99px;
+}
+
+/* Toolbar & Filters */
+.saas-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.saas-search-input-wrapper {
+  position: relative;
+  flex: 1;
+  max-width: 380px;
+  min-width: 260px;
+}
+
+.saas-input-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--saas-text-muted);
+  font-size: 16px;
+}
+
+.saas-search-input {
+  width: 100%;
+  height: 42px;
+  padding: 8px 16px 8px 40px;
+  border: 1px solid var(--saas-border);
+  border-radius: 20px;
+  font-size: 13.5px;
+  outline: none;
+  background-color: #ffffff;
+  transition: all 0.2s;
+  box-sizing: border-box;
+}
+
+.saas-search-input:focus {
+  border-color: var(--saas-primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.saas-select-filter {
+  height: 42px;
+  border: 1px solid var(--saas-border);
+  border-radius: 20px;
+  padding: 0 16px;
+  font-size: 13.5px;
+  color: var(--saas-text-main);
+  background-color: #ffffff;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.saas-select-filter:focus {
+  border-color: var(--saas-primary);
+}
+
+.saas-btn-primary {
+  height: 42px;
+  padding: 0 20px;
+  background-color: var(--saas-primary);
+  color: #ffffff;
+  border: none;
+  border-radius: 20px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.saas-btn-primary:hover {
+  background-color: var(--saas-primary-hover);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+}
+
+/* Exam Card layout */
+.exam-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.saas-exam-card {
+  background-color: var(--saas-bg-card);
+  border: 1px solid var(--saas-border);
+  border-radius: var(--saas-radius);
+  padding: 20px;
+  box-shadow: var(--saas-shadow);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+  transition: all 0.2s;
+}
+
+.saas-exam-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--saas-shadow-hover);
+}
+
+.saas-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 20px;
+}
+
+.saas-badge.published { background-color: #d1fae5; color: #065f46; }
+.saas-badge.draft { background-color: #f1f5f9; color: #475569; }
+.saas-badge.pending { background-color: #fef3c7; color: #92400e; }
+.saas-badge.rejected { background-color: #fee2e2; color: #991b1b; }
+
+/* AI Import Dropzone */
+.saas-dropzone-container {
+  border: 2px dashed var(--saas-border);
+  border-radius: var(--saas-radius);
+  padding: 40px;
+  background-color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.saas-dropzone-container:hover {
+  border-color: var(--saas-primary);
+  background-color: var(--saas-primary-light);
+}
+
+/* Side-by-side Import Review Panel */
+.saas-split-panel {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 24px;
+  min-height: 520px;
+}
+
+.saas-sidebar-list {
+  background-color: #ffffff;
+  border: 1px solid var(--saas-border);
+  border-radius: var(--saas-radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 560px;
+  overflow-y: auto;
+}
+
+.saas-sidebar-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--saas-border);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+.saas-sidebar-item:hover {
+  background-color: var(--saas-bg-container);
+}
+
+.saas-sidebar-item.active {
+  background-color: var(--saas-primary-light);
+  border-color: var(--saas-primary);
+  color: var(--saas-primary);
+}
+
+.saas-sidebar-status-icon {
+  font-size: 12px;
+}
+.saas-sidebar-status-icon.ok { color: var(--saas-success); }
+.saas-sidebar-status-icon.warning { color: var(--saas-warning); }
+.saas-sidebar-status-icon.error { color: var(--saas-error); }
+
+/* Table design with Sticky Header */
+.saas-table-container {
+  background-color: #ffffff;
+  border: 1px solid var(--saas-border);
+  border-radius: var(--saas-radius);
+  overflow: hidden;
+  box-shadow: var(--saas-shadow);
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.saas-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.saas-table th {
+  background-color: #f8fafc;
+  color: var(--saas-text-muted);
+  font-weight: 700;
+  padding: 14px 16px;
+  border-bottom: 2px solid var(--saas-border);
+  text-align: left;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.saas-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--saas-border);
+  color: var(--saas-text-main);
+  background-color: #ffffff;
+}
+
+.saas-table tr:hover td {
+  background-color: #f8fafc;
+}
+
+/* Wizard step progress */
+.wizard-steps-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 32px;
+  position: relative;
+}
+
+.wizard-steps-header::before {
+  content: '';
+  position: absolute;
+  top: 18px;
+  left: 30px;
+  right: 30px;
+  height: 2px;
+  background-color: var(--saas-border);
+  z-index: 0;
+}
+
+.wizard-step-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  z-index: 1;
+  cursor: default;
+}
+
+.wizard-step-circle {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  border: 2px solid var(--saas-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--saas-text-muted);
+  transition: all 0.2s;
+}
+
+.wizard-step-node.active .wizard-step-circle {
+  border-color: var(--saas-primary);
+  background-color: var(--saas-primary);
+  color: #ffffff;
+}
+
+.wizard-step-node.completed .wizard-step-circle {
+  border-color: var(--saas-success);
+  background-color: var(--saas-success);
+  color: #ffffff;
+}
+
+.wizard-step-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--saas-text-muted);
+}
+
+.wizard-step-node.active .wizard-step-label {
+  color: var(--saas-primary);
+  font-weight: 700;
+}
+
+.wizard-step-node.completed .wizard-step-label {
+  color: var(--saas-success);
+}
+
+/* ── Question HTML Preview (renders mammoth HTML output) ──────────────── */
+.question-html-preview {
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 15px;
+  line-height: 1.75;
+  color: #0f172a;
+}
+
+.question-html-preview p,
+.question-html-preview li {
+  margin: 4px 0;
+}
+
+.question-html-preview img {
+  max-width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  vertical-align: middle;
+  margin: 2px 4px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.question-html-preview table {
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 13px;
+}
+
+.question-html-preview td,
+.question-html-preview th {
+  border: 1px solid #cbd5e1;
+  padding: 4px 10px;
+  text-align: center;
+}
+
+/* ── WMF Formula Placeholder ──────────────────────────────────────────── */
+.wmf-placeholder {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #fffbeb;
+  border: 1px dashed #f59e0b;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 14px;
+  color: #92400e;
+  cursor: help;
+  vertical-align: middle;
+  margin: 0 2px;
+}

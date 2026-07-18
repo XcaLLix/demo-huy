@@ -76,7 +76,13 @@ model User {
   voucherReservations  VoucherReservation[]
   documentRatings      DocumentRating[]
   documentPurchases    DocumentPurchase[]
+
+  questionsCreated     Question[]          @relation("QuestionCreatedByUser")
+  examsCreated         Exam[]              @relation("ExamCreatedByUser")
+  questionReports      QuestionReport[]    @relation("Reporter")
+  importSessions       ImportSession[]
 }
+
 
 
 model Student {
@@ -196,6 +202,15 @@ model Question {
   updatedAt      DateTime            @default(now()) @updatedAt
   examQuestions  ExamQuestion[]
   attemptAnswers TestAttemptAnswer[]
+
+  // Tích hợp thêm mới
+  knowledgeId    Int?
+  knowledge      Knowledge?          @relation(fields: [knowledgeId], references: [id], onDelete: Restrict)
+  creator        User                @relation("QuestionCreatedByUser", fields: [createdBy], references: [id], onDelete: Restrict)
+  status         QuestionStatus      @default(APPROVED)
+  optionsRel     QuestionOption[]
+  mediaRel       QuestionMedia[]
+  reports        QuestionReport[]
 }
 
 model Exam {
@@ -208,9 +223,11 @@ model Exam {
   createdBy      Int
   year           Int?
   source         String?
+  description    String?        @db.Text
   totalQuestions Int            @default(0)
   difficulty     Difficulty     @default(MEDIUM)
   status         String         @default("pending")
+
   grade          Int?
   approvedAt     DateTime?
   approvedBy     Int?
@@ -224,6 +241,9 @@ model Exam {
   updatedAt      DateTime       @default(now()) @updatedAt
   examQuestions  ExamQuestion[]
   attempts       TestAttempt[]
+
+  // Tích hợp thêm mới
+  creator        User           @relation("ExamCreatedByUser", fields: [createdBy], references: [id], onDelete: Restrict)
 }
 
 model ExamQuestion {
@@ -1418,6 +1438,133 @@ model DocumentPurchase {
   @@unique([studentId, documentId])
   @@map("document_purchases")
 }
+
+enum QuestionStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  HIDDEN
+}
+
+enum ImportStatus {
+  PROCESSING
+  REVIEWING
+  COMPLETED
+  FAILED
+}
+
+model Subject {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  topics      Topic[]
+}
+
+model Topic {
+  id          Int         @id @default(autoincrement())
+  subjectId   Int
+  name        String
+  description String?
+  createdAt   DateTime    @default(now())
+
+  subject     Subject     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  knowledges  Knowledge[]
+
+  @@unique([subjectId, name])
+}
+
+model Knowledge {
+  id          Int        @id @default(autoincrement())
+  topicId     Int
+  name        String
+  description String?
+  createdAt   DateTime   @default(now())
+
+  topic       Topic      @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  questions   Question[]
+
+  @@unique([topicId, name])
+}
+
+model QuestionOption {
+  id          Int      @id @default(autoincrement())
+  questionId  Int
+  optionLabel String   // A, B, C, D
+  optionText  String   @db.Text
+  isCorrect   Boolean  @default(false)
+
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, optionLabel])
+}
+
+model QuestionMedia {
+  id          Int      @id @default(autoincrement())
+  questionId  Int
+  url         String
+  mediaType   String   // IMAGE, AUDIO, GRAPH, TABLE, etc.
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+model QuestionReport {
+  id          Int          @id @default(autoincrement())
+  questionId  Int
+  reporterId  Int
+  reason      String       @db.Text
+  status      ReportStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+  resolvedAt  DateTime?
+
+  question    Question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  reporter    User         @relation("Reporter", fields: [reporterId], references: [id], onDelete: Restrict)
+
+  @@index([questionId])
+  @@index([reporterId])
+  @@index([status])
+}
+
+model ImportSession {
+  id            Int              @id @default(autoincrement())
+  userId        Int
+  fileName      String
+  fileSize      Int
+  filePath      String?
+  status        ImportStatus     @default(PROCESSING)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  user          User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  questions     ImportQuestion[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model ImportQuestion {
+  id              Int           @id @default(autoincrement())
+  sessionId       Int
+  content         String        @db.Text
+  options         Json          // [ { label: 'A', text: '...' }, ... ]
+  correctAnswer   String        // A, B, C, D
+  explanation     String?       @db.Text
+  difficulty      Difficulty    @default(MEDIUM)
+  knowledgeId     Int?
+  status          String        // OK, WARNING, ERROR
+  statusDetails   String?
+  similarityScore Float?
+  duplicateOfId   Int?
+  media           Json?         // [ { type: 'IMAGE', url: '...', order: 0 } ]
+
+  session         ImportSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
 
 
 

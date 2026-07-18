@@ -45,6 +45,8 @@ import { seedSystemSettings } from './seedSettings.js';
 import voucherRoutes from './routes/voucher.routes.js';
 import { VoucherService } from './services/voucher.service.js';
 import announcementRoutes from './routes/announcement.routes.js';
+import examManagementRoutes from './routes/examManagement.routes.js';
+
 
 import {
   getLeaderboardRankings,
@@ -493,6 +495,9 @@ app.use('/', voucherRoutes);
 
 // Announcement Popup Router
 app.use('/', announcementRoutes);
+
+// Teacher Exam Management Router
+app.use('/', examManagementRoutes);
 
 // =========================================================================
 // AFFILIATE SYSTEM ROUTING
