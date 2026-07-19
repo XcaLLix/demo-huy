@@ -294,7 +294,10 @@ export class ExamManagementRepository {
         statusDetails: q.statusDetails || null,
         similarityScore: q.similarityScore || null,
         duplicateOfId: q.duplicateOfId || null,
-        media: q.media && q.media.length > 0 ? q.media : undefined
+        media: q.media && q.media.length > 0 ? q.media : undefined,
+        type: q.type || 'MULTIPLE_CHOICE',
+        section: q.section || 'PHẦN I',
+        questionOrder: q.questionOrder || 1
       }))
     });
   }

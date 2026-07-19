@@ -201,6 +201,9 @@ model Question {
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @default(now()) @updatedAt
   examQuestions  ExamQuestion[]
+  type           String              @default("MULTIPLE_CHOICE")
+  section        String              @default("PHẦN I")
+  questionOrder  Int                 @default(1)
   attemptAnswers TestAttemptAnswer[]
 
   // Tích hợp thêm mới
@@ -1561,6 +1564,9 @@ model ImportQuestion {
   similarityScore Float?
   duplicateOfId   Int?
   media           Json?         // [ { type: 'IMAGE', url: '...', order: 0 } ]
+  type            String        @default("MULTIPLE_CHOICE")
+  section         String        @default("PHẦN I")
+  questionOrder   Int           @default(1)
 
   session         ImportSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }

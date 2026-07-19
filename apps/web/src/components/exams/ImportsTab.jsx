@@ -445,37 +445,48 @@ export function ImportsTab({
                     />
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#475569', margin: 0 }}>4 Phương án lựa chọn</label>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      {Array.isArray(activeQuestion.options) && activeQuestion.options.map((opt, idx) => (
-                        <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                          <span style={{ fontWeight: 800, color: '#6366f1', minWidth: '16px' }}>{opt.label}.</span>
-                          <input 
-                            type="text" 
-                            className="saas-search-input" 
-                            style={{ paddingLeft: '12px', height: '38px', borderRadius: '10px' }}
-                            value={opt.text}
-                            onChange={(e) => handleOptionChange(idx, e.target.value)}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
+                  {/* Dynamic Question Type Editor */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>Đáp án chính xác</label>
+                      <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>Loại câu hỏi</label>
                       <select 
                         className="saas-select-filter" 
                         style={{ width: '100%', borderRadius: '10px', height: '40px' }}
-                        value={activeQuestion.correctAnswer}
-                        onChange={(e) => handleFieldChange('correctAnswer', e.target.value)}
+                        value={activeQuestion.type || 'MULTIPLE_CHOICE'}
+                        onChange={(e) => {
+                          const newType = e.target.value;
+                          let newOptions = activeQuestion.options;
+                          let newCorrectAnswer = activeQuestion.correctAnswer;
+                          if (newType === 'MULTIPLE_CHOICE') {
+                            newOptions = Array.isArray(activeQuestion.options) ? activeQuestion.options.map((o, i) => ({ label: ['A','B','C','D'][i] || '', text: o.text || '' })) : [
+                              { label: 'A', text: '...' }, { label: 'B', text: '...' }, { label: 'C', text: '...' }, { label: 'D', text: '...' }
+                            ];
+                            newCorrectAnswer = 'A';
+                          } else if (newType === 'TRUE_FALSE') {
+                            newOptions = Array.isArray(activeQuestion.options) ? activeQuestion.options.map((o, i) => ({ label: ['a','b','c','d'][i] || '', text: o.text || '', isCorrect: o.isCorrect !== undefined ? o.isCorrect : true })) : [
+                              { label: 'a', text: '...', isCorrect: true }, { label: 'b', text: '...', isCorrect: false },
+                              { label: 'c', text: '...', isCorrect: true }, { label: 'd', text: '...', isCorrect: false }
+                            ];
+                            newCorrectAnswer = '';
+                          } else if (newType === 'SHORT_ANSWER') {
+                            newOptions = { tolerance: 0.0, format: 'NUMBER' };
+                            newCorrectAnswer = '0';
+                          }
+                          
+                          if (activeSession) {
+                            activeSession.questions[activeQuestionIdx] = {
+                              ...activeQuestion,
+                              type: newType,
+                              options: newOptions,
+                              correctAnswer: newCorrectAnswer
+                            };
+                            setDecisions({ ...decisions });
+                          }
+                        }}
                       >
-                        <option value="A">A</option>
-                        <option value="B">B</option>
-                        <option value="C">C</option>
-                        <option value="D">D</option>
+                        <option value="MULTIPLE_CHOICE">Trắc nghiệm ABCD (Một đáp án đúng)</option>
+                        <option value="TRUE_FALSE">Trắc nghiệm Đúng/Sai (Nhiều phát biểu)</option>
+                        <option value="SHORT_ANSWER">Trắc nghiệm trả lời ngắn (Điền số/chữ)</option>
                       </select>
                     </div>
                     <div>
@@ -492,6 +503,143 @@ export function ImportsTab({
                       </select>
                     </div>
                   </div>
+
+                  {/* MCQ Options Editor */}
+                  {(activeQuestion.type === 'MULTIPLE_CHOICE' || !activeQuestion.type) && (
+                    <>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#475569', margin: 0 }}>4 Phương án lựa chọn</label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                          {Array.isArray(activeQuestion.options) && activeQuestion.options.map((opt, idx) => (
+                            <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                              <span style={{ fontWeight: 800, color: '#6366f1', minWidth: '16px' }}>{opt.label}.</span>
+                              <input 
+                                type="text" 
+                                className="saas-search-input" 
+                                style={{ paddingLeft: '12px', height: '38px', borderRadius: '10px' }}
+                                value={opt.text}
+                                onChange={(e) => handleOptionChange(idx, e.target.value)}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>Đáp án chính xác</label>
+                        <select 
+                          className="saas-select-filter" 
+                          style={{ width: '100%', borderRadius: '10px', height: '40px' }}
+                          value={activeQuestion.correctAnswer}
+                          onChange={(e) => handleFieldChange('correctAnswer', e.target.value)}
+                        >
+                          <option value="A">A</option>
+                          <option value="B">B</option>
+                          <option value="C">C</option>
+                          <option value="D">D</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
+
+                  {/* True / False Options Editor */}
+                  {activeQuestion.type === 'TRUE_FALSE' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <label style={{ fontSize: '12.5px', fontWeight: 700, color: '#475569', margin: 0 }}>Danh sách phát biểu và Đáp án Đúng/Sai</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                        {Array.isArray(activeQuestion.options) && activeQuestion.options.map((opt, idx) => (
+                          <div key={idx} style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 800, color: '#6366f1', minWidth: '16px' }}>{opt.label}.</span>
+                            <input 
+                              type="text" 
+                              className="saas-search-input" 
+                              style={{ paddingLeft: '12px', height: '38px', borderRadius: '10px', flex: 1 }}
+                              value={opt.text}
+                              onChange={(e) => {
+                                const updatedOptions = [...activeQuestion.options];
+                                updatedOptions[idx] = { ...updatedOptions[idx], text: e.target.value };
+                                handleFieldChange('options', updatedOptions);
+                              }}
+                            />
+                            <div style={{ display: 'flex', gap: '4px', border: '1px solid #cbd5e1', borderRadius: '8px', overflow: 'hidden', height: '38px', flexShrink: 0 }}>
+                              <button
+                                type="button"
+                                style={{
+                                  border: 'none',
+                                  padding: '0 12px',
+                                  fontSize: '12px',
+                                  fontWeight: 700,
+                                  backgroundColor: opt.isCorrect ? '#10b981' : '#f1f5f9',
+                                  color: opt.isCorrect ? '#ffffff' : '#64748b',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                onClick={() => {
+                                  const updatedOptions = [...activeQuestion.options];
+                                  updatedOptions[idx] = { ...updatedOptions[idx], isCorrect: true };
+                                  handleFieldChange('options', updatedOptions);
+                                }}
+                              >
+                                Đúng
+                              </button>
+                              <button
+                                type="button"
+                                style={{
+                                  border: 'none',
+                                  padding: '0 12px',
+                                  fontSize: '12px',
+                                  fontWeight: 700,
+                                  backgroundColor: !opt.isCorrect ? '#ef4444' : '#f1f5f9',
+                                  color: !opt.isCorrect ? '#ffffff' : '#64748b',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                onClick={() => {
+                                  const updatedOptions = [...activeQuestion.options];
+                                  updatedOptions[idx] = { ...updatedOptions[idx], isCorrect: false };
+                                  handleFieldChange('options', updatedOptions);
+                                }}
+                              >
+                                Sai
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Short Answer Editor */}
+                  {activeQuestion.type === 'SHORT_ANSWER' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>Đáp án ngắn</label>
+                        <input 
+                          type="text" 
+                          className="saas-search-input" 
+                          style={{ paddingLeft: '12px', height: '40px', borderRadius: '10px' }}
+                          value={activeQuestion.correctAnswer}
+                          onChange={(e) => handleFieldChange('correctAnswer', e.target.value)}
+                          placeholder="Nhập giá trị số hoặc biểu thức LaTeX..."
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>Định dạng dữ liệu</label>
+                        <select 
+                          className="saas-select-filter" 
+                          style={{ width: '100%', borderRadius: '10px', height: '40px' }}
+                          value={activeQuestion.options?.format || 'NUMBER'}
+                          onChange={(e) => {
+                            const updatedOptions = { ...activeQuestion.options, format: e.target.value };
+                            handleFieldChange('options', updatedOptions);
+                          }}
+                        >
+                          <option value="NUMBER">Số học (Number)</option>
+                          <option value="TEXT">Văn bản / Ký tự (Text)</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
 
                   <div>
                     <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>Hướng dẫn giải chi tiết</label>
@@ -581,6 +729,10 @@ export function ImportsTab({
                                 <option value="GRAPH">Đồ thị hàm số (Graph)</option>
                                 <option value="GEOMETRY">Hình vẽ hình học (Geometry)</option>
                                 <option value="TABLE">Bảng số liệu (Table)</option>
+                                <option value="MAP">Bản đồ (Map)</option>
+                                <option value="DIAGRAM">Sơ đồ/Biểu đồ (Diagram)</option>
+                                <option value="CHEMICAL_STRUCTURE">Cấu trúc hóa học (Chemical Structure)</option>
+                                <option value="OTHER">Khác (Other)</option>
                               </select>
                             </div>
                             <span style={{ fontSize: '11px', color: '#94a3b8', wordBreak: 'break-all' }}>Link: {med.url}</span>
@@ -691,6 +843,10 @@ export function ImportsTab({
                                 : med.type === 'GRAPH' ? 'Đồ thị'
                                 : med.type === 'GEOMETRY' ? 'Hình học'
                                 : med.type === 'TABLE' ? 'Bảng số liệu'
+                                : med.type === 'MAP' ? 'Bản đồ'
+                                : med.type === 'DIAGRAM' ? 'Sơ đồ'
+                                : med.type === 'CHEMICAL_STRUCTURE' ? 'Cấu trúc hóa học'
+                                : med.type === 'OTHER' ? 'Tài nguyên khác'
                                 : `Hình ${idx + 1}`}
                             </span>
                           </div>
@@ -717,38 +873,108 @@ export function ImportsTab({
                       </div>
                     )}
 
-                    {/* Options list */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '10px' }}>
-                      {Array.isArray(activeQuestion.options) && activeQuestion.options.map((opt, idx) => (
-                        <div
-                          key={idx}
-                          style={{
-                            padding: '12px 16px',
-                            borderRadius: '10px',
-                            border: opt.label === activeQuestion.correctAnswer ? '1.5px solid #10b981' : '1px solid #e2e8f0',
-                            backgroundColor: opt.label === activeQuestion.correctAnswer ? '#f0fdf4' : '#ffffff',
-                            fontSize: '13.5px',
-                            fontWeight: 600,
-                            color: opt.label === activeQuestion.correctAnswer ? '#15803d' : '#334155',
-                            display: 'flex',
-                            gap: '6px',
-                            alignItems: 'flex-start'
-                          }}
-                        >
-                          <span style={{ color: opt.label === activeQuestion.correctAnswer ? '#10b981' : '#6366f1', fontWeight: 800, flexShrink: 0 }}>{opt.label}.</span>
-                          <span
-                            className="mathjax-render"
-                            dangerouslySetInnerHTML={{
-                              __html: opt.text && opt.text !== '...'
-                                ? opt.text
-                                    .replace(/<img([^>]+)src=(["'])([^"']+\.wmf)\2/gi,
-                                      '<span class="wmf-placeholder" title="Công thức WMF">📐</span>')
-                                : '<em style="color:#94a3b8">Chưa có nội dung</em>'
+                    {/* Dynamic Options preview list */}
+                    {(activeQuestion.type === 'MULTIPLE_CHOICE' || !activeQuestion.type) && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '10px' }}>
+                        {Array.isArray(activeQuestion.options) && activeQuestion.options.map((opt, idx) => (
+                          <div
+                            key={idx}
+                            style={{
+                              padding: '12px 16px',
+                              borderRadius: '10px',
+                              border: opt.label === activeQuestion.correctAnswer ? '1.5px solid #10b981' : '1px solid #e2e8f0',
+                              backgroundColor: opt.label === activeQuestion.correctAnswer ? '#f0fdf4' : '#ffffff',
+                              fontSize: '13.5px',
+                              fontWeight: 600,
+                              color: opt.label === activeQuestion.correctAnswer ? '#15803d' : '#334155',
+                              display: 'flex',
+                              gap: '6px',
+                              alignItems: 'flex-start'
                             }}
+                          >
+                            <span style={{ color: opt.label === activeQuestion.correctAnswer ? '#10b981' : '#6366f1', fontWeight: 800, flexShrink: 0 }}>{opt.label}.</span>
+                            <span
+                              className="mathjax-render"
+                              dangerouslySetInnerHTML={{
+                                __html: opt.text && opt.text !== '...'
+                                  ? opt.text
+                                      .replace(/<img([^>]+)src=(["'])([^"']+\.wmf)\2/gi,
+                                        '<span class="wmf-placeholder" title="Công thức WMF">📐</span>')
+                                  : '<em style="color:#94a3b8">Chưa có nội dung</em>'
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {activeQuestion.type === 'TRUE_FALSE' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
+                        {Array.isArray(activeQuestion.options) && activeQuestion.options.map((opt, idx) => (
+                          <div
+                            key={idx}
+                            style={{
+                              padding: '12px 16px',
+                              borderRadius: '10px',
+                              border: '1px solid #e2e8f0',
+                              backgroundColor: '#ffffff',
+                              fontSize: '13.5px',
+                              fontWeight: 600,
+                              color: '#334155',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              gap: '12px'
+                            }}
+                          >
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+                              <span style={{ color: '#6366f1', fontWeight: 800, flexShrink: 0 }}>{opt.label}.</span>
+                              <span
+                                className="mathjax-render"
+                                dangerouslySetInnerHTML={{
+                                  __html: opt.text && opt.text !== '...'
+                                    ? opt.text
+                                        .replace(/<img([^>]+)src=(["'])([^"']+\.wmf)\2/gi,
+                                          '<span class="wmf-placeholder" title="Công thức WMF">📐</span>')
+                                    : '<em style="color:#94a3b8">Chưa có nội dung</em>'
+                                }}
+                              />
+                            </div>
+                            <span
+                              style={{
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                padding: '4px 10px',
+                                borderRadius: '6px',
+                                backgroundColor: opt.isCorrect ? '#d1fae5' : '#fee2e2',
+                                color: opt.isCorrect ? '#065f46' : '#991b1b',
+                                flexShrink: 0
+                              }}
+                            >
+                              {opt.isCorrect ? 'Đúng' : 'Sai'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {activeQuestion.type === 'SHORT_ANSWER' && (
+                      <div style={{ padding: '16px', borderRadius: '10px', border: '1.5px dashed #6366f1', backgroundColor: '#f5f3ff', display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
+                        <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#4f46e5' }}>Đáp án điền khuyết của học sinh:</span>
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                          <input 
+                            type="text" 
+                            className="saas-search-input" 
+                            disabled 
+                            style={{ height: '38px', borderRadius: '8px', paddingLeft: '12px', backgroundColor: '#e2e8f0', color: '#64748b', flex: 1 }}
+                            value={activeQuestion.correctAnswer}
                           />
+                          <span style={{ fontSize: '13px', fontWeight: 700, color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            ✓ Đúng (Định dạng: {activeQuestion.options?.format === 'NUMBER' ? 'Số học' : 'Chữ'})
+                          </span>
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    )}
 
                     {/* Explanation */}
                     {activeQuestion.explanation && (

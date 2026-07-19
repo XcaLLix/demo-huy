@@ -1,5 +1,5 @@
 import { ExamManagementRepository } from '../repositories/examManagement.repository.js';
-import { AiParser } from '../utils/aiParser.js';
+import { ImportEngine } from '../utils/importEngine.js';
 import { prisma } from '../lib/prisma.js';
 import fs from 'fs';
 import path from 'path';
@@ -227,7 +227,7 @@ export class ExamManagementService {
     try {
       // Simulate brief processing delay for nice UI flow
       await new Promise(resolve => setTimeout(resolve, 2000));
-      const parsedQuestions = await AiParser.parseFile(filePath, originalName, sessionId);
+      const parsedQuestions = await ImportEngine.parseFile(filePath, originalName, sessionId);
       await ExamManagementRepository.createImportQuestions(sessionId, parsedQuestions);
       await ExamManagementRepository.updateImportSession(sessionId, { status: 'REVIEWING' });
     } catch (err) {
@@ -246,7 +246,7 @@ export class ExamManagementService {
       throw new Error('FORBIDDEN: Bạn không có quyền sửa câu hỏi của phiên import này');
     }
 
-    const { content, options, correctAnswer, explanation, difficulty, media } = data;
+    const { content, options, correctAnswer, explanation, difficulty, media, type, section, questionOrder } = data;
 
     return prisma.importQuestion.update({
       where: { id },
@@ -256,7 +256,10 @@ export class ExamManagementService {
         correctAnswer,
         explanation,
         difficulty,
-        media: media !== undefined ? (media as any) : undefined
+        media: media !== undefined ? (media as any) : undefined,
+        type: type !== undefined ? type : undefined,
+        section: section !== undefined ? section : undefined,
+        questionOrder: questionOrder !== undefined ? Number(questionOrder) : undefined
       }
     });
   }
@@ -285,7 +288,10 @@ export class ExamManagementService {
               subject: session.fileName.toLowerCase().includes('ly') ? 'Vật lý' : 'Toán học',
               topic: 'Chương 1',
               difficulty: q.difficulty,
-              createdBy: userId
+              createdBy: userId,
+              type: q.type,
+              section: q.section,
+              questionOrder: q.questionOrder
             }
           });
 
@@ -297,7 +303,7 @@ export class ExamManagementService {
                 questionId: newQ.id,
                 optionLabel: opt.label,
                 optionText: opt.text,
-                isCorrect: opt.label === q.correctAnswer
+                isCorrect: q.type === 'TRUE_FALSE' ? !!opt.isCorrect : (opt.label === q.correctAnswer)
               }))
             });
           }
