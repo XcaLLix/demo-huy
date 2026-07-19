@@ -688,6 +688,22 @@ export class LeaderboardService {
           };
         }
 
+        // CRITICAL OPTIMIZATION: Only fetch students with submitted test attempts with score > 0 (excludes 0 scores at DB level!)
+        studentWhereClause.testAttempts = {
+          some: {
+            status: 'SUBMITTED',
+            score: { gt: 0 },
+            ...(subject ? {
+              exam: {
+                subject: {
+                  contains: subject,
+                  mode: 'insensitive'
+                }
+              }
+            } : {})
+          }
+        };
+
         // Fetch students matching filters along with their test attempts
         const students = await prisma.student.findMany({
           where: studentWhereClause,
@@ -705,6 +721,7 @@ export class LeaderboardService {
             testAttempts: {
               where: {
                 status: 'SUBMITTED',
+                score: { gt: 0 },
                 ...(subject ? {
                   exam: {
                     subject: {
@@ -744,7 +761,7 @@ export class LeaderboardService {
             grade: student.grade || null,
             province: student.province || 'Chưa cập nhật'
           };
-        });
+        }).filter(item => item.testScore > 0);
 
         // Sort: testScore desc, xp desc, streak desc
         formatted.sort((a, b) => {
@@ -773,6 +790,15 @@ export class LeaderboardService {
       // CASE B: Sorting by 'streak' or 'xp' (gamification table)
       // ────────────────────────────────────────────────────────
       const whereClause: any = {};
+
+      // Exclude 0 value entries at database level to optimize query and keep page sizes accurate
+      if (sortBy === 'streak') {
+        if (!subject) {
+          whereClause.streakDays = { gt: 0 };
+        }
+      } else {
+        whereClause.xp = { gt: 0 };
+      }
 
       if (grade !== undefined || province !== undefined || search !== undefined) {
         whereClause.user = {};
@@ -833,7 +859,8 @@ export class LeaderboardService {
             ...whereClause.user,
             subjectStreaks: {
               some: {
-                subject: cleanSubject
+                subject: cleanSubject,
+                ...(sortBy === 'streak' ? { currentStreak: { gt: 0 } } : {})
               }
             }
           }
@@ -881,6 +908,15 @@ export class LeaderboardService {
         };
       });
 
+      // Filter out 0 value entries in memory as a second layer of safety
+      formatted = formatted.filter(item => {
+        if (sortBy === 'streak') {
+          return (subject ? item.subjectStreak : item.streak) > 0;
+        } else {
+          return item.xp > 0;
+        }
+      });
+
       // Filter/Sort based on subject streak
       if (cleanSubject) {
         if (sortBy === 'streak') {
@@ -894,6 +930,7 @@ export class LeaderboardService {
             return b.subjectStreak - a.subjectStreak;
           });
         }
+        totalCount = formatted.length;
       }
 
       const paginated = (subject ? formatted.slice(skip, skip + limit) : formatted).map((item, idx) => ({

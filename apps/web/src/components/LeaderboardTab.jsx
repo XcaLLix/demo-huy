@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import { toast } from '../utils/toast';
+import LoadingOverlay from './LoadingOverlay';
 
 const skeletonKeyframes = `
   @keyframes mm-pulse {
@@ -196,7 +197,7 @@ export default function LeaderboardTab({ currentUser }) {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [sortBy, setSortBy] = useState('streak'); // Default to attendance streak (chuỗi điểm danh)
+  const [sortBy, setSortBy] = useState('xp'); // Default to mock exam scores (điểm thi thử)
   const [userGamify, setUserGamify] = useState(null);
   const [checkingIn, setCheckingIn] = useState(false);
 
@@ -347,6 +348,10 @@ export default function LeaderboardTab({ currentUser }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <style>{skeletonKeyframes}</style>
+      
+      {(loading || checkingIn) && (
+        <LoadingOverlay message={checkingIn ? "Đang tiến hành điểm danh..." : "Đang tải dữ liệu bảng xếp hạng..."} />
+      )}
       
       {/* Daily Check-In Premium Panel */}
       {userGamify && (
@@ -550,23 +555,6 @@ export default function LeaderboardTab({ currentUser }) {
         {/* Toggle Streak vs XP */}
         <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto', flexWrap: 'wrap' }}>
           <button
-            onClick={() => { setSortBy('streak'); setPage(1); }}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '8px',
-              fontSize: '13px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              border: '1px solid ' + (sortBy === 'streak' ? '#6c5ce7' : '#E2E8F0'),
-              background: sortBy === 'streak' ? '#6c5ce7' : '#FFFFFF',
-              color: sortBy === 'streak' ? '#FFFFFF' : '#475569',
-              boxShadow: sortBy === 'streak' ? '0 4px 12px rgba(108, 92, 231, 0.15)' : 'none',
-              transition: 'all 0.2s'
-            }}
-          >
-            ⚡ Chăm Chỉ (Streak)
-          </button>
-          <button
             onClick={() => { setSortBy('xp'); setPage(1); }}
             style={{
               padding: '8px 16px',
@@ -583,13 +571,103 @@ export default function LeaderboardTab({ currentUser }) {
           >
             📝 Điểm Thi Thử
           </button>
+          <button
+            onClick={() => { setSortBy('streak'); setPage(1); }}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '8px',
+              fontSize: '13px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              border: '1px solid ' + (sortBy === 'streak' || sortBy === 'gamification_xp' ? '#6c5ce7' : '#E2E8F0'),
+              background: sortBy === 'streak' || sortBy === 'gamification_xp' ? '#6c5ce7' : '#FFFFFF',
+              color: sortBy === 'streak' || sortBy === 'gamification_xp' ? '#FFFFFF' : '#475569',
+              boxShadow: sortBy === 'streak' || sortBy === 'gamification_xp' ? '0 4px 12px rgba(108, 92, 231, 0.15)' : 'none',
+              transition: 'all 0.2s'
+            }}
+          >
+            ⚡ Chăm Chỉ
+          </button>
         </div>
       </div>
+
+      {/* Sub-buttons for sorting under Chăm Chỉ */}
+      {(sortBy === 'streak' || sortBy === 'gamification_xp') && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          background: '#FFFFFF',
+          padding: '8px 16px',
+          borderRadius: '12px',
+          alignSelf: 'flex-start',
+          border: '1px solid #E2E8F0',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
+        }}>
+          <span style={{ fontSize: '12.5px', fontWeight: 'bold', color: '#64748B' }}>Sắp xếp theo:</span>
+          <button
+            onClick={() => { setSortBy('streak'); setPage(1); }}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '8px',
+              fontSize: '12.5px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              border: '1px solid ' + (sortBy === 'streak' ? '#6c5ce7' : 'transparent'),
+              background: sortBy === 'streak' ? '#F0EFFB' : 'transparent',
+              color: sortBy === 'streak' ? '#6c5ce7' : '#475569',
+              transition: 'all 0.2s'
+            }}
+          >
+            🔥 Chuỗi ngày học
+          </button>
+          <button
+            onClick={() => { setSortBy('gamification_xp'); setPage(1); }}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '8px',
+              fontSize: '12.5px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              border: '1px solid ' + (sortBy === 'gamification_xp' ? '#6c5ce7' : 'transparent'),
+              background: sortBy === 'gamification_xp' ? '#F0EFFB' : 'transparent',
+              color: sortBy === 'gamification_xp' ? '#6c5ce7' : '#475569',
+              transition: 'all 0.2s'
+            }}
+          >
+            💎 Điểm XP
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           {renderTop3Skeleton()}
           {renderTableSkeleton()}
+        </div>
+      ) : rankings.length === 0 ? (
+        <div style={{
+          background: '#FFFFFF',
+          border: '1px solid #E2E8F0',
+          borderRadius: '20px',
+          padding: '48px 24px',
+          textAlign: 'center',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '12px'
+        }}>
+          <div style={{ fontSize: '48px' }}>📝</div>
+          <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#1E293B', margin: 0 }}>
+            {sortBy === 'xp' ? "Chưa có học sinh nào làm bài" : "Chưa có dữ liệu xếp hạng"}
+          </h3>
+          <p style={{ fontSize: '14px', color: '#64748B', margin: 0, maxWidth: '400px', lineHeight: 1.5 }}>
+            {sortBy === 'xp'
+              ? (subject ? `Chưa có học sinh nào vào làm đề thi thử môn ${subject.toUpperCase()} thuộc khối này.` : "Chưa có học sinh nào vào làm đề thi thử thuộc các môn học.")
+              : "Hãy tham gia học tập, ôn luyện và duy trì chuỗi học để lọt vào bảng xếp hạng!"}
+          </p>
         </div>
       ) : (
         <>

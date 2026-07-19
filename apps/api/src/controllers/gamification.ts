@@ -198,7 +198,7 @@ export async function getLeaderboardRankings(req: AuthRequest, res: Response) {
     const subject = req.query.subject ? String(req.query.subject).toLowerCase().trim() : undefined;
     const province = req.query.province ? String(req.query.province).trim() : undefined;
     const search = req.query.search ? String(req.query.search).trim() : undefined;
-    const sortBy = req.query.sortBy ? (String(req.query.sortBy).trim() as any) : 'streak';
+    const sortBy = req.query.sortBy ? (String(req.query.sortBy).trim() as any) : 'xp';
 
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 50;

@@ -5,10 +5,13 @@ import DOMPurify from 'dompurify';
 import {
   HiChat, HiHeart, HiSearch, HiPlus, HiArrowLeft, HiUser, HiTag,
   HiCheckCircle, HiDownload, HiUserGroup, HiStar, HiTrendingUp,
-  HiSparkles, HiShieldCheck, HiFlag, HiRefresh
+  HiSparkles, HiShieldCheck, HiFlag, HiRefresh, HiHome,
+  HiChatAlt, HiBookmark, HiShare
 } from 'react-icons/hi';
+import { HiTrophy } from 'react-icons/hi2';
 import { io } from 'socket.io-client';
 import { api, API_BASE } from '../api';
+import LoadingOverlay from './LoadingOverlay';
 
 function resolveImageUrl(url) {
   if (!url) return '';
@@ -37,6 +40,7 @@ function renderSanitizedContent(content) {
   html = html.replace(/!\[(.*?)\]\((.*?)\)/g, (match, alt, src) => {
     return `<img src="${resolveImageUrl(src)}" alt="${alt}" class="forum-content-image" />`;
   });
+  html = html.replace(/(@[A-Za-z0-9_À-ỹ]+(?:\s+[A-Za-z0-9_À-ỹ]+)*)/g, '<span style="color: var(--primary); font-weight: bold;">$1</span>');
   html = html.replace(/\n/g, '<br />');
   const sanitized = DOMPurify.sanitize(html);
   return <div dangerouslySetInnerHTML={{ __html: sanitized }} />;
@@ -131,6 +135,12 @@ export default function Forum({ currentUser }) {
   const [dragOverPost, setDragOverPost] = useState(false);
   const [dragOverComment, setDragOverComment] = useState(false);
 
+  // New States for community enhancements
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [groupSearchQuery, setGroupSearchQuery] = useState('');
+  const [showXPHelp, setShowXPHelp] = useState(false);
+  const [uploadingResource, setUploadingResource] = useState(false);
+
   // Socket setup
   const socketRef = useRef(null);
 
@@ -182,8 +192,9 @@ export default function Forum({ currentUser }) {
       fetchStudyGroups();
     });
 
-    // Fetch initial categories
+    // Fetch initial categories and study groups
     fetchCategories();
+    fetchStudyGroups();
 
     return () => {
       if (socketRef.current) {
@@ -366,22 +377,28 @@ export default function Forum({ currentUser }) {
 
   const handleLeaveGroup = async (groupId) => {
     if (!window.confirm('Bạn có chắc chắn muốn rời nhóm học tập này?')) return;
+    setLoading(true);
     try {
       await api.leaveStudyGroup(groupId);
       setSelectedGroup(null);
-      fetchStudyGroups();
+      await fetchStudyGroups();
       toast('Đã rời khỏi nhóm học tập!', 'success');
     } catch (err) {
       toast(err.message || 'Không thể rời nhóm!', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
   const fetchComments = async (postId) => {
+    setCommentsLoading(true);
     try {
       const data = await api.getForumComments(postId);
       setComments(data || []);
     } catch (err) {
       console.error('Lỗi tải bình luận:', err);
+    } finally {
+      setCommentsLoading(false);
     }
   };
 
@@ -541,13 +558,16 @@ export default function Forum({ currentUser }) {
 
   const handleDeleteGroup = async (groupId) => {
     if (!window.confirm('Bạn có chắc chắn muốn giải tán (xóa) nhóm học tập này? Hành động này không thể hoàn tác.')) return;
+    setLoading(true);
     try {
       await api.deleteStudyGroup(groupId);
       setSelectedGroup(null);
-      fetchStudyGroups();
+      await fetchStudyGroups();
       toast('Đã xóa nhóm học tập thành công!', 'success');
     } catch (err) {
       toast(err.message || 'Xóa nhóm học tập thất bại!', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -584,6 +604,27 @@ export default function Forum({ currentUser }) {
       toast(err.message || 'Tải ảnh lên thất bại!', 'error');
     } finally {
       setUploadingImage(false);
+    }
+  };
+
+  const handleDocumentUpload = async (file) => {
+    if (!file) return;
+    setUploadingResource(true);
+    try {
+      const data = await api.uploadFile(file);
+      if (data && data.url) {
+        setResourceFile({
+          fileUrl: data.url,
+          fileName: file.name,
+          fileType: file.name.split('.').pop()?.toUpperCase() || 'PDF',
+          fileSize: file.size
+        });
+        toast('Tải tệp tài liệu lên thành công!', 'success');
+      }
+    } catch (err) {
+      toast(err.message || 'Tải tệp tài liệu lên thất bại!', 'error');
+    } finally {
+      setUploadingResource(false);
     }
   };
 
@@ -866,959 +907,875 @@ export default function Forum({ currentUser }) {
     }
   };
 
+  const getFilteredPosts = (items) => {
+    if (!items) return [];
+    return items.filter(post => {
+      // 1. Search Query
+      if (searchQuery && searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const matchesTitle = post.title?.toLowerCase().includes(query);
+        const matchesContent = post.content?.toLowerCase().includes(query);
+        if (!matchesTitle && !matchesContent) return false;
+      }
+      
+      // 2. Category
+      if (selectedCategory && selectedCategory !== 'All') {
+        if (post.categoryName !== selectedCategory) return false;
+      }
+      
+      // 3. Post Type
+      if (selectedType && selectedType !== 'All') {
+        if (post.postType !== selectedType) return false;
+      }
+      
+      // 4. Difficulty (only for Q&A)
+      if (filterDifficulty && filterDifficulty !== 'All') {
+        if (post.difficulty !== filterDifficulty) return false;
+      }
+      
+      // 5. Resolved Status (only for Q&A)
+      if (filterResolved && filterResolved !== 'All') {
+        const isResolved = filterResolved === 'RESOLVED';
+        if (post.isResolved !== isResolved) return false;
+      }
+      
+      // 6. Has Attachment
+      if (filterHasAttachment) {
+        if (!post.resourceFile && !post.resourceId) return false;
+      }
+      
+      // 7. Date Range
+      if (filterDateRange && filterDateRange !== 'All') {
+        const postDate = new Date(post.createdAt);
+        const now = new Date();
+        if (filterDateRange === 'today') {
+          const isToday = postDate.getDate() === now.getDate() &&
+                          postDate.getMonth() === now.getMonth() &&
+                          postDate.getFullYear() === now.getFullYear();
+          if (!isToday) return false;
+        } else if (filterDateRange === 'week') {
+          const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          if (postDate < oneWeekAgo) return false;
+        } else if (filterDateRange === 'month') {
+          const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          if (postDate < oneMonthAgo) return false;
+        }
+      }
+      
+      return true;
+    });
+  };
+
   // =========================================================================
   // RENDER SUB-COMPONENTS & VIEW LAYOUTS
   // =========================================================================
 
-  return (
-    <div className="forum-container animate-in" style={{ padding: '24px', background: 'var(--bg-main)', minHeight: '100vh', color: 'var(--text-main)' }}>
-      {/* Dynamic Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <HiSparkles style={{ color: 'var(--primary)' }} /> Diễn đàn EduPath Community
-          </h1>
-          <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-            Nơi kết nối tri thức, chia sẻ học liệu nâng cao và thi đua giải đề THPTQG
-          </p>
-        </div>
+    return (
+    <div className="forum-container animate-in" style={{ background: 'var(--bg-main)', minHeight: '100vh', color: 'var(--text-main)', fontFamily: "'Inter', sans-serif" }}>
+      {/* EduPath Loading Overlay */}
+      {(loading || submitting || commentsLoading) && (
+        <LoadingOverlay message={submitting ? "Đang xử lý bình luận..." : (commentsLoading ? "Đang tải bài viết..." : "Đang tải dữ liệu...")} />
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '32px', width: '100%', margin: 0, padding: '24px 16px', minHeight: '100vh', boxSizing: 'border-box' }}>
         
-        <div style={{ display: 'flex', gap: '10px' }}>
-          {(activeTab === 'feed' || activeTab === 'saved') && (
-            <button 
-              className="btn-primary" 
-              onClick={() => setShowCreateModal(true)} 
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '10px 20px',
-                borderRadius: '10px',
-                border: 'none',
-                background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)',
-                color: '#FFFFFF',
-                boxShadow: 'var(--shadow-sm)',
-                cursor: 'pointer',
-                fontWeight: '600',
-                fontSize: '13.5px',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = 'var(--shadow-md)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'none';
-                e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
-              }}
-            >
-              <HiPlus /> Đăng câu hỏi mới
-            </button>
-          )}
-          {activeTab === 'groups' && (
-            <button 
-              id="forum-btn-create-group" 
-              className="btn-primary" 
-              onClick={() => setShowGroupModal(true)} 
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '10px 20px',
-                borderRadius: '10px',
-                border: 'none',
-                background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)',
-                color: '#FFFFFF',
-                boxShadow: 'var(--shadow-sm)',
-                cursor: 'pointer',
-                fontWeight: '600',
-                fontSize: '13.5px',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = 'var(--shadow-md)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'none';
-                e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
-              }}
-            >
-              <HiPlus /> Tạo nhóm học tập
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Main Grid Wrapper */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '24px', alignItems: 'start' }}>
-        {/* Left Column (Main Feed & Details) */}
-        <div>
-          {/* Tabs bar */}
-          <div style={{ display: 'flex', marginBottom: '24px', gap: '12px' }}>
-            {[
-              { id: 'feed', label: 'Bài thảo luận', icon: <HiChat /> },
-              { id: 'groups', label: 'Nhóm học tập', icon: <HiUserGroup /> },
-              { id: 'saved', label: 'Bài viết đã lưu', icon: <HiStar /> }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                id={`forum-tab-${tab.id}`}
-                onClick={() => {
-                  setActiveTab(tab.id);
-                  setSelectedPost(null);
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '10px 20px',
-                  borderRadius: '10px',
-                  border: activeTab === tab.id ? '1px solid var(--primary)' : '1px solid var(--border)',
-                  background: activeTab === tab.id ? 'var(--primary)' : 'var(--bg-card)',
-                  color: activeTab === tab.id ? '#FFFFFF' : 'var(--text-secondary)',
-                  boxShadow: activeTab === tab.id ? 'var(--shadow-md)' : 'var(--shadow-sm)',
-                  cursor: 'pointer',
-                  fontWeight: '600',
-                  fontSize: '13.5px',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  if (activeTab !== tab.id) {
-                    e.currentTarget.style.transform = 'translateY(-1px)';
-                    e.currentTarget.style.boxShadow = 'var(--shadow-md)';
-                    e.currentTarget.style.borderColor = 'var(--primary-light)';
-                    e.currentTarget.style.color = 'var(--primary)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (activeTab !== tab.id) {
-                    e.currentTarget.style.transform = 'none';
-                    e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
-                    e.currentTarget.style.borderColor = 'var(--border)';
-                    e.currentTarget.style.color = 'var(--text-secondary)';
-                  }
-                }}
-              >
-                {tab.icon} {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {selectedPost ? (
-            /* DETAILED VIEW POST */
-            <div className="card detailed-post-card" style={{ padding: '24px', background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-              <button className="btn-outline" onClick={() => setSelectedPost(null)} style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <HiArrowLeft /> Quay lại danh sách
-              </button>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                  <div style={{ background: 'var(--primary)', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 'bold' }}>
-                    {selectedPost.author?.fullName?.slice(0, 2).toUpperCase() || 'AD'}
-                  </div>
-                  <div>
-                    <h4 style={{ fontWeight: 'bold', fontSize: '15px' }}>{selectedPost.author?.fullName}</h4>
-                    <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                      Đăng vào: {new Date(selectedPost.createdAt).toLocaleString()} • 
-                      <span className="badge-pill" style={{ background: 'var(--primary-bg)', color: 'var(--primary)', marginLeft: '8px' }}>
-                        {selectedPost.category?.name}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  {(currentUser?.role === 'ADMIN' || currentUser?.role === 'TEACHER' || selectedPost.authorId === currentUser?.id) && (
-                    <>
-                      <button 
-                        onClick={() => handleOpenEditModal(selectedPost)}
-                        style={{
-                          background: 'none',
-                          border: '1px solid var(--border)',
-                          borderRadius: '6px',
-                          padding: '4px 10px',
-                          fontSize: '12px',
-                          fontWeight: '600',
-                          color: 'var(--primary)',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}
-                      >
-                        Sửa
-                      </button>
-                      <button 
-                        onClick={() => handleDeletePost(selectedPost.id)}
-                        style={{
-                          background: 'none',
-                          border: '1px solid rgba(231, 76, 60, 0.2)',
-                          borderRadius: '6px',
-                          padding: '4px 10px',
-                          fontSize: '12px',
-                          fontWeight: '600',
-                          color: 'var(--accent-red)',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}
-                      >
-                        Xóa
-                      </button>
-                    </>
-                  )}
-                  <button 
-                    onClick={() => {
-                      setReportTarget({ postId: selectedPost.id, commentId: null });
-                      setShowReportModal(true);
-                    }}
-                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
-                    title="Báo cáo vi phạm"
-                  >
-                    <HiFlag style={{ fontSize: '18px' }} />
-                  </button>
-                </div>
+        {/* ================= LEFT SIDEBAR (Threads Style) ================= */}
+        <aside style={{ position: 'sticky', top: '80px', display: 'flex', flexDirection: 'column', gap: '32px', borderRight: '1px solid var(--border)', paddingRight: '24px', boxSizing: 'border-box', height: 'fit-content' }}>
+          <div>
+            {/* Header/Logo */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '32px', cursor: 'pointer' }} onClick={() => { setActiveTab('feed'); setSelectedGroup(null); }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '20px', fontWeight: '900', boxShadow: '0 4px 12px rgba(108, 92, 231, 0.2)' }}>
+                EP
               </div>
-
-              <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '12px' }}>{selectedPost.title}</h2>
-              <div style={{ fontSize: '15px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '20px' }}>
-                {renderSanitizedContent(selectedPost.content)}
-              </div>
-
-              {/* Resource Download Attachment widget */}
-              {selectedPost.resource && (
-                <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: 'var(--bg-main)', border: '1px solid var(--border)', marginBottom: '20px' }}>
-                  <div>
-                    <h5 style={{ fontWeight: 'bold', fontSize: '13.5px' }}>📎 Tài liệu đính kèm: {selectedPost.title}</h5>
-                    <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: 0 }}>
-                      Định dạng: {selectedPost.resource.fileType} • Tải xuống: {selectedPost.resource.downloadCount} lượt
-                    </p>
-                  </div>
-                  <button 
-                    className="btn-primary" 
-                    style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', fontSize: '12px' }}
-                    onClick={() => handleDownloadFile(selectedPost.resource.id, selectedPost.resource.fileUrl)}
-                  >
-                    <HiDownload /> Tải ngay
-                  </button>
-                </div>
-              )}
-
-              {/* Action Buttons Row */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '16px', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
-                <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    {[
-                      { type: 'LIKE', emoji: '👍', label: 'Thích' },
-                      { type: 'LOVE', emoji: '❤️', label: 'Yêu thích' },
-                      { type: 'LAUGH', emoji: '😄', label: 'Cười' },
-                      { type: 'CLAP', emoji: '👏', label: 'Vỗ tay' }
-                    ].map(reaction => {
-                      const count = selectedPost.reactionCounts?.[reaction.type] || 0;
-                      const isUserReacted = selectedPost.userReaction === reaction.type;
-                      return (
-                        <button
-                          key={reaction.type}
-                          onClick={() => handleReactPost(selectedPost.id, reaction.type)}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            background: isUserReacted ? 'var(--primary-bg)' : 'transparent',
-                            border: isUserReacted ? '1px solid var(--primary)' : '1px solid transparent',
-                            borderRadius: '20px',
-                            padding: '6px 12px',
-                            fontSize: '12px',
-                            cursor: 'pointer',
-                            color: isUserReacted ? 'var(--primary)' : 'var(--text-secondary)',
-                            transition: 'all 0.15s ease'
-                          }}
-                          title={reaction.label}
-                        >
-                          <span>{reaction.emoji}</span>
-                          {count > 0 && <span style={{ fontWeight: 'bold' }}>{count}</span>}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)', fontSize: '13px' }}>
-                    <HiChat style={{ fontSize: '18px' }} /> {comments.length} Phản hồi
-                  </span>
-                </div>
-                
-                <button
-                  onClick={(e) => handleToggleSavePost(e, selectedPost)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    border: 'none',
-                    background: 'none',
-                    color: selectedPost.isSaved ? '#f1c40f' : 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    fontSize: '13px'
-                  }}
-                >
-                  <HiStar style={{ fontSize: '18px' }} /> {selectedPost.isSaved ? 'Đã lưu' : 'Lưu lại'}
-                </button>
-              </div>
-
-              {/* Comments Section */}
-              <div style={{ background: 'var(--bg-main)', padding: '20px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                <h3 style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: '16px' }}>Ý kiến thảo luận ({comments.length})</h3>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '20px' }}>
-                  {comments.length > 0 ? (
-                    comments.map(c => (
-                      <div key={c.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: '16px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            <div style={{ background: 'var(--accent-blue)', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}>
-                              {c.author?.slice(0, 2).toUpperCase() || 'AD'}
-                            </div>
-                            <div>
-                              <span style={{ fontSize: '13px', fontWeight: 'bold' }}>{c.author}</span>
-                              <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '8px' }}>
-                                {new Date(c.createdAt).toLocaleTimeString()}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            {/* Checkmark to verify solution */}
-                            {c.isSolution && (
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--accent-green)', fontSize: '11px', fontWeight: 'bold' }}>
-                                <HiCheckCircle style={{ fontSize: '16px' }} /> Lời giải hay
-                              </span>
-                            )}
-                            
-                            {/* Option to mark solution for post author or teacher */}
-                            {(currentUser?.role === 'TEACHER' || currentUser?.role === 'ADMIN' || selectedPost.authorId === currentUser?.id) && (
-                              <button 
-                                onClick={() => handleAcceptSolution(c.id)}
-                                style={{
-                                  background: 'none', border: '1px solid var(--border)', borderRadius: '4px',
-                                  padding: '2px 8px', fontSize: '11px', cursor: 'pointer',
-                                  borderColor: c.isSolution ? 'var(--accent-green)' : 'var(--border)',
-                                  color: c.isSolution ? 'var(--accent-green)' : 'var(--text-secondary)'
-                                }}
-                              >
-                                {c.isSolution ? 'Hủy duyệt' : 'Duyệt lời giải'}
-                              </button>
-                            )}
-
-                            <button
-                              onClick={() => {
-                                setReportTarget({ postId: null, commentId: c.id });
-                                setShowReportModal(true);
-                              }}
-                              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
-                              title="Báo cáo bình luận"
-                            >
-                              <HiFlag />
-                            </button>
-                          </div>
-                        </div>
-
-                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', paddingLeft: '36px', margin: 0 }}>
-                          {renderSanitizedContent(c.content)}
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', paddingLeft: '36px', marginTop: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                          {[
-                            { type: 'LIKE', emoji: '👍', label: 'Thích' },
-                            { type: 'LOVE', emoji: '❤️', label: 'Yêu thích' },
-                            { type: 'LAUGH', emoji: '😄', label: 'Cười' },
-                            { type: 'CLAP', emoji: '👏', label: 'Vỗ tay' }
-                          ].map(reaction => {
-                            const count = c.reactionCounts?.[reaction.type] || 0;
-                            const isUserReacted = c.userReaction === reaction.type;
-                            return (
-                              <button
-                                key={reaction.type}
-                                onClick={() => handleReactComment(c.id, reaction.type)}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  background: isUserReacted ? 'var(--primary-bg)' : 'transparent',
-                                  border: isUserReacted ? '1px solid var(--primary)' : '1px solid transparent',
-                                  borderRadius: '20px',
-                                  padding: '2px 8px',
-                                  fontSize: '11px',
-                                  cursor: 'pointer',
-                                  color: isUserReacted ? 'var(--primary)' : 'var(--text-secondary)',
-                                  transition: 'all 0.15s ease'
-                                }}
-                                title={reaction.label}
-                              >
-                                <span>{reaction.emoji}</span>
-                                {count > 0 && <span style={{ fontWeight: 'bold' }}>{count}</span>}
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        {/* Nesting replies handler */}
-                        <div style={{ paddingLeft: '36px', marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          {c.replies && c.replies.map(reply => (
-                            <div key={reply.id} style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRadius: '6px', border: '1px solid var(--border)' }}>
-                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}>
-                                <span style={{ fontSize: '11.5px', fontWeight: 'bold' }}>{reply.author}</span>
-                                <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>{new Date(reply.createdAt).toLocaleTimeString()}</span>
-                              </div>
-                               <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: 0 }}>{renderSanitizedContent(reply.content)}</div>
-                            </div>
-                          ))}
-
-                          <button 
-                            onClick={() => {
-                              setReplyTargetId(c.id);
-                              setCommentText(`@${c.author} `);
-                            }}
-                            style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '11.5px', alignSelf: 'flex-start', padding: 0 }}
-                          >
-                            Phản hồi
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p style={{ fontStyle: 'italic', fontSize: '13px', color: 'var(--text-muted)' }}>Chưa có phản hồi nào. Hãy viết giải đáp đầu tiên!</p>
-                  )}
-                </div>
-
-                {/* Reply form */}
-                <form onSubmit={handleSendComment} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                    <textarea
-                      className="form-control"
-                      placeholder={replyTargetId ? "Viết phản hồi của bạn... (Kéo thả ảnh hoặc dán Ctrl+V trực tiếp vào đây)" : "Giải pháp hoặc ý kiến thảo luận của bạn... (Kéo thả ảnh hoặc dán Ctrl+V trực tiếp vào đây)"}
-                      value={commentText}
-                      onChange={e => setCommentText(e.target.value)}
-                      onPaste={(e) => handlePasteImage(e, false)}
-                      onDragOver={(e) => { e.preventDefault(); setDragOverComment(true); }}
-                      onDragLeave={() => setDragOverComment(false)}
-                      onDrop={(e) => { setDragOverComment(false); handleDropImage(e, false); }}
-                      style={{
-                        flex: 1,
-                        minHeight: '80px',
-                        resize: 'vertical',
-                        border: dragOverComment ? '2px dashed #6c5ce7' : '2.5px solid #000000',
-                        background: dragOverComment ? '#f3f0ff' : '#FFFFFF',
-                        transition: 'all 0.15s ease'
-                      }}
-                      required
-                    />
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <label className="btn-outline" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: '8px 12px', fontSize: '14px', margin: 0, height: '38px', boxSizing: 'border-box' }} title="Tải ảnh lên">
-                        {uploadingImage ? '⏳' : '📷'}
-                        <input 
-                          type="file" 
-                          accept="image/*" 
-                          onChange={handleUploadImageForComment} 
-                          disabled={uploadingImage || submitting} 
-                          style={{ display: 'none' }} 
-                        />
-                      </label>
-                      <button type="submit" className="btn-primary" style={{ padding: '8px 16px', height: '38px' }} disabled={submitting}>
-                        {submitting ? 'Gửi...' : 'Gửi'}
-                      </button>
-                    </div>
-                  </div>
-
-                  {commentImages.length > 0 && (
-                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '4px' }}>
-                      {commentImages.map((url, idx) => (
-                        <div key={idx} style={{ position: 'relative', width: '60px', height: '60px', border: '2px solid #000000', borderRadius: '8px', overflow: 'hidden' }}>
-                          <img src={url} alt="Comment Uploaded preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          <button
-                            type="button"
-                            onClick={() => setCommentImages(prev => prev.filter((_, i) => i !== idx))}
-                            style={{
-                              position: 'absolute', top: '2px', right: '2px',
-                              background: '#ff7675', color: '#fff', border: '1px solid #000',
-                              borderRadius: '50%', width: '16px', height: '16px',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              cursor: 'pointer', fontSize: '8px', fontWeight: 'bold'
-                            }}
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </form>
+              <div>
+                <span style={{ fontSize: '17px', fontWeight: '900', letterSpacing: '-0.5px', color: 'var(--text-primary)', display: 'block' }}>EduPath AI</span>
+                <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Cộng đồng</span>
               </div>
             </div>
-          ) : (
-            /* LISTINGS OR TABS */
-            <div>
-              {(activeTab === 'feed' || activeTab === 'saved') && (
+
+            {/* Navigation Items */}
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {[
+                { id: 'feed', label: 'Dành cho bạn', icon: <HiHome style={{ fontSize: '20px' }} /> },
+                { id: 'search', label: 'Tìm kiếm', icon: <HiSearch style={{ fontSize: '20px' }} /> },
+                { id: 'profile', label: 'Trang cá nhân', icon: <HiUser style={{ fontSize: '20px' }} /> },
+                { id: 'groups', label: 'Nhóm học tập', icon: <HiUserGroup style={{ fontSize: '20px' }} /> },
+                { id: 'leaderboard', label: 'Bảng xếp hạng', icon: <HiTrophy style={{ fontSize: '20px' }} /> },
+              ].map((item) => {
+                const isSelected = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActiveTab(item.id);
+                      setSelectedGroup(null);
+                      if (item.id === 'leaderboard') fetchLeaderboard();
+                      if (item.id === 'profile') fetchGamifyProfile();
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '12px 16px',
+                      borderRadius: '12px',
+                      border: 'none',
+                      background: isSelected ? 'var(--primary-bg)' : 'transparent',
+                      color: isSelected ? 'var(--primary)' : 'var(--text-muted)',
+                      fontWeight: isSelected ? '800' : '600',
+                      fontSize: '14.5px',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'all 0.2s ease',
+                      width: '100%'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.background = 'var(--bg-card)';
+                        e.currentTarget.style.color = 'var(--text-primary)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = 'var(--text-muted)';
+                      }
+                    }}
+                  >
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* Nhóm học tập / Suggestions box */}
+          <div style={{
+            background: 'var(--bg-card)',
+            border: '1.5px dashed var(--border)',
+            borderRadius: '16px',
+            padding: '16px',
+            boxShadow: 'var(--shadow-sm)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px'
+          }}>
+            <h4 style={{ margin: 0, fontSize: '12.5px', fontWeight: '900', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ color: 'var(--primary)' }}>•</span> Nhóm học tập của bạn
+            </h4>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {studyGroups.filter(g => g.isMember).slice(0, 3).map(group => (
+                <div 
+                  key={group.id} 
+                  onClick={() => {
+                    setSelectedGroup(group);
+                    setActiveTab('groups');
+                    setGroupTab('announcements');
+                    fetchGroupAnnouncements(group.id);
+                  }}
+                  style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '8px', transition: 'background 0.2s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-main)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <span style={{ fontSize: '14px' }}>👥</span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{group.name}</span>
+                </div>
+              ))}
+              {studyGroups.filter(g => g.isMember).length === 0 && (
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', padding: '4px 8px' }}>Bạn chưa tham gia nhóm nào.</span>
+              )}
+            </div>
+
+            <button 
+              onClick={() => { setActiveTab('groups'); setSelectedGroup(null); }}
+              style={{
+                marginTop: '6px',
+                padding: '10px 12px',
+                borderRadius: '10px',
+                background: 'var(--primary)',
+                color: '#fff',
+                fontWeight: '800',
+                border: 'none',
+                fontSize: '12px',
+                cursor: 'pointer',
+                textAlign: 'center',
+                boxShadow: '0 4px 12px rgba(108, 92, 231, 0.15)',
+                transition: 'opacity 0.2s'
+              }}
+              onMouseEnter={e => e.currentTarget.style.opacity = '0.9'}
+              onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+            >
+              Khám phá nhóm học tập
+            </button>
+          </div>
+        </aside>
+
+        {/* ================= MAIN CONTENT ================= */}
+        <main style={{ flex: 1, minWidth: 0, maxWidth: '920px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
+          
+          {/* 1. FEED VIEW */}
+          {activeTab === 'feed' && (
+            <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <div>
-                  {/* Filters Bar */}
-                  <div className="card" style={{
-                    padding: '20px',
-                    marginBottom: '24px',
-                    display: 'flex',
-                    gap: '12px',
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
-                    background: 'var(--bg-card)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius-lg)',
-                    boxShadow: 'var(--shadow-sm)'
-                  }}>
-                    <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-                      <HiSearch style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748B', fontSize: '16px' }} />
-                      <input 
-                        type="text" 
-                        className="form-control"
-                        placeholder="Tìm bài viết..."
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
+                  <h2 style={{ fontSize: '22px', fontWeight: '900', color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.5px' }}>Dành cho bạn</h2>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '13.5px', color: 'var(--text-secondary)' }}>Bảng tin cộng đồng học tập EduPath</p>
+                </div>
+              </div>
+
+              {/* Tag selectors & Categories scroll */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '16px', boxShadow: 'var(--shadow-sm)' }}>
+                {/* Search query input */}
+                <div style={{ position: 'relative' }}>
+                  <HiSearch style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', fontSize: '18px' }} />
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Tìm kiếm bài viết, tài liệu học liệu..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    style={{ paddingLeft: '38px', width: '100%', height: '42px', fontSize: '13.5px', borderRadius: '10px' }}
+                  />
+                </div>
+
+                {/* Categories badges */}
+                <div className="no-scrollbar" style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+                  <button
+                    onClick={() => setSelectedCategory('All')}
+                    className={`btn ${selectedCategory === 'All' ? 'btn-primary' : 'btn-outline'}`}
+                    style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12px', whiteSpace: 'nowrap', fontWeight: 'bold' }}
+                  >
+                    Tất cả môn học
+                  </button>
+                  {categories.map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setSelectedCategory(cat.name)}
+                      className={`btn ${selectedCategory === cat.name ? 'btn-primary' : 'btn-outline'}`}
+                      style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12px', whiteSpace: 'nowrap', fontWeight: 'bold' }}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Quick Filters Row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: '12px', marginTop: '4px' }}>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {[
+                      { id: 'All', label: 'Tất cả dạng bài' },
+                      { id: 'GENERAL', label: 'Thảo luận' },
+                      { id: 'QA', label: 'Hỏi & Đáp' },
+                      { id: 'RESOURCE', label: 'Tài liệu' }
+                    ].map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => setSelectedType(t.id)}
                         style={{
-                          paddingLeft: '36px',
-                          width: '100%',
-                          border: '1px solid var(--border)',
-                          paddingTop: '10px',
-                          paddingBottom: '10px',
-                          paddingRight: '14px',
+                          background: selectedType === t.id ? 'var(--primary-bg)' : 'transparent',
+                          color: selectedType === t.id ? 'var(--primary)' : 'var(--text-secondary)',
+                          border: 'none',
+                          padding: '6px 12px',
                           borderRadius: '8px',
-                          fontSize: '13px',
-                          background: '#F8FAFC',
-                          color: '#1E293B',
-                          fontWeight: '500',
-                          outline: 'none'
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer'
                         }}
-                      />
-                    </div>
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
 
-                    <select 
-                      className="form-control"
-                      value={selectedCategory}
-                      onChange={e => setSelectedCategory(e.target.value)}
-                      style={{
-                        minWidth: '150px',
-                        border: '1px solid var(--border)',
-                        padding: '10px',
-                        borderRadius: '8px',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        background: '#F8FAFC',
-                        color: '#1E293B',
-                        cursor: 'pointer',
-                        outline: 'none'
-                      }}
-                    >
-                      <option value="All">Tất cả môn học</option>
-                      {categories.map(cat => (
-                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                      ))}
-                    </select>
-
-                    <select 
-                      className="form-control"
-                      value={selectedType}
-                      onChange={e => setSelectedType(e.target.value)}
-                      style={{
-                        minWidth: '150px',
-                        border: '1px solid var(--border)',
-                        padding: '10px',
-                        borderRadius: '8px',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        background: '#F8FAFC',
-                        color: '#1E293B',
-                        cursor: 'pointer',
-                        outline: 'none'
-                      }}
-                    >
-                      <option value="All">Loại chủ đề</option>
-                      <option value="GENERAL">Thảo luận chung</option>
-                      <option value="QA">Hỏi & Đáp (Q&A)</option>
-                      <option value="RESOURCE">Học liệu & Đề thi</option>
-                    </select>
-
-                    <select 
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <select
                       className="form-control"
                       value={sortType}
-                      onChange={e => setSortType(e.target.value)}
-                      style={{
-                        minWidth: '150px',
-                        border: '1px solid var(--border)',
-                        padding: '10px',
-                        borderRadius: '8px',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        background: '#F8FAFC',
-                        color: '#1E293B',
-                        cursor: 'pointer',
-                        outline: 'none'
-                      }}
+                      onChange={(e) => setSortType(e.target.value)}
+                      style={{ fontSize: '12px', height: '32px', width: '130px', padding: '0 8px' }}
                     >
                       <option value="newest">Mới nhất</option>
-                      <option value="views">Xem nhiều nhất</option>
-                      <option value="pinned">Đã ghim lên đầu</option>
+                      <option value="popular">Nổi bật (Lượt thích)</option>
+                      <option value="comments">Bình luận nhiều</option>
                     </select>
 
                     <button
                       type="button"
                       onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
                       style={{
-                        padding: '10px 18px',
-                        border: '2px solid #000000',
-                        background: showAdvancedFilters ? '#6c5ce7' : '#FFFFFF',
-                        color: showAdvancedFilters ? '#FFFFFF' : '#1E293B',
-                        fontWeight: 'bold',
+                        background: showAdvancedFilters ? 'var(--primary-bg)' : 'transparent',
+                        color: showAdvancedFilters ? 'var(--primary)' : 'var(--text-secondary)',
+                        border: '1px solid var(--border)',
+                        padding: '6px 12px',
                         borderRadius: '8px',
-                        cursor: 'pointer',
-                        fontSize: '13px',
-                        transition: 'all 0.15s',
-                        boxShadow: '2px 2px 0px #000000',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer'
                       }}
                     >
-                      Lọc nâng cao {showAdvancedFilters ? '▲' : '▼'}
+                      Bộ lọc nâng cao
                     </button>
-
-                    {(searchQuery || selectedCategory !== 'All' || selectedType !== 'All' || selectedTag || filterDifficulty !== 'All' || filterResolved !== 'All' || filterHasAttachment || filterDateRange !== 'All') && (
-                      <button 
-                        className="btn-outline" 
-                        onClick={() => {
-                          setSearchQuery('');
-                          setSelectedCategory('All');
-                          setSelectedType('All');
-                          setSelectedTag('');
-                          setSortType('newest');
-                          setFilterDifficulty('All');
-                          setFilterResolved('All');
-                          setFilterHasAttachment(false);
-                          setFilterDateRange('All');
-                        }}
-                        style={{
-                          padding: '10px 18px',
-                          border: '1px solid var(--border)',
-                          background: '#FFFFFF',
-                          color: '#1E293B',
-                          fontWeight: '600',
-                          borderRadius: '8px',
-                          cursor: 'pointer',
-                          fontSize: '13px',
-                          transition: 'all 0.15s',
-                          boxShadow: 'var(--shadow-sm)'
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; }}
-                      >
-                        Đặt lại
-                      </button>
-                    )}
                   </div>
+                </div>
 
-                  {showAdvancedFilters && (
-                    <div className="card animate-in" style={{
-                      padding: '20px',
-                      marginBottom: '24px',
-                      background: '#F8FAFC',
-                      border: '2.5px solid #000000',
-                      borderRadius: '16px',
-                      boxShadow: '4px 4px 0px #000000',
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                      gap: '20px'
-                    }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '12.5px', fontWeight: '900', color: '#1E293B', marginBottom: '8px' }}>⚙️ Độ khó (Q&A):</label>
-                        <select
-                          className="form-control"
-                          value={filterDifficulty}
-                          onChange={e => setFilterDifficulty(e.target.value)}
-                          style={{ width: '100%', border: '2px solid #000000', borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: 'bold', background: '#FFFFFF', outline: 'none' }}
-                        >
-                          <option value="All">Tất cả độ khó</option>
-                          <option value="EASY">Dễ</option>
-                          <option value="MEDIUM">Trung bình</option>
-                          <option value="HARD">Khó</option>
-                        </select>
-                      </div>
+                {/* Advanced Filters Panel */}
+                {showAdvancedFilters && (
+                  <div className="animate-in" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', background: 'var(--bg-main)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border)', marginTop: '8px' }}>
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Độ khó bài thi/Q&A</label>
+                      <select className="form-control" value={filterDifficulty} onChange={(e) => setFilterDifficulty(e.target.value)} style={{ fontSize: '11.5px', height: '30px' }}>
+                        <option value="All">Tất cả</option>
+                        <option value="EASY">Dễ</option>
+                        <option value="MEDIUM">Trung bình</option>
+                        <option value="HARD">Khó</option>
+                      </select>
+                    </div>
 
-                      <div>
-                        <label style={{ display: 'block', fontSize: '12.5px', fontWeight: '900', color: '#1E293B', marginBottom: '8px' }}>✓ Lời giải:</label>
-                        <select
-                          className="form-control"
-                          value={filterResolved}
-                          onChange={e => setFilterResolved(e.target.value)}
-                          style={{ width: '100%', border: '2px solid #000000', borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: 'bold', background: '#FFFFFF', outline: 'none' }}
-                        >
-                          <option value="All">Tất cả trạng thái</option>
-                          <option value="true">Đã duyệt lời giải hay</option>
-                          <option value="false">Chưa giải quyết</option>
-                        </select>
-                      </div>
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Trạng thái</label>
+                      <select className="form-control" value={filterResolved} onChange={(e) => setFilterResolved(e.target.value)} style={{ fontSize: '11.5px', height: '30px' }}>
+                        <option value="All">Tất cả</option>
+                        <option value="RESOLVED">Đã giải quyết</option>
+                        <option value="UNRESOLVED">Chưa giải quyết</option>
+                      </select>
+                    </div>
 
-                      <div>
-                        <label style={{ display: 'block', fontSize: '12.5px', fontWeight: '900', color: '#1E293B', marginBottom: '8px' }}>📅 Thời gian đăng:</label>
-                        <select
-                          className="form-control"
-                          value={filterDateRange}
-                          onChange={e => setFilterDateRange(e.target.value)}
-                          style={{ width: '100%', border: '2px solid #000000', borderRadius: '8px', padding: '10px', fontSize: '13px', fontWeight: 'bold', background: '#FFFFFF', outline: 'none' }}
-                        >
-                          <option value="All">Mọi thời gian</option>
-                          <option value="24h">Trong 24 giờ qua</option>
-                          <option value="7d">Trong 7 ngày qua</option>
-                          <option value="30d">Trong 30 ngày qua</option>
-                        </select>
-                      </div>
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Khoảng thời gian</label>
+                      <select className="form-control" value={filterDateRange} onChange={(e) => setFilterDateRange(e.target.value)} style={{ fontSize: '11.5px', height: '30px' }}>
+                        <option value="All">Tất cả</option>
+                        <option value="today">Hôm nay</option>
+                        <option value="week">Trong tuần này</option>
+                        <option value="month">Trong tháng này</option>
+                      </select>
+                    </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', height: '100%', paddingTop: '16px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>
                         <input
                           type="checkbox"
-                          id="filterHasAttachment"
                           checked={filterHasAttachment}
-                          onChange={e => setFilterHasAttachment(e.target.checked)}
-                          style={{ cursor: 'pointer', width: '20px', height: '20px', accentColor: '#6c5ce7', border: '2px solid #000000' }}
+                          onChange={(e) => setFilterHasAttachment(e.target.checked)}
                         />
-                        <label htmlFor="filterHasAttachment" style={{ fontSize: '13px', fontWeight: '900', color: '#1E293B', cursor: 'pointer', userSelect: 'none' }}>📎 Có đính kèm tài liệu</label>
-                      </div>
+                        Có file đính kèm
+                      </label>
                     </div>
-                  )}
-
-                  {/* Popular Tags List */}
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)' }}>🏷️ Tags phổ biến:</span>
-                    {['casio', 'daoham', 'toan12', 'tienganh', 'dao-dong', 'este', 'menh-de'].map(t => (
-                      <button
-                        key={t}
-                        onClick={() => setSelectedTag(selectedTag === t ? '' : t)}
-                        className={`forum-tag-pill ${selectedTag === t ? 'active' : ''}`}
-                      >
-                        #{t}
-                      </button>
-                    ))}
                   </div>
+                )}
+              </div>
 
-                  {/* Feed listings */}
-                  {loading ? (
-                    <div style={{ textAlign: 'center', padding: '40px' }}><HiRefresh className="animate-spin" style={{ fontSize: '24px' }} /> Đang tải dữ liệu...</div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {posts.length > 0 ? (
-                        posts.map(post => (
-                          <div 
-                            key={post.id} 
-                            className={`forum-post-card ${post.isPinned ? 'pinned' : ''}`} 
-                            onClick={() => setSelectedPost(post)}
-                            style={{
-                              display: 'flex',
-                              gap: '16px',
-                              padding: '20px',
-                              background: 'var(--bg-card)',
-                              border: '1px solid var(--border)',
-                              borderRadius: 'var(--radius-lg)',
-                              cursor: 'pointer',
-                              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
-                            }}
-                          >
-                            {/* Left Column: Avatar + Thread Connector Line */}
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
-                              <div style={{
-                                width: '42px',
-                                height: '42px',
-                                borderRadius: '50%',
-                                background: 'var(--primary-bg)',
-                                color: 'var(--primary)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontWeight: '900',
-                                fontSize: '15px',
-                                border: '1.5px solid var(--primary-light)',
-                                boxShadow: 'var(--shadow-sm)'
-                              }}>
-                                {post.author?.fullName?.substring(0, 2).toUpperCase() || 'HS'}
-                              </div>
-                              <div style={{ width: '2px', flexGrow: 1, background: 'var(--border)', marginTop: '8px', minHeight: '30px' }} />
-                            </div>
+              {/* Feed Post Create Quick Box */}
+              <div 
+                onClick={() => setShowCreateModal(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', cursor: 'pointer', boxShadow: 'var(--shadow-sm)' }}
+              >
+                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--primary-bg)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 'bold' }}>
+                  {currentUser.fullName?.substring(0, 2).toUpperCase() || 'EP'}
+                </div>
+                <div style={{ flex: 1, background: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: '24px', padding: '10px 16px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                  Bạn có câu hỏi gì cần thảo luận hôm nay? Đăng bài ✍️
+                </div>
+              </div>
 
-                            {/* Right Column: Main Content */}
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              {/* Header info */}
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                  <span style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-primary)' }}>
-                                    {post.author?.fullName}
-                                  </span>
-                                  <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>•</span>
-                                  <span className="badge-pill" style={{ background: 'var(--primary-bg)', color: 'var(--primary)', fontSize: '10.5px', fontWeight: '800', padding: '3px 8px' }}>
-                                    {post.category?.name}
-                                  </span>
-                                  {post.postType === 'QA' && (
-                                    <span className="badge-pill" style={{ background: 'rgba(255, 168, 0, 0.12)', color: 'rgb(255, 168, 0)', fontSize: '10.5px', fontWeight: '800', padding: '3px 8px' }}>
-                                      Q&A ({post.difficulty})
-                                    </span>
-                                  )}
-                                  {post.postType === 'RESOURCE' && (
-                                    <span className="badge-pill" style={{ background: 'rgba(0, 184, 148, 0.12)', color: 'var(--accent-green)', fontSize: '10.5px', fontWeight: '800', padding: '3px 8px' }}>
-                                      Học liệu
-                                    </span>
-                                  )}
-                                  {post.isPinned && (
-                                    <span className="badge-pill" style={{ background: 'var(--primary)', color: '#fff', fontSize: '9px', padding: '2px 6px' }}>Ghim</span>
-                                  )}
-                                </div>
-                                <span style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
-                                  {new Date(post.createdAt).toLocaleDateString()}
-                                </span>
-                              </div>
+              {/* Threads Feed List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {getFilteredPosts(posts).map((post) => (
+                  <article
+                    key={post.id}
+                    className="card post-item"
+                    onClick={() => setSelectedPost(post)}
+                    style={{
+                      padding: '20px',
+                      cursor: 'pointer',
+                      borderRadius: '16px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-card)',
+                      transition: 'all 0.2s ease',
+                      boxShadow: 'var(--shadow-sm)',
+                      display: 'flex',
+                      gap: '16px'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                      e.currentTarget.style.borderColor = 'var(--primary)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'none';
+                      e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+                      e.currentTarget.style.borderColor = 'var(--border)';
+                    }}
+                  >
+                    {/* Left Thread bar */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                      <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', fontWeight: '900', boxShadow: '0 2px 8px rgba(108, 92, 231, 0.2)' }}>
+                        {post.authorName?.substring(0, 2).toUpperCase() || 'EP'}
+                      </div>
+                      <div style={{ width: '2px', flexGrow: 1, background: 'var(--border)', marginTop: '8px', borderRadius: '1px' }}></div>
+                    </div>
 
-                              {/* Title */}
-                              <h3 style={{ fontSize: '16.5px', fontWeight: '800', margin: '4px 0 6px 0', color: 'var(--text-primary)', lineHeight: '1.4' }}>
-                                {post.title}
-                              </h3>
+                    {/* Right post contents */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {/* Header metadata row */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: '800', fontSize: '14px', color: 'var(--text-primary)' }}>{post.authorName}</span>
+                          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>•</span>
+                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>{post.categoryName}</span>
+                          {post.postType === 'QA' && (
+                            <span style={{ fontSize: '10.5px', background: '#ffeaa7', color: '#d63031', fontWeight: '800', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
+                              Q&A
+                            </span>
+                          )}
+                          {post.postType === 'RESOURCE' && (
+                            <span style={{ fontSize: '10.5px', background: '#e3faf2', color: '#00b894', fontWeight: '800', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
+                              Học liệu
+                            </span>
+                          )}
+                          {post.difficulty && (
+                            <span style={{
+                              fontSize: '10.5px',
+                              background: post.difficulty === 'EASY' ? '#d4edda' : (post.difficulty === 'MEDIUM' ? '#fff3cd' : '#f8d7da'),
+                              color: post.difficulty === 'EASY' ? '#155724' : (post.difficulty === 'MEDIUM' ? '#856404' : '#721c24'),
+                              fontWeight: '800',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              textTransform: 'uppercase'
+                            }}>
+                              {post.difficulty === 'EASY' ? 'Dễ' : (post.difficulty === 'MEDIUM' ? 'T.Bình' : 'Khó')}
+                            </span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>{new Date(post.createdAt).toLocaleDateString()}</span>
+                      </div>
 
-                              {/* Description text */}
-                              {stripImages(post.content) && (
-                                <p style={{
-                                  fontSize: '13.5px',
-                                  color: 'var(--text-secondary)',
-                                  display: '-webkit-box',
-                                  WebkitLineClamp: 2,
-                                  WebkitBoxOrient: 'vertical',
-                                  overflow: 'hidden',
-                                  margin: '0 0 10px 0',
-                                  lineHeight: 1.5,
-                                  wordBreak: 'break-word'
-                                }}>
-                                  {stripImages(post.content)}
-                                </p>
-                              )}
+                      {/* Title & snippet */}
+                      <h3 style={{ fontSize: '16.5px', fontWeight: '900', color: 'var(--text-primary)', marginTop: 0, marginBottom: '6px', lineHeight: 1.3 }}>{post.title}</h3>
+                      <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', margin: '0 0 12px 0', lineHeight: 1.5, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
+                        {post.content ? post.content.replace(/!\[(.*?)\]\((.*?)\)/g, '[Ảnh]') : ''}
+                      </p>
 
-                              {/* Image attached preview */}
-                              {getFirstImageUrl(post.content) && (
-                                <div className="forum-post-preview-image" style={{ borderRadius: '12px', border: '1.5px solid var(--border)', overflow: 'hidden', maxWidth: '100%', maxHeight: '250px', marginBottom: '12px' }}>
-                                  <img 
-                                    src={resolveImageUrl(getFirstImageUrl(post.content))} 
-                                    alt="Preview" 
-                                    loading="lazy"
-                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                  />
-                                </div>
-                              )}
-
-                              {/* Footer Actions (Threads-style Action Bar) */}
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: '10px', marginTop: '4px' }}>
-                                <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                                  {/* Likes display */}
-                                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                    <HiHeart style={{ color: 'var(--accent-red)', fontSize: '16px' }} />
-                                    <span>
-                                      {Object.values(post.reactionCounts || {}).reduce((a, b) => a + b, 0) || 0}
-                                    </span>
-                                  </div>
-
-                                  {/* Comments count */}
-                                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                    <HiChat style={{ fontSize: '16px', color: 'var(--primary)' }} />
-                                    <span>{post.comments?.length || 0}</span>
-                                  </div>
-                                </div>
-
-                                <button
-                                  onClick={(e) => handleToggleSavePost(e, post)}
-                                  style={{
-                                    border: 'none',
-                                    background: 'none',
-                                    padding: 4,
-                                    cursor: 'pointer',
-                                    color: post.isSaved ? '#f1c40f' : 'var(--text-muted)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    transition: 'transform 0.1s'
-                                  }}
-                                  title={post.isSaved ? "Bỏ lưu bài viết" : "Lưu bài viết"}
-                                >
-                                  <HiStar style={{ fontSize: '18px' }} />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="card" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                          Chưa có câu hỏi thảo luận nào phù hợp bộ lọc!
+                      {/* Tag chips */}
+                      {post.tags && post.tags.length > 0 && (
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                          {post.tags.map(t => (
+                            <span key={t.id} style={{ fontSize: '11px', background: 'var(--bg-main)', color: 'var(--text-secondary)', padding: '3px 8px', borderRadius: '6px', fontWeight: '600', border: '1px solid var(--border)' }}>
+                              #{t.name}
+                            </span>
+                          ))}
                         </div>
                       )}
+
+                      {/* Action buttons row */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
+                        <div style={{ display: 'flex', gap: '20px' }}>
+                          {/* Heart Likes */}
+                          <button
+                            type="button"
+                            onClick={(e) => handleReactPost(e, post.id, 'UPVOTE')}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              fontSize: '13px',
+                              color: post.userReaction === 'UPVOTE' ? '#ff7675' : 'var(--text-muted)',
+                              fontWeight: 'bold',
+                              padding: 0
+                            }}
+                          >
+                            {post.userReaction === 'UPVOTE' ? (
+                              <HiHeart style={{ fontSize: '18px', fill: '#ff7675' }} />
+                            ) : (
+                              <HiHeart style={{ fontSize: '18px' }} />
+                            )}
+                            <span>{Object.values(post.reactionCounts || {}).reduce((a, b) => a + b, 0) || 0}</span>
+                          </button>
+
+                          {/* Comments count */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: 'bold' }}>
+                            <HiChatAlt style={{ fontSize: '18px' }} />
+                            <span>{post.commentCount || 0} bình luận</span>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                          {/* Copy Share Link */}
+                          <button
+                            type="button"
+                            onClick={(e) => handleSharePost(e, post)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px' }}
+                            title="Sao chép liên kết"
+                          >
+                            <HiShare style={{ fontSize: '17px' }} />
+                          </button>
+
+                          {/* Bookmark Save */}
+                          <button
+                            type="button"
+                            onClick={(e) => handleToggleSavePost(e, post.id)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: post.isSaved ? '#fdcb6e' : 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px' }}
+                            title={post.isSaved ? "Bỏ lưu bài viết" : "Lưu bài viết"}
+                          >
+                            <HiBookmark style={{ fontSize: '17px', fill: post.isSaved ? '#fdcb6e' : 'none' }} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+
+                {getFilteredPosts(posts).length === 0 && (
+                  <div style={{ padding: '48px', textAlign: 'center', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px' }}>
+                    <span style={{ fontSize: '32px', display: 'block', marginBottom: '10px' }}>🔍</span>
+                    <h4 style={{ margin: 0, fontWeight: 'bold', color: 'var(--text-primary)' }}>Không tìm thấy bài viết nào phù hợp</h4>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>Bạn hãy đổi bộ lọc hoặc từ khóa tìm kiếm nhé.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 2. SEARCH VIEW */}
+          {activeTab === 'search' && (
+            <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div>
+                <h2 style={{ fontSize: '22px', fontWeight: '900', color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.5px' }}>Tìm kiếm nâng cao</h2>
+                <p style={{ margin: '4px 0 0 0', fontSize: '13.5px', color: 'var(--text-secondary)' }}>Bộ lọc tìm kiếm toàn diện dữ liệu cộng đồng</p>
+              </div>
+
+              {/* Main Search Panel */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px', boxShadow: 'var(--shadow-sm)' }}>
+                <div style={{ position: 'relative' }}>
+                  <HiSearch style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', fontSize: '18px' }} />
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Nhập từ khóa tìm kiếm..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    style={{ paddingLeft: '38px', width: '100%', height: '42px', fontSize: '13.5px', borderRadius: '10px' }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Môn học / Danh mục</label>
+                    <select className="form-control" value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} style={{ fontSize: '12.5px', height: '36px' }}>
+                      <option value="All">Tất cả môn học</option>
+                      {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Dạng bài viết</label>
+                    <select className="form-control" value={selectedType} onChange={(e) => setSelectedType(e.target.value)} style={{ fontSize: '12.5px', height: '36px' }}>
+                      <option value="All">Tất cả dạng bài</option>
+                      <option value="GENERAL">Thảo luận chung</option>
+                      <option value="QA">Hỏi & Đáp (Q&A)</option>
+                      <option value="RESOURCE">Học liệu / Tài liệu</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Độ khó</label>
+                    <select className="form-control" value={filterDifficulty} onChange={(e) => setFilterDifficulty(e.target.value)} style={{ fontSize: '12.5px', height: '36px' }}>
+                      <option value="All">Tất cả độ khó</option>
+                      <option value="EASY">Dễ</option>
+                      <option value="MEDIUM">Trung bình</option>
+                      <option value="HARD">Khó</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', fontWeight: 'bold', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={filterHasAttachment}
+                      onChange={(e) => setFilterHasAttachment(e.target.checked)}
+                    />
+                    Chỉ hiển thị bài viết có tài liệu đính kèm
+                  </label>
+                  
+                  <button 
+                    onClick={() => { setSearchQuery(''); setSelectedCategory('All'); setSelectedType('All'); setFilterDifficulty('All'); setFilterHasAttachment(false); }}
+                    style={{ background: 'none', border: 'none', color: 'var(--primary)', fontWeight: 'bold', fontSize: '12.5px', cursor: 'pointer' }}
+                  >
+                    Đặt lại bộ lọc
+                  </button>
+                </div>
+              </div>
+
+              {/* Search Results list */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {getFilteredPosts(posts).map((post) => (
+                  <article
+                    key={post.id}
+                    className="card post-item"
+                    onClick={() => setSelectedPost(post)}
+                    style={{
+                      padding: '20px',
+                      cursor: 'pointer',
+                      borderRadius: '16px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-card)',
+                      transition: 'all 0.2s ease',
+                      boxShadow: 'var(--shadow-sm)',
+                      display: 'flex',
+                      gap: '16px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                      <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', fontWeight: '900' }}>
+                        {post.authorName?.substring(0, 2).toUpperCase() || 'EP'}
+                      </div>
+                      <div style={{ width: '2px', flexGrow: 1, background: 'var(--border)', marginTop: '8px' }}></div>
+                    </div>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontWeight: '800', fontSize: '14px' }}>{post.authorName}</span>
+                          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>•</span>
+                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>{post.categoryName}</span>
+                        </div>
+                        <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>{new Date(post.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      <h3 style={{ fontSize: '16.5px', fontWeight: '900', color: 'var(--text-primary)', margin: '0 0 6px 0' }}>{post.title}</h3>
+                      <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', margin: '0 0 12px 0', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                        {post.content ? post.content.replace(/!\[(.*?)\]\((.*?)\)/g, '[Ảnh]') : ''}
+                      </p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 3. PROFILE VIEW */}
+          {activeTab === 'profile' && gamifyProfile && (
+            <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div>
+                <h2 style={{ fontSize: '22px', fontWeight: '900', color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.5px' }}>Trang cá nhân của bạn</h2>
+                <p style={{ margin: '4px 0 0 0', fontSize: '13.5px', color: 'var(--text-secondary)' }}>Học viên: {currentUser.fullName}</p>
+              </div>
+
+              {/* Two columns: Posts left, Card right */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '32px', alignItems: 'start' }}>
+                {/* Left side: My posts list */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: '900', color: 'var(--text-primary)', margin: '0 0 8px 0', borderBottom: '2px solid var(--primary)', paddingBottom: '8px', width: 'fit-content' }}>
+                    Bài đăng của tôi 📝
+                  </h3>
+                  {posts.filter(p => p.authorId === currentUser?.id).map((post) => (
+                    <article
+                      key={post.id}
+                      className="card post-item"
+                      onClick={() => setSelectedPost(post)}
+                      style={{
+                        padding: '16px',
+                        cursor: 'pointer',
+                        borderRadius: '12px',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-card)',
+                        boxShadow: 'var(--shadow-sm)',
+                        display: 'flex',
+                        gap: '12px'
+                      }}
+                    >
+                      <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '900', flexShrink: 0 }}>
+                        {post.authorName?.substring(0, 2).toUpperCase() || 'EP'}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                          <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>{post.categoryName}</span>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{new Date(post.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        <h4 style={{ fontSize: '14.5px', fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 4px 0' }}>{post.title}</h4>
+                        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                          {post.content ? post.content.replace(/!\[(.*?)\]\((.*?)\)/g, '[Ảnh]') : ''}
+                        </p>
+                      </div>
+                    </article>
+                  ))}
+                  {posts.filter(p => p.authorId === currentUser?.id).length === 0 && (
+                    <div style={{ padding: '36px', textAlign: 'center', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px' }}>
+                      <span style={{ fontSize: '24px', display: 'block', marginBottom: '8px' }}>📝</span>
+                      <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: 'bold' }}>Bạn chưa đăng tải thảo luận nào trên diễn đàn.</span>
                     </div>
                   )}
                 </div>
-              )}
 
-              {activeTab === 'groups' && selectedGroup ? (
-                /* GROUP WORKSPACE DETAIL VIEW */
-                <div className="card detailed-post-card animate-in" style={{ padding: '24px', background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                  {/* Header info */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '16px', marginBottom: '20px' }}>
-                    <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                      <button className="btn-outline" onClick={() => setSelectedGroup(null)} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px' }}>
-                        <HiArrowLeft /> Danh sách nhóm
-                      </button>
-                      <div>
-                        <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0 }}>👥 {selectedGroup.name}</h2>
-                        <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>{selectedGroup.description}</p>
-                      </div>
+                {/* Right side: Gamification Profile Card */}
+                <div style={{
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '20px',
+                  padding: '24px',
+                  boxShadow: 'var(--shadow-md)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '20px',
+                  position: 'sticky',
+                  top: '80px'
+                }}>
+                  {/* Top user header */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', fontWeight: '900', boxShadow: '0 4px 12px rgba(108, 92, 231, 0.3)' }}>
+                      {currentUser.fullName?.substring(0, 2).toUpperCase() || 'EP'}
                     </div>
-                    
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      {(currentUser?.role === 'ADMIN' || selectedGroup.creatorId === currentUser?.id) && (
-                        <button 
-                          className="btn-outline" 
-                          onClick={() => handleDeleteGroup(selectedGroup.id)}
-                          style={{ color: 'var(--accent-red)', borderColor: 'var(--accent-red)', background: 'none', padding: '6px 14px' }}
-                        >
-                          Xóa nhóm
-                        </button>
-                      )}
-                      <button 
-                        className="btn-outline" 
-                        onClick={() => handleLeaveGroup(selectedGroup.id)}
-                        style={{ color: 'var(--text-secondary)', borderColor: 'var(--border)', background: 'none', padding: '6px 14px' }}
-                      >
-                        Rời nhóm
-                      </button>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '900', color: 'var(--text-primary)' }}>{currentUser.fullName}</h4>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '700' }}>Cấp độ hiện tại: <span style={{ color: 'var(--primary)', fontSize: '13px' }}>Cấp {gamifyProfile.level}</span></span>
                     </div>
                   </div>
 
-                  {/* Tabs menu */}
-                  <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: '20px', gap: '8px' }}>
+                  {/* Level progress bar */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '700', marginBottom: '8px', alignItems: 'center' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        Tiến trình cấp độ 
+                        <button 
+                          type="button" 
+                          onClick={() => setShowXPHelp(true)} 
+                          style={{ background: 'var(--primary-bg)', color: 'var(--primary)', border: 'none', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', cursor: 'pointer', fontWeight: 'bold' }}
+                          title="Giải thích cách tính điểm XP"
+                        >
+                          ?
+                        </button>
+                      </span>
+                      <span>{gamifyProfile.xp} XP / {gamifyProfile.nextLevelXP} XP</span>
+                    </div>
+                    <div style={{ width: '100%', height: '8px', background: 'var(--bg-main)', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{ width: `${Math.min(100, (gamifyProfile.xp / gamifyProfile.nextLevelXP) * 100)}%`, height: '100%', background: 'linear-gradient(90deg, var(--primary) 0%, #a55eea 100%)', borderRadius: '4px' }}></div>
+                    </div>
+                  </div>
+
+                  {/* Streak and stats */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', padding: '16px 0' }}>
+                    <div style={{ textAlign: 'center', borderRight: '1px solid var(--border)' }}>
+                      <span style={{ fontSize: '24px', display: 'block' }}>🔥</span>
+                      <span style={{ fontSize: '16px', fontWeight: '900', color: 'var(--text-primary)', display: 'block', marginTop: '4px' }}>{gamifyProfile.streak} ngày</span>
+                      <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', fontWeight: 'bold' }}>Chuỗi học tập</span>
+                    </div>
+                    
+                    <div style={{ textAlign: 'center' }}>
+                      <span style={{ fontSize: '24px', display: 'block' }}>🏆</span>
+                      <span style={{ fontSize: '16px', fontWeight: '900', color: 'var(--text-primary)', display: 'block', marginTop: '4px' }}>Cấp {gamifyProfile.level}</span>
+                      <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', fontWeight: 'bold' }}>Hạng danh vọng</span>
+                    </div>
+                  </div>
+
+                  {/* Badges list */}
+                  <div>
+                    <h5 style={{ margin: '0 0 10px 0', fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.5px' }}>Huy hiệu đạt được</h5>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {gamifyProfile.badges && gamifyProfile.badges.map((badge, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            background: 'var(--bg-main)',
+                            border: '1.5px solid var(--primary)',
+                            borderRadius: '12px',
+                            padding: '8px 12px',
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: 'var(--shadow-sm)'
+                          }}
+                        >
+                          <span>🏅</span>
+                          <span>{badge}</span>
+                        </div>
+                      ))}
+                      {(!gamifyProfile.badges || gamifyProfile.badges.length === 0) && (
+                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>Chưa có huy hiệu nào. Hãy đóng góp tích cực để nhận thưởng!</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 4. GROUPS VIEW */}
+          {activeTab === 'groups' && (
+            <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              
+              {/* Group workspace is selected */}
+              {selectedGroup ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {/* Group header banner */}
+                  <div style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', borderRadius: '16px', padding: '24px', color: '#fff', position: 'relative', boxShadow: 'var(--shadow-md)' }}>
+                    <button
+                      onClick={() => setSelectedGroup(null)}
+                      style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '8px', color: '#fff', padding: '6px 12px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '16px' }}
+                    >
+                      ← Quay lại danh sách nhóm
+                    </button>
+                    
+                    <h2 style={{ margin: '0 0 6px 0', fontSize: '24px', fontWeight: '900' }}>👥 {selectedGroup.name}</h2>
+                    <p style={{ margin: '0 0 16px 0', fontSize: '13.5px', color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>{selectedGroup.description}</p>
+                    
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '16px' }}>
+                      <span style={{ fontSize: '12.5px', fontWeight: 'bold' }}>Mã nhóm: <code style={{ background: 'rgba(0,0,0,0.2)', padding: '2px 6px', borderRadius: '4px' }}>{selectedGroup.id}</code></span>
+                      
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        {selectedGroup.creatorId === currentUser.id ? (
+                          <button
+                            onClick={() => handleDeleteGroup(selectedGroup.id)}
+                            style={{ background: '#ff7675', border: 'none', borderRadius: '8px', color: '#fff', padding: '6px 12px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
+                          >
+                            Giải tán nhóm
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleLeaveGroup(selectedGroup.id)}
+                            style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '8px', color: '#fff', padding: '6px 12px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
+                          >
+                            Rời nhóm
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Group Navigation tabs */}
+                  <div style={{ display: 'flex', gap: '10px', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
                     {[
-                      { id: 'announcements', label: 'Bảng tin thông báo' },
-                      { id: 'discussion', label: 'Thảo luận nội bộ' },
-                      { id: 'chat', label: 'Hộp chat trực tuyến ⚡' },
-                      { id: 'members', label: 'Thành viên (' + (selectedGroup.members?.length || 0) + ')' }
+                      { id: 'announcements', label: '📢 Thông báo' },
+                      { id: 'discussion', label: '💬 Thảo luận nhóm' },
+                      { id: 'chat', label: '⚡ Chat trực tuyến' },
+                      { id: 'members', label: '👥 Thành viên' }
                     ].map(tab => (
                       <button
                         key={tab.id}
-                        id={`group-tab-${tab.id}`}
-                        onClick={() => setGroupTab(tab.id)}
+                        onClick={() => {
+                          setGroupTab(tab.id);
+                          if (tab.id === 'announcements') fetchGroupAnnouncements(selectedGroup.id);
+                          if (tab.id === 'discussion') fetchGroupPosts(selectedGroup.id);
+                          if (tab.id === 'chat') {
+                            setGroupChatMessages([]);
+                            if (socketRef.current) {
+                              socketRef.current.emit('join_group_chat', `group_${selectedGroup.id}`);
+                            }
+                          }
+                        }}
                         style={{
-                          padding: '10px 16px',
-                          border: 'none',
-                          borderBottom: groupTab === tab.id ? '2px solid var(--primary)' : '2px solid transparent',
-                          background: 'none',
+                          background: groupTab === tab.id ? 'var(--primary-bg)' : 'transparent',
                           color: groupTab === tab.id ? 'var(--primary)' : 'var(--text-secondary)',
-                          cursor: 'pointer',
-                          fontWeight: '600',
+                          border: 'none',
+                          padding: '8px 16px',
+                          borderRadius: '8px',
                           fontSize: '13px',
-                          transition: 'all 0.2s'
+                          fontWeight: 'bold',
+                          cursor: 'pointer'
                         }}
                       >
                         {tab.label}
@@ -1826,515 +1783,862 @@ export default function Forum({ currentUser }) {
                     ))}
                   </div>
 
-                  {/* Tab Announcement contents */}
-                  {groupTab === 'announcements' && (
-                    <div>
-                      {/* Only creators/admin can announce */}
-                      {(selectedGroup.creatorId === currentUser?.id || currentUser?.role === 'ADMIN' || currentUser?.role === 'TEACHER') && (
-                        <form onSubmit={handleCreateGroupAnnouncement} className="card" style={{ padding: '16px', background: 'var(--bg-main)', border: '1px solid var(--border)', marginBottom: '20px' }}>
-                          <h4 style={{ fontSize: '13.5px', fontWeight: 'bold', marginBottom: '10px' }}>📢 Phát hành thông báo nhóm mới</h4>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <input 
-                              type="text" 
-                              className="form-control" 
-                              placeholder="Tiêu đề thông báo..." 
-                              value={newAnnTitle}
-                              onChange={e => setNewAnnTitle(e.target.value)}
-                              required
-                            />
-                            <textarea 
-                              className="form-control" 
-                              placeholder="Nội dung thông báo chi tiết..." 
-                              value={newAnnContent}
-                              onChange={e => setNewAnnContent(e.target.value)}
-                              style={{ minHeight: '80px' }}
-                              required
-                            />
-                            <button type="submit" className="btn-primary" style={{ alignSelf: 'flex-end', padding: '6px 16px' }} disabled={submitting}>
-                              {submitting ? 'Đang phát...' : 'Phát thông báo'}
-                            </button>
-                          </div>
-                        </form>
-                      )}
+                  {/* Group Sub-tab Content Area */}
+                  <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px', minHeight: '300px', boxShadow: 'var(--shadow-sm)' }}>
+                    {/* tab: announcements */}
+                    {groupTab === 'announcements' && (
+                      <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        {selectedGroup.creatorId === currentUser.id && (
+                          <form 
+                            onSubmit={async (e) => {
+                              e.preventDefault();
+                              const title = e.target.annTitle.value.trim();
+                              const content = e.target.annContent.value.trim();
+                              if (!title || !content || submitting) return;
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {groupAnnouncements.length > 0 ? (
-                          groupAnnouncements.map(ann => (
-                            <div key={ann.id} className="card" style={{ padding: '16px', border: '1px solid var(--border)' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                  <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--primary)', color: '#fff', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
-                                    {ann.author?.fullName?.slice(0, 2).toUpperCase() || 'TR'}
-                                  </div>
-                                  <span style={{ fontSize: '12.5px', fontWeight: 'bold' }}>{ann.author?.fullName}</span>
-                                </div>
+                              setSubmitting(true);
+                              try {
+                                await api.createGroupAnnouncement(selectedGroup.id, title, content);
+                                e.target.reset();
+                                fetchGroupAnnouncements(selectedGroup.id);
+                                toast('Đã đăng thông báo nhóm thành công!', 'success');
+                              } catch (err) {
+                                toast(err.message || 'Lỗi gửi thông báo!', 'error');
+                              } finally {
+                                setSubmitting(false);
+                              }
+                            }}
+                            style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'var(--bg-main)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}
+                          >
+                            <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 'bold' }}>Tạo thông báo nhóm mới</h4>
+                            <input
+                              name="annTitle"
+                              type="text"
+                              className="form-control"
+                              placeholder="Tiêu đề thông báo..."
+                              style={{ fontSize: '12.5px', height: '36px' }}
+                              required
+                            />
+                            <textarea
+                              name="annContent"
+                              className="form-control"
+                              placeholder="Nội dung thông báo chi tiết..."
+                              style={{ fontSize: '12.5px', minHeight: '80px', resize: 'vertical' }}
+                              required
+                            />
+                            <button type="submit" className="btn-primary" style={{ padding: '8px 16px', alignSelf: 'flex-end', fontSize: '12px' }}>Đăng thông báo</button>
+                          </form>
+                        )}
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {groupAnnouncements.map(ann => (
+                            <div key={ann.id} style={{ padding: '16px', border: '1px solid var(--border)', borderRadius: '12px', background: 'var(--bg-main)' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                <span style={{ fontWeight: 'bold', fontSize: '13.5px', color: 'var(--text-primary)' }}>📢 {ann.title}</span>
                                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{new Date(ann.createdAt).toLocaleString()}</span>
                               </div>
-                              <h5 style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '6px', color: 'var(--text-main)' }}>{ann.title}</h5>
-                              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0, whiteSpace: 'pre-line' }}>{ann.content}</p>
+                              <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{ann.content}</p>
                             </div>
-                          ))
-                        ) : (
-                          <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                            Không có thông báo nhóm nào.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Tab Discussion content */}
-                  {groupTab === 'discussion' && (
-                    <div>
-                      {/* Simple group create post form */}
-                      <form onSubmit={handleCreateGroupPost} className="card" style={{ padding: '16px', background: 'var(--bg-main)', border: '1px solid var(--border)', marginBottom: '20px' }}>
-                        <h4 style={{ fontSize: '13.5px', fontWeight: 'bold', marginBottom: '10px' }}>✍️ Tạo bài thảo luận nội bộ</h4>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          <select className="form-control" value={newCategoryId} onChange={e => setNewCategoryId(e.target.value)}>
-                            {categories.map(cat => (
-                              <option key={cat.id} value={cat.id}>{cat.name}</option>
-                            ))}
-                          </select>
-                          <input 
-                            type="text" 
-                            className="form-control" 
-                            placeholder="Tiêu đề thảo luận..." 
-                            value={newTitle}
-                            onChange={e => setNewTitle(e.target.value)}
-                            required
-                          />
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <label style={{ fontSize: '12.5px', fontWeight: '600', margin: 0 }}>Nội dung thảo luận:</label>
-                            <label className="btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'pointer', padding: '4px 10px', fontSize: '11px', margin: 0 }}>
-                              📷 {uploadingImage ? 'Đang tải...' : 'Chèn ảnh'}
-                              <input 
-                                type="file" 
-                                accept="image/*" 
-                                onChange={handleUploadImageForPost} 
-                                disabled={uploadingImage} 
-                                style={{ display: 'none' }} 
-                              />
-                            </label>
-                          </div>
-                          <textarea 
-                            className="form-control" 
-                            placeholder="Nội dung thảo luận... (Hỗ trợ Ctrl+V để dán ảnh từ clipboard)" 
-                            value={newContent}
-                            onPaste={(e) => handlePasteImage(e, setNewContent)}
-                            onChange={e => setNewContent(e.target.value)}
-                            style={{ minHeight: '80px' }}
-                            required
-                          />
-                          <button type="submit" className="btn-primary" style={{ alignSelf: 'flex-end', padding: '6px 16px' }} disabled={submitting}>
-                            {submitting ? 'Đang đăng...' : 'Đăng thảo luận'}
-                          </button>
+                          ))}
+                          {groupAnnouncements.length === 0 && (
+                            <div style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)', fontSize: '13px' }}>Nhóm chưa có thông báo nào.</div>
+                          )}
                         </div>
-                      </form>
+                      </div>
+                    )}
 
-                      {/* Display internal group posts */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {groupPosts.length > 0 ? (
-                          groupPosts.map(post => (
+                    {/* tab: discussion */}
+                    {groupTab === 'discussion' && (
+                      <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        {/* Box to quickly create a post inside the group */}
+                        <form 
+                          onSubmit={async (e) => {
+                            e.preventDefault();
+                            const title = e.target.postTitle.value.trim();
+                            const content = e.target.postContent.value.trim();
+                            if (!title || !content || submitting) return;
+
+                            setSubmitting(true);
+                            try {
+                              const postPayload = {
+                                title,
+                                content,
+                                categoryId: categories[0]?.id || 1,
+                                postType: 'GENERAL',
+                                studyGroupId: selectedGroup.id
+                              };
+                              await api.createForumPost(postPayload);
+                              e.target.reset();
+                              fetchGroupPosts(selectedGroup.id);
+                              toast('Đăng bài thảo luận vào nhóm thành công!', 'success');
+                            } catch (err) {
+                              toast(err.message || 'Lỗi đăng bài viết nhóm!', 'error');
+                            } finally {
+                              setSubmitting(false);
+                            }
+                          }}
+                          style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'var(--bg-main)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}
+                        >
+                          <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 'bold' }}>Chia sẻ thảo luận với nhóm của bạn</h4>
+                          <input
+                            name="postTitle"
+                            type="text"
+                            className="form-control"
+                            placeholder="Tiêu đề thảo luận..."
+                            style={{ fontSize: '12.5px', height: '36px' }}
+                            required
+                          />
+                          <textarea
+                            name="postContent"
+                            className="form-control"
+                            placeholder="Nội dung chi tiết..."
+                            style={{ fontSize: '12.5px', minHeight: '80px', resize: 'vertical' }}
+                            required
+                          />
+                          <button type="submit" className="btn-primary" style={{ padding: '8px 16px', alignSelf: 'flex-end', fontSize: '12px' }}>Đăng bài viết</button>
+                        </form>
+
+                        {/* List of group posts */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {groupPosts.map(post => (
                             <div 
                               key={post.id} 
-                              className="forum-post-card" 
                               onClick={() => setSelectedPost(post)}
+                              style={{ padding: '16px', border: '1px solid var(--border)', borderRadius: '12px', background: 'var(--bg-main)', cursor: 'pointer' }}
                             >
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                                <span className="badge-pill" style={{ background: 'var(--primary-bg)', color: 'var(--primary)', fontSize: '10px' }}>{post.category?.name}</span>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                <span style={{ fontWeight: 'bold', fontSize: '13px' }}>{post.authorName}</span>
                                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{new Date(post.createdAt).toLocaleDateString()}</span>
                               </div>
-                              <h4 style={{ fontWeight: 'bold', fontSize: '15.5px', margin: '0 0 2px 0', color: 'var(--text-main)' }}>{post.title}</h4>
-                              
-                              {getFirstImageUrl(post.content) && (
-                                <div className="forum-post-preview-image">
-                                  <img 
-                                    src={getFirstImageUrl(post.content)} 
-                                    alt="Preview" 
-                                    loading="lazy"
-                                  />
-                                </div>
-                              )}
-
-                              {stripImages(post.content) && (
-                                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', margin: '0 0 4px 0', lineHeight: 1.5 }}>{stripImages(post.content)}</p>
-                              )}
-
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: '10px', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                                <span>Tác giả: {post.author?.fullName}</span>
-                                <span>💬 {post.comments?.length || 0} bình luận</span>
-                              </div>
+                              <h4 style={{ margin: '0 0 4px 0', fontSize: '14.5px', fontWeight: 'bold' }}>{post.title}</h4>
+                              <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                                {post.content}
+                              </p>
                             </div>
-                          ))
-                        ) : (
-                          <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                            Chưa có chủ đề thảo luận nội bộ nào. Hãy khởi xướng chủ đề đầu tiên!
-                          </div>
-                        )}
+                          ))}
+                          {groupPosts.length === 0 && (
+                            <div style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)', fontSize: '13px' }}>Chưa có thảo luận nào trong nhóm này.</div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Tab Chat room */}
-                  {groupTab === 'chat' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', height: '400px', border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
-                      {/* Messages list */}
-                      <div style={{ flex: 1, padding: '16px', overflowY: 'auto', background: 'var(--bg-main)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {groupChatMessages.map((msg, i) => {
-                          const isSystem = msg.role === 'SYSTEM';
-                          const isMe = msg.studentId === currentUser?.id;
-
-                          if (isSystem) {
+                    {/* tab: chat */}
+                    {groupTab === 'chat' && (
+                      <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', height: '400px' }}>
+                        {/* Messages display */}
+                        <div style={{ flex: 1, overflowY: 'auto', padding: '10px', display: 'flex', flexDirection: 'column', gap: '10px', background: 'var(--bg-main)', borderRadius: '12px', border: '1px solid var(--border)', marginBottom: '10px' }}>
+                          {groupChatMessages.map(msg => {
+                            const isMe = msg.studentId === currentUser.id;
                             return (
-                              <div key={msg.id || i} style={{ alignSelf: 'center', background: 'var(--border)', color: 'var(--text-secondary)', padding: '4px 12px', borderRadius: '12px', fontSize: '11.5px', textAlign: 'center', maxWidth: '80%' }}>
-                                {msg.content}
+                              <div key={msg.id} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '70%', background: isMe ? 'var(--primary)' : 'var(--bg-card)', color: isMe ? '#fff' : 'var(--text-primary)', padding: '10px 14px', borderRadius: '12px', border: isMe ? 'none' : '1px solid var(--border)' }}>
+                                <div style={{ fontSize: '10.5px', opacity: isMe ? 0.9 : 0.7, fontWeight: 'bold', marginBottom: '2px' }}>
+                                  {msg.authorName} • {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                                <div style={{ fontSize: '13px', lineHeight: 1.4 }}>{msg.content}</div>
                               </div>
                             );
-                          }
+                          })}
+                          {groupChatMessages.length === 0 && (
+                            <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12.5px' }}>Bắt đầu cuộc hội thoại chat nhóm trực tuyến tại đây...</div>
+                          )}
+                        </div>
 
-                          return (
-                            <div key={msg.id || i} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start', maxWidth: '70%' }}>
-                              <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginBottom: '2px', fontWeight: 'bold' }}>
-                                {isMe ? 'Tôi' : (msg.authorName || 'Học viên')}
-                              </span>
-                              <div style={{
-                                padding: '10px 14px',
-                                borderRadius: '12px',
-                                background: isMe ? 'var(--primary)' : 'var(--bg-card)',
-                                color: isMe ? '#fff' : 'var(--text-primary)',
-                                border: isMe ? 'none' : '1px solid var(--border)',
-                                fontSize: '13px',
-                                wordBreak: 'break-word'
-                              }}>
-                                {msg.content}
-                              </div>
-                              <span style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                                {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </div>
-                          );
-                        })}
+                        {/* Send bar */}
+                        <form onSubmit={handleSendChatMessage} style={{ display: 'flex', gap: '8px' }}>
+                          <input
+                            type="text"
+                            className="form-control"
+                            placeholder="Nhập tin nhắn chat nhóm..."
+                            value={chatInput}
+                            onChange={e => setChatInput(e.target.value)}
+                            style={{ flex: 1, fontSize: '13px' }}
+                          />
+                          <button type="submit" className="btn-primary" style={{ padding: '0 20px', fontSize: '13px' }}>Gửi</button>
+                        </form>
                       </div>
+                    )}
 
-                      {/* Chat input form */}
-                      <form onSubmit={handleSendChatMessage} style={{ display: 'flex', borderTop: '1px solid var(--border)', background: 'var(--bg-card)' }}>
-                        <input 
-                          type="text" 
-                          className="form-control" 
-                          placeholder="Nhập nội dung tin nhắn và ấn Enter..." 
-                          value={chatInput}
-                          onChange={e => setChatInput(e.target.value)}
-                          style={{ flex: 1, border: 'none', borderRadius: 0, padding: '14px', outline: 'none', background: 'none' }}
-                        />
-                        <button type="submit" className="btn-primary" style={{ borderRadius: 0, border: 'none', padding: '0 24px' }}>Gửi</button>
-                      </form>
-                    </div>
-                  )}
-
-                  {/* Tab Members */}
-                  {groupTab === 'members' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <h4 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '6px' }}>Danh sách thành viên nhóm:</h4>
-                      {selectedGroup.members?.map(m => (
-                        <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-main)' }}>
-                          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: m.role === 'CREATOR' ? 'var(--primary)' : 'var(--accent-blue)', color: '#fff', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
-                              {m.user?.fullName?.slice(0, 2).toUpperCase() || 'HV'}
-                            </div>
+                    {/* tab: members */}
+                    {groupTab === 'members' && (
+                      <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 'bold', color: 'var(--text-primary)' }}>Thành viên của nhóm</h4>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'var(--bg-main)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #fd9644 0%, #fa8231 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 'bold' }}>AD</div>
                             <div>
-                              <span style={{ fontSize: '13.5px', fontWeight: 'bold' }}>{m.user?.fullName}</span>
-                              <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '8px' }}>Tham gia: {new Date(m.joinedAt).toLocaleDateString()}</span>
+                              <span style={{ fontSize: '13px', fontWeight: 'bold', display: 'block' }}>Quản trị nhóm (Creator)</span>
+                              <span style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>Người sáng lập nhóm</span>
                             </div>
                           </div>
                           
-                          <span className="badge-pill" style={{
-                            background: m.role === 'CREATOR' ? 'rgba(108,92,231,0.12)' : 'rgba(9,132,227,0.12)',
-                            color: m.role === 'CREATOR' ? 'var(--primary)' : 'var(--accent-blue)',
-                            fontSize: '11px', fontWeight: 'bold'
-                          }}>
-                            {m.role === 'CREATOR' ? 'Trưởng nhóm' : 'Thành viên'}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : activeTab === 'groups' ? (
-                /* REGULAR LIST OF GROUPS */
-                <div>
-                  {loading ? (
-                    <div style={{ textAlign: 'center', padding: '40px' }}><HiRefresh className="animate-spin" style={{ fontSize: '24px' }} /> Đang tải...</div>
-                  ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
-                      {studyGroups.map(group => (
-                        <div 
-                          key={group.id} 
-                          className="card" 
-                          style={{
-                            padding: '22px',
-                            background: 'var(--bg-card)',
-                            border: '1px solid var(--border)',
-                            borderRadius: 'var(--radius-lg)',
-                            boxShadow: 'var(--shadow-sm)',
-                            transition: 'all 0.2s ease',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'space-between'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                            e.currentTarget.style.boxShadow = 'var(--shadow-md)';
-                            e.currentTarget.style.borderColor = 'var(--primary-light)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = 'none';
-                            e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
-                            e.currentTarget.style.borderColor = 'var(--border)';
-                          }}
-                        >
-                          <div>
-                            <h4 style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--text-main)', marginBottom: '8px' }}>👥 {group.name}</h4>
-                            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '500', minHeight: '40px', marginBottom: '16px', lineHeight: '1.4' }}>{group.description}</p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'var(--bg-main)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 'bold' }}>{currentUser.fullName?.substring(0, 2).toUpperCase() || 'EP'}</div>
+                            <div>
+                              <span style={{ fontSize: '13px', fontWeight: 'bold', display: 'block' }}>{currentUser.fullName} (Bạn)</span>
+                              <span style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>Thành viên học tập</span>
+                            </div>
                           </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
-                            <span style={{ fontWeight: '600', color: 'var(--text-muted)' }}>Thành viên: {group.memberCount}</span>
-                            {group.isMember ? (
-                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                <span style={{ color: '#00b894', fontWeight: '900', fontSize: '14px' }}>✓</span>
-                                <button 
-                                  className="btn-primary" 
-                                  onClick={() => setSelectedGroup(group)} 
-                                  style={{
-                                    padding: '6px 14px',
-                                    fontSize: '11.5px',
-                                    fontWeight: '600',
-                                    background: 'var(--primary)',
-                                    color: '#FFFFFF',
-                                    border: 'none',
-                                    borderRadius: '6px',
-                                    cursor: 'pointer',
-                                    boxShadow: '0 2px 4px rgba(108, 92, 231, 0.15)',
-                                    transition: 'all 0.2s'
-                                  }}
-                                >
-                                  Vào nhóm
-                                </button>
-                              </div>
-                            ) : (
-                              <button 
-                                className="btn-primary" 
-                                onClick={() => handleJoinStudyGroup(group.id)} 
-                                style={{
-                                  padding: '6px 14px',
-                                  fontSize: '11.5px',
-                                  fontWeight: '600',
-                                  background: 'var(--primary)',
-                                  color: '#FFFFFF',
-                                  border: 'none',
-                                  borderRadius: '6px',
-                                  cursor: 'pointer',
-                                  boxShadow: '0 2px 4px rgba(108, 92, 231, 0.15)',
-                                  transition: 'all 0.2s'
-                                }}
-                              >
-                                Tham gia
-                              </button>
-                            )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                // 3-Column Study Groups Listing (Redesigned)
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div>
+                    <h2 style={{ fontSize: '22px', fontWeight: '900', color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.5px' }}>Nhóm học tập 👥</h2>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '13.5px', color: 'var(--text-secondary)' }}>Tìm kiếm và tham gia nhóm học tập cùng bạn bè</p>
+                  </div>
+
+                  {/* Group Search Bar */}
+                  <div style={{ position: 'relative' }}>
+                    <HiSearch style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', fontSize: '18px' }} />
+                    <input 
+                      type="text" 
+                      className="form-control"
+                      placeholder="Tìm kiếm nhóm học tập..."
+                      value={groupSearchQuery}
+                      onChange={e => setGroupSearchQuery(e.target.value)}
+                      style={{ paddingLeft: '38px', width: '100%', border: '1px solid var(--border)', borderRadius: '10px', height: '42px', fontSize: '13.5px', background: 'var(--bg-card)' }}
+                    />
+                  </div>
+
+                  {/* 1. Nhóm của tôi (Created by user) */}
+                  <div>
+                    <h3 style={{ fontSize: '15px', fontWeight: '900', color: 'var(--text-primary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      🌟 Nhóm học tập của tôi ({studyGroups.filter(g => g.creatorId === currentUser?.id && g.name.toLowerCase().includes(groupSearchQuery.toLowerCase())).length})
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '28px' }}>
+                      {studyGroups.filter(g => g.creatorId === currentUser?.id && g.name.toLowerCase().includes(groupSearchQuery.toLowerCase())).map(group => (
+                        <div key={group.id} style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '16px', boxShadow: 'var(--shadow-sm)', transition: 'border 0.2s' }} onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--primary)'} onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+                          <h4 style={{ margin: '0 0 8px 0', fontSize: '14.5px', fontWeight: '900', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>👥 {group.name}</h4>
+                          <p style={{ margin: '0 0 16px 0', fontSize: '12.5px', color: 'var(--text-secondary)', lineHeight: 1.4, flexGrow: 1, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{group.description}</p>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'bold' }}>1 thành viên</span>
+                            <button 
+                              onClick={() => {
+                                setSelectedGroup(group);
+                                setGroupTab('announcements');
+                                fetchGroupAnnouncements(group.id);
+                              }}
+                              style={{ background: 'var(--primary-bg)', color: 'var(--primary)', border: 'none', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
+                            >
+                              Vào nhóm
+                            </button>
                           </div>
                         </div>
                       ))}
+                      {studyGroups.filter(g => g.creatorId === currentUser?.id && g.name.toLowerCase().includes(groupSearchQuery.toLowerCase())).length === 0 && (
+                        <div style={{ gridColumn: 'span 3', padding: '20px', textAlign: 'center', background: 'var(--bg-card)', border: '1px dashed var(--border)', borderRadius: '12px', fontSize: '12.5px', color: 'var(--text-muted)' }}>
+                          Bạn chưa tạo nhóm học tập nào.
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              ) : null}
+                  </div>
 
-            </div>
-          )}
-        </div>
+                  {/* 2. Nhóm tôi đã tham gia */}
+                  <div>
+                    <h3 style={{ fontSize: '15px', fontWeight: '900', color: 'var(--text-primary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      ✅ Nhóm đã tham gia ({studyGroups.filter(g => g.isMember && g.creatorId !== currentUser?.id && g.name.toLowerCase().includes(groupSearchQuery.toLowerCase())).length})
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '28px' }}>
+                      {studyGroups.filter(g => g.isMember && g.creatorId !== currentUser?.id && g.name.toLowerCase().includes(groupSearchQuery.toLowerCase())).map(group => (
+                        <div key={group.id} style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '16px', boxShadow: 'var(--shadow-sm)', transition: 'border 0.2s' }} onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--primary)'} onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+                          <h4 style={{ margin: '0 0 8px 0', fontSize: '14.5px', fontWeight: '900', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>👥 {group.name}</h4>
+                          <p style={{ margin: '0 0 16px 0', fontSize: '12.5px', color: 'var(--text-secondary)', lineHeight: 1.4, flexGrow: 1, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{group.description}</p>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'bold' }}>2 thành viên</span>
+                            <button 
+                              onClick={() => {
+                                setSelectedGroup(group);
+                                setGroupTab('announcements');
+                                fetchGroupAnnouncements(group.id);
+                              }}
+                              style={{ background: 'var(--primary-bg)', color: 'var(--primary)', border: 'none', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
+                            >
+                              Vào nhóm
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {studyGroups.filter(g => g.isMember && g.creatorId !== currentUser?.id && g.name.toLowerCase().includes(groupSearchQuery.toLowerCase())).length === 0 && (
+                        <div style={{ gridColumn: 'span 3', padding: '20px', textAlign: 'center', background: 'var(--bg-card)', border: '1px dashed var(--border)', borderRadius: '12px', fontSize: '12.5px', color: 'var(--text-muted)' }}>
+                          Bạn chưa tham gia nhóm học tập nào khác.
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
-        {/* Right Sidebar Column (Gamification Profile Widget & Info) */}
-        <div>
-          {gamifyProfile && (
-            <div className="card gamify-card" style={{
-              padding: '20px',
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-lg)',
-              boxShadow: 'var(--shadow-sm)',
-              marginBottom: '24px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px'
-            }}>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                <div style={{
-                  width: '48px',
-                  height: '48px',
-                  background: '#ffc229',
-                  border: 'none',
-                  borderRadius: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '24px',
-                  boxShadow: '0 2px 8px rgba(255, 194, 41, 0.3)'
-                }}>
-                  ⚡
+                  {/* 3. Gợi ý nhóm học tập (Chưa tham gia) */}
+                  <div>
+                    <h3 style={{ fontSize: '15px', fontWeight: '900', color: 'var(--text-primary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      🔥 Gợi ý nhóm học tập ({studyGroups.filter(g => !g.isMember && g.name.toLowerCase().includes(groupSearchQuery.toLowerCase())).length})
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '28px' }}>
+                      {studyGroups.filter(g => !g.isMember && g.name.toLowerCase().includes(groupSearchQuery.toLowerCase())).map(group => (
+                        <div key={group.id} style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '16px', boxShadow: 'var(--shadow-sm)', transition: 'border 0.2s' }} onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--primary)'} onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+                          <h4 style={{ margin: '0 0 8px 0', fontSize: '14.5px', fontWeight: '900', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>👥 {group.name}</h4>
+                          <p style={{ margin: '0 0 16px 0', fontSize: '12.5px', color: 'var(--text-secondary)', lineHeight: 1.4, flexGrow: 1, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{group.description}</p>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'bold' }}>1 thành viên</span>
+                            <button 
+                              onClick={() => handleJoinStudyGroup(group.id)}
+                              style={{ background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
+                            >
+                              Tham gia
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {studyGroups.filter(g => !g.isMember && g.name.toLowerCase().includes(groupSearchQuery.toLowerCase())).length === 0 && (
+                        <div style={{ gridColumn: 'span 3', padding: '20px', textAlign: 'center', background: 'var(--bg-card)', border: '1px dashed var(--border)', borderRadius: '12px', fontSize: '12.5px', color: 'var(--text-muted)' }}>
+                          Không có nhóm gợi ý nào phù hợp.
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h4 style={{ fontWeight: 'bold', fontSize: '15px', color: 'var(--text-main)', margin: 0 }}>{currentUser?.fullName}</h4>
-                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600', margin: '2px 0 0 0' }}>Cấp độ hiện tại: {gamifyProfile.level}</p>
-                </div>
-              </div>
-
-              {/* Progress bar */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '6px' }}>
-                  <span>Tiến trình cấp độ</span>
-                  <span>{gamifyProfile.xp} XP / {gamifyProfile.nextLevelXP} XP</span>
-                </div>
-                <div style={{ width: '100%', height: '10px', background: '#F1F5F9', border: 'none', borderRadius: '6px', overflow: 'hidden' }}>
-                  <div style={{ width: `${gamifyProfile.progress}%`, height: '100%', background: '#6c5ce7', transition: 'width 0.4s ease' }} />
-                </div>
-              </div>
-
-              {/* Daily Streak widget */}
-              <div style={{
-                background: '#F8FAFC',
-                padding: '12px',
-                borderRadius: '12px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                border: '1px solid var(--border)',
-                boxShadow: 'none'
-              }}>
-                <div>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600', display: 'block' }}>Chuỗi hoạt động</span>
-                  <span style={{ fontSize: '15px', fontWeight: 'bold', color: '#ff9f43' }}>🔥 {gamifyProfile.streakDays || 0} Ngày liên tục</span>
-                </div>
-              </div>
-
-              {/* Badges Grid */}
-              <div>
-                <h5 style={{ fontSize: '12.5px', fontWeight: 'bold', color: 'var(--text-main)', marginBottom: '8px' }}>🎖️ Huy hiệu của bạn ({gamifyProfile.badges?.length || 0})</h5>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  {gamifyProfile.badges && gamifyProfile.badges.length > 0 ? (
-                    gamifyProfile.badges.map(b => (
-                      <span 
-                        key={b.id} 
-                        className="badge-pill" 
-                        style={{
-                          background: '#fff3cd',
-                          color: '#856404',
-                          border: 'none',
-                          fontSize: '11px',
-                          fontWeight: '600',
-                          boxShadow: 'none'
-                        }}
-                        title={b.description}
-                      >
-                        🏅 {b.name}
-                      </span>
-                    ))
-                  ) : (
-                    <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', fontStyle: 'italic' }}>Chưa mở khóa huy hiệu nào. Hãy tham gia tích cực để nhận thưởng!</span>
-                  )}
-                </div>
-              </div>
+              )}
             </div>
           )}
 
-          {/* Quick Guidance Card */}
-          <div className="card" style={{
-            padding: '20px',
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-lg)',
-            boxShadow: 'var(--shadow-sm)',
-            fontSize: '13px',
-            color: 'var(--text-secondary)'
-          }}>
-            <h5 style={{ fontWeight: 'bold', color: 'var(--text-main)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px' }}>
-              💡 Thể lệ tính điểm XP:
-            </h5>
-            <ul style={{ paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '6px', margin: 0, fontWeight: '500', color: 'var(--text-secondary)' }}>
-              <li>Câu hỏi hữu ích: <span style={{ color: '#00b894' }}>+5 XP</span></li>
-              <li>Lời giải được chọn: <span style={{ color: '#00b894' }}>+15 XP</span></li>
-              <li>Đóng góp bình luận: <span style={{ color: '#00b894' }}>+2 XP</span></li>
-              <li>Tải xuống tài liệu hữu ích: <span style={{ color: '#00b894' }}>+5 XP</span></li>
-            </ul>
-          </div>
-        </div>
+          {/* 5. LEADERBOARD VIEW */}
+          {activeTab === 'leaderboard' && (
+            <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div>
+                <h2 style={{ fontSize: '22px', fontWeight: '900', color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.5px' }}>Bảng xếp hạng danh vọng</h2>
+                <p style={{ margin: '4px 0 0 0', fontSize: '13.5px', color: 'var(--text-secondary)' }}>Tích lũy điểm XP để tranh đua thứ hạng cùng mọi người</p>
+              </div>
+
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px', boxShadow: 'var(--shadow-sm)' }}>
+                <table className="table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                      <th style={{ padding: '12px 10px', fontSize: '12.5px', fontWeight: 'bold' }}>Hạng</th>
+                      <th style={{ padding: '12px 10px', fontSize: '12.5px', fontWeight: 'bold' }}>Học viên</th>
+                      <th style={{ padding: '12px 10px', fontSize: '12.5px', fontWeight: 'bold' }}>Cấp độ</th>
+                      <th style={{ padding: '12px 10px', fontSize: '12.5px', fontWeight: 'bold', textAlign: 'right' }}>Tổng điểm XP</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leaderboard.map((user, index) => (
+                      <tr key={user.id} style={{ borderBottom: '1px solid var(--border)', fontWeight: user.id === currentUser.id ? 'bold' : 'normal', background: user.id === currentUser.id ? 'var(--primary-bg)' : 'transparent' }}>
+                        <td style={{ padding: '14px 10px', fontSize: '14px' }}>
+                          {index === 0 && <span style={{ fontSize: '18px' }}>🥇</span>}
+                          {index === 1 && <span style={{ fontSize: '18px' }}>🥈</span>}
+                          {index === 2 && <span style={{ fontSize: '18px' }}>🥉</span>}
+                          {index > 2 && index + 1}
+                        </td>
+                        <td style={{ padding: '14px 10px', fontSize: '14px', color: 'var(--text-primary)' }}>{user.fullName}</td>
+                        <td style={{ padding: '14px 10px', fontSize: '14px', color: 'var(--text-secondary)' }}>Cấp {user.level}</td>
+                        <td style={{ padding: '14px 10px', fontSize: '14px', textAlign: 'right', color: 'var(--primary)', fontWeight: 'bold' }}>{user.totalXp} XP</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </main>
       </div>
 
-      {/* ================= MODALS ================= */}
+      {/* Floating Action Button (FAB) at bottom-right for creating a post */}
+      <button 
+        onClick={() => setShowCreateModal(true)}
+        style={{
+          position: 'fixed',
+          bottom: '32px',
+          right: '32px',
+          width: '56px',
+          height: '56px',
+          borderRadius: '50%',
+          background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)',
+          color: '#FFFFFF',
+          border: 'none',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 4px 16px rgba(108, 92, 231, 0.4)',
+          zIndex: 999,
+          transition: 'transform 0.2s ease'
+        }}
+        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.08)'}
+        onMouseLeave={e => e.currentTarget.style.transform = 'none'}
+        title="Tạo bài thảo luận mới"
+      >
+        <HiPlus style={{ fontSize: '24px' }} />
+      </button>
 
-      {/* Create New Post Modal */}
-      {showCreateModal && createPortal(
-        <div className="modal-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 999 }}>
-          <div className="modal-card card" style={{ maxWidth: '600px', width: '90%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+      {/* Floating Action Button (FAB) at bottom-left for creating a group (Only when in groups list tab) */}
+      {activeTab === 'groups' && !selectedGroup && (
+        <button 
+          onClick={() => setShowGroupModal(true)}
+          style={{
+            position: 'fixed',
+            bottom: '32px',
+            left: '32px',
+            width: '56px',
+            height: '56px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)',
+            color: '#FFFFFF',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 16px rgba(108, 92, 231, 0.4)',
+            zIndex: 999,
+            transition: 'transform 0.2s ease'
+          }}
+          onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.08)'}
+          onMouseLeave={e => e.currentTarget.style.transform = 'none'}
+          title="Tạo nhóm học tập mới"
+        >
+          <HiPlus style={{ fontSize: '24px' }} />
+        </button>
+      )}
+
+      {/* ================= MODALS & POPUPS ================= */}
+
+      {/* Detailed Post Popup Modal (With nested comment threads) */}
+      {selectedPost && createPortal(
+        <div className="modal-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 999 }}>
+          <div className="modal-card card animate-in" style={{ maxWidth: '820px', width: '90%', maxHeight: '90vh', overflowY: 'auto', padding: '28px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '20px', boxShadow: 'var(--shadow-lg)' }}>
+            
+            {/* Header close bar */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ fontSize: '17px', fontWeight: 'bold' }}>Tạo bài viết thảo luận mới</h3>
-              <button onClick={() => setShowCreateModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--text-muted)' }}>✕</button>
+              <button 
+                onClick={() => setSelectedPost(null)}
+                style={{ background: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: '10px', color: 'var(--text-primary)', padding: '8px 16px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                ← Quay lại danh sách
+              </button>
+              <button onClick={() => setSelectedPost(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '22px', color: 'var(--text-muted)' }}>✕</button>
             </div>
 
-            <form onSubmit={handleCreatePost} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div className="form-group">
-                <label style={{ fontSize: '12px', fontWeight: '600', marginBottom: '6px', display: 'block' }}>Chủ đề / Môn học:</label>
-                <select className="form-control" value={newCategoryId} onChange={e => setNewCategoryId(e.target.value)} style={{ width: '100%' }}>
-                  {categories.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label style={{ fontSize: '12px', fontWeight: '600', marginBottom: '6px', display: 'block' }}>Dạng bài đăng:</label>
-                <select className="form-control" value={newPostType} onChange={e => setNewPostType(e.target.value)} style={{ width: '100%' }}>
-                  <option value="GENERAL">Thảo luận chung</option>
-                  <option value="QA">Hỏi & Đáp (Q&A)</option>
-                  <option value="RESOURCE">Chia sẻ tài liệu / Đề thi</option>
-                </select>
-              </div>
-
-              {newPostType === 'QA' && (
-                <div className="form-group">
-                  <label style={{ fontSize: '12px', fontWeight: '600', marginBottom: '6px', display: 'block' }}>Độ khó:</label>
-                  <select className="form-control" value={newDifficulty} onChange={e => setNewDifficulty(e.target.value)} style={{ width: '100%' }}>
-                    <option value="EASY">Dễ</option>
-                    <option value="MEDIUM">Trung bình</option>
-                    <option value="HARD">Khó</option>
-                  </select>
+            {/* Author info card */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', borderBottom: '1px solid var(--border)', paddingBottom: '16px' }}>
+              <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                <div style={{ background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)', width: '48px', height: '48px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: '900', fontSize: '16px', boxShadow: '0 4px 10px rgba(108, 92, 231, 0.2)' }}>
+                  {selectedPost.authorName?.substring(0, 2).toUpperCase() || 'EP'}
                 </div>
-              )}
+                <div>
+                  <h4 style={{ fontWeight: '900', fontSize: '15.5px', color: 'var(--text-primary)', margin: 0 }}>{selectedPost.authorName}</h4>
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                    Đăng vào: {new Date(selectedPost.createdAt).toLocaleString()} • 
+                    <span className="badge-pill" style={{ background: 'var(--primary-bg)', color: 'var(--primary)', marginLeft: '8px' }}>
+                      {selectedPost.categoryName}
+                    </span>
+                  </p>
+                </div>
+              </div>
 
-              {newPostType === 'RESOURCE' && (
-                <div className="form-group" style={{ background: 'var(--bg-main)', padding: '12px', borderRadius: '6px', border: '1px dashed var(--border)' }}>
-                  <label style={{ fontSize: '12px', fontWeight: '600', marginBottom: '6px', display: 'block' }}>Đính kèm tệp học liệu (Mô phỏng):</label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    placeholder="URL tài liệu (ví dụ: https://edupath.cdn/files/math12.pdf)" 
-                    onChange={e => setResourceFile({ fileUrl: e.target.value, fileType: 'PDF', fileSize: 2048000 })}
-                    style={{ width: '100%', fontSize: '12px' }}
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                {(currentUser?.role === 'ADMIN' || currentUser?.role === 'TEACHER' || selectedPost.authorId === currentUser?.id) && (
+                  <>
+                    <button 
+                      onClick={() => handleOpenEditModal(selectedPost)}
+                      style={{
+                        background: 'none',
+                        border: '1px solid var(--border)',
+                        borderRadius: '8px',
+                        padding: '6px 12px',
+                        fontSize: '12.5px',
+                        fontWeight: '700',
+                        color: 'var(--primary)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Sửa
+                    </button>
+                    <button 
+                      onClick={() => handleDeletePost(selectedPost.id)}
+                      style={{
+                        background: 'none',
+                        border: '1px solid rgba(231, 76, 60, 0.2)',
+                        borderRadius: '8px',
+                        padding: '6px 12px',
+                        fontSize: '12.5px',
+                        fontWeight: '700',
+                        color: '#ff7675',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Xóa
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Post main details */}
+            <h2 style={{ fontSize: '21px', fontWeight: '900', color: 'var(--text-primary)', marginTop: 0, marginBottom: '16px', lineHeight: 1.35 }}>{selectedPost.title}</h2>
+            
+            <div style={{ fontSize: '14.5px', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '24px', overflowWrap: 'break-word' }}>
+              {renderSanitizedContent(selectedPost.content)}
+            </div>
+
+            {/* Document attachment slot */}
+            {selectedPost.postType === 'RESOURCE' && selectedPost.resourceFile && (
+              <div style={{ background: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: '16px', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '32px' }}>📄</span>
+                  <div>
+                    <h5 style={{ fontWeight: '800', fontSize: '14.5px', margin: 0, color: 'var(--text-primary)' }}>{selectedPost.resourceFile.fileName}</h5>
+                    <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>Định dạng: {selectedPost.resourceFile.fileType} | Kích thước: {Math.round((selectedPost.resourceFile.fileSize || 0) / 1024)} KB</span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => handleDownloadFile(selectedPost.resourceId, selectedPost.resourceFile.fileUrl)}
+                  className="btn-primary" 
+                  style={{ padding: '8px 16px', borderRadius: '10px', fontSize: '13px', fontWeight: 'bold' }}
+                >
+                  Tải xuống học liệu (Nhận +5 XP)
+                </button>
+              </div>
+            )}
+
+            {/* Likes count & reactions row */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', padding: '12px 0', marginBottom: '24px' }}>
+              <button
+                onClick={(e) => handleReactPost(e, selectedPost.id, 'UPVOTE')}
+                style={{ background: 'var(--primary-bg)', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--primary)', fontWeight: 'bold', padding: '8px 16px' }}
+              >
+                <HiHeart style={{ fontSize: '18px', fill: selectedPost.userReaction === 'UPVOTE' ? 'var(--primary)' : 'none' }} />
+                <span>{Object.values(selectedPost.reactionCounts || {}).reduce((a, b) => a + b, 0) || 0} lượt thích</span>
+              </button>
+
+              <button
+                onClick={(e) => handleToggleSavePost(e, selectedPost.id)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: selectedPost.isSaved ? '#fdcb6e' : 'var(--text-secondary)', fontWeight: '700' }}
+              >
+                <HiBookmark style={{ fontSize: '18px', fill: selectedPost.isSaved ? '#fdcb6e' : 'none' }} />
+                <span>{selectedPost.isSaved ? 'Đã lưu thư mục' : 'Lưu trữ bài'}</span>
+              </button>
+            </div>
+
+            {/* Thread comments - 2 level tree structure */}
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: '900', color: 'var(--text-primary)', marginBottom: '16px' }}>Hội thoại thảo luận ({comments.length})</h3>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '28px' }}>
+                {comments.filter(c => !c.parentId).map(parentComment => {
+                  const hasReplies = comments.filter(r => r.parentId === parentComment.id);
+                  const isCLiked = parentComment.userReaction === 'UPVOTE';
+                  return (
+                    <div key={parentComment.id} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {/* Parent level comment item */}
+                      <div style={{ display: 'flex', gap: '14px', background: 'var(--bg-main)', padding: '16px', borderRadius: '16px', border: '1px solid var(--border)', position: 'relative' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                          <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '900' }}>
+                            {parentComment.author?.fullName?.substring(0, 2).toUpperCase() || 'EP'}
+                          </div>
+                          {hasReplies.length > 0 && (
+                            <div style={{ width: '2px', flexGrow: 1, background: 'var(--primary-bg)', margin: '8px 0' }}></div>
+                          )}
+                        </div>
+
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <span style={{ fontWeight: '800', fontSize: '13.5px', color: 'var(--text-primary)' }}>{parentComment.author?.fullName}</span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{new Date(parentComment.createdAt).toLocaleDateString()}</span>
+                          </div>
+
+                          <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+                            {renderSanitizedContent(parentComment.content)}
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '16px', marginTop: '12px', alignItems: 'center' }}>
+                            {/* Like parent comment */}
+                            <button
+                              onClick={() => handleReactComment(parentComment.id, 'UPVOTE')}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11.5px', color: isCLiked ? '#ff7675' : 'var(--text-secondary)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', padding: 0 }}
+                            >
+                              <HiHeart style={{ fontSize: '14px', fill: isCLiked ? '#ff7675' : 'none' }} />
+                              <span>{Object.values(parentComment.reactionCounts || {}).reduce((a, b) => a + b, 0) || 0} thích</span>
+                            </button>
+
+                            {/* Reply button */}
+                            <button
+                              onClick={() => { setReplyTargetId(parentComment.id); setCommentText(`@${parentComment.author?.fullName} `); }}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11.5px', color: 'var(--primary)', fontWeight: 'bold', padding: 0 }}
+                            >
+                              Phản hồi
+                            </button>
+
+                            {/* Report comment */}
+                            <button
+                              onClick={() => { setReportTarget({ postId: null, commentId: parentComment.id }); setShowReportModal(true); }}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11.5px', color: 'var(--text-muted)', padding: 0 }}
+                            >
+                              Báo cáo
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Nested child level comment items */}
+                      {hasReplies.map(childComment => {
+                        const isChildLiked = childComment.userReaction === 'UPVOTE';
+                        return (
+                          <div key={childComment.id} style={{ display: 'flex', gap: '14px', paddingLeft: '52px', position: 'relative' }}>
+                            {/* Visual connector line indicator */}
+                            <div style={{ position: 'absolute', left: '26px', top: '-12px', bottom: '18px', width: '2px', background: 'var(--primary-bg)' }}></div>
+                            <div style={{ position: 'absolute', left: '26px', bottom: '18px', width: '16px', height: '2px', background: 'var(--primary-bg)' }}></div>
+
+                            <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '900', flexShrink: 0, zIndex: 1 }}>
+                              {childComment.author?.fullName?.substring(0, 2).toUpperCase() || 'EP'}
+                            </div>
+
+                            <div style={{ flex: 1, background: 'var(--bg-card)', padding: '12px 14px', borderRadius: '14px', border: '1px solid var(--border)', minWidth: 0 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                <span style={{ fontWeight: '800', fontSize: '12.5px', color: 'var(--text-primary)' }}>{childComment.author?.fullName}</span>
+                                <span style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>{new Date(childComment.createdAt).toLocaleDateString()}</span>
+                              </div>
+
+                              <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                                {renderSanitizedContent(childComment.content)}
+                              </div>
+
+                              <div style={{ display: 'flex', gap: '14px', marginTop: '8px', alignItems: 'center' }}>
+                                {/* Like child comment */}
+                                <button
+                                  onClick={() => handleReactComment(childComment.id, 'UPVOTE')}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: isChildLiked ? '#ff7675' : 'var(--text-secondary)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', padding: 0 }}
+                                >
+                                  <HiHeart style={{ fontSize: '12px', fill: isChildLiked ? '#ff7675' : 'none' }} />
+                                  <span>{Object.values(childComment.reactionCounts || {}).reduce((a, b) => a + b, 0) || 0}</span>
+                                </button>
+                                
+                                <button
+                                  onClick={() => { setReportTarget({ postId: null, commentId: childComment.id }); setShowReportModal(true); }}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: 'var(--text-muted)', padding: 0 }}
+                                >
+                                  Báo cáo
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Add comment submit row */}
+              <form onSubmit={handleSendComment} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {replyTargetId && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--primary-bg)', padding: '8px 12px', borderRadius: '10px', fontSize: '12px', color: 'var(--primary)', fontWeight: 'bold' }}>
+                    <span>Đang soạn phản hồi trả lời...</span>
+                    <button type="button" onClick={() => { setReplyTargetId(null); setCommentText(''); }} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontWeight: '900' }}>Hủy bỏ</button>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Viết phản hồi thảo luận của bạn tại đây... (nhắc tên bằng @)"
+                    value={commentText}
+                    onChange={e => setCommentText(e.target.value)}
+                    style={{ flex: 1, borderRadius: '10px', height: '40px', fontSize: '13.5px' }}
                     required
                   />
+                  <button type="submit" className="btn-primary" style={{ padding: '0 20px', borderRadius: '10px', fontSize: '13px', fontWeight: 'bold' }} disabled={submitting}>
+                    Phản hồi
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Create New Post Modal Redesigned */}
+      {showCreateModal && createPortal(
+        <div className="modal-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 999 }}>
+          <div className="modal-card card animate-in" style={{ maxWidth: '640px', width: '90%', maxHeight: '90vh', overflowY: 'auto', padding: '28px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '20px', boxShadow: 'var(--shadow-lg)' }}>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '17px', fontWeight: '900', color: 'var(--text-primary)' }}>Tạo bài thảo luận mới ✍️</h3>
+              <button onClick={() => setShowCreateModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: 'var(--text-muted)' }}>✕</button>
+            </div>
+
+            <form onSubmit={handleCreatePost} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              
+              {/* Category selector */}
+              <div className="form-group">
+                <label style={{ fontSize: '12px', fontWeight: '800', marginBottom: '8px', display: 'block', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.5px' }}>Chủ đề / Môn học:</label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {categories.map(cat => {
+                    const isSelected = newCategoryId === String(cat.id);
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setNewCategoryId(String(cat.id))}
+                        style={{
+                          background: isSelected ? 'var(--primary)' : 'var(--bg-main)',
+                          color: isSelected ? '#fff' : 'var(--text-secondary)',
+                          border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border)',
+                          borderRadius: '10px',
+                          padding: '8px 16px',
+                          fontSize: '12.5px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {cat.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Post type selector */}
+              <div className="form-group">
+                <label style={{ fontSize: '12px', fontWeight: '800', marginBottom: '8px', display: 'block', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.5px' }}>Dạng bài đăng:</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {[
+                    { id: 'GENERAL', label: '💬 Thảo luận' },
+                    { id: 'QA', label: '❓ Hỏi & Đáp (Q&A)' },
+                    { id: 'RESOURCE', label: '📄 Học liệu / Đề thi' }
+                  ].map(t => {
+                    const isSelected = newPostType === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setNewPostType(t.id)}
+                        style={{
+                          flex: 1,
+                          background: isSelected ? 'var(--primary)' : 'var(--bg-main)',
+                          color: isSelected ? '#fff' : 'var(--text-secondary)',
+                          border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border)',
+                          borderRadius: '10px',
+                          padding: '10px',
+                          fontSize: '12.5px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {t.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Difficulty selector (For Q&A type) */}
+              {newPostType === 'QA' && (
+                <div className="form-group animate-in">
+                  <label style={{ fontSize: '12px', fontWeight: '800', marginBottom: '8px', display: 'block', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.5px' }}>Độ khó câu hỏi:</label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {[
+                      { id: 'EASY', label: '🟢 Dễ', color: '#2ecc71' },
+                      { id: 'MEDIUM', label: '🟡 Trung bình', color: '#f1c40f' },
+                      { id: 'HARD', label: '🔴 Khó', color: '#e74c3c' }
+                    ].map(d => {
+                      const isSelected = newDifficulty === d.id;
+                      return (
+                        <button
+                          key={d.id}
+                          type="button"
+                          onClick={() => setNewDifficulty(d.id)}
+                          style={{
+                            flex: 1,
+                            background: isSelected ? d.color : 'var(--bg-main)',
+                            color: isSelected ? '#fff' : 'var(--text-secondary)',
+                            border: isSelected ? `1px solid ${d.color}` : '1px solid var(--border)',
+                            borderRadius: '10px',
+                            padding: '10px',
+                            fontSize: '12.5px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {d.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
+              {/* Document upload widget (For RESOURCE type) */}
+              {newPostType === 'RESOURCE' && (
+                <div className="form-group animate-in" style={{ background: 'var(--bg-main)', padding: '16px', borderRadius: '12px', border: '1px dashed var(--border)' }}>
+                  <label style={{ fontSize: '12px', fontWeight: '800', marginBottom: '8px', display: 'block', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.5px' }}>Đính kèm tệp học liệu (.pdf, .doc, .xlsx, .zip):</label>
+                  
+                  {resourceFile ? (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <span style={{ fontSize: '20px' }}>📄</span>
+                        <div>
+                          <span style={{ fontSize: '13px', fontWeight: 'bold', display: 'block' }}>{resourceFile.fileName}</span>
+                          <span style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>Định dạng: {resourceFile.fileType} | {Math.round(resourceFile.fileSize / 1024)} KB</span>
+                        </div>
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={() => setResourceFile(null)}
+                        style={{ background: 'none', border: 'none', color: '#ff7675', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer' }}
+                      >
+                        ✕ Xóa file
+                      </button>
+                    </div>
+                  ) : (
+                    <div 
+                      onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; }}
+                      onDragLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+                      onDrop={e => {
+                        e.preventDefault();
+                        const file = e.dataTransfer.files?.[0];
+                        if (file) handleDocumentUpload(file);
+                      }}
+                      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px', cursor: 'pointer', textAlign: 'center' }}
+                      onClick={() => document.getElementById('document-file-picker').click()}
+                    >
+                      <span style={{ fontSize: '32px', marginBottom: '8px' }}>📤</span>
+                      <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>{uploadingResource ? 'Đang tải tệp lên...' : 'Kéo thả file tài liệu vào đây hoặc click để chọn'}</span>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Hỗ trợ các file đề thi thử, tóm tắt lý thuyết</span>
+                      <input 
+                        type="file" 
+                        id="document-file-picker" 
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) handleDocumentUpload(file);
+                        }} 
+                        style={{ display: 'none' }} 
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Title Input */}
               <div className="form-group">
-                <label style={{ fontSize: '12px', fontWeight: '600', marginBottom: '6px', display: 'block' }}>Tiêu đề câu hỏi / bài thảo luận:</label>
+                <label style={{ fontSize: '12px', fontWeight: '800', marginBottom: '6px', display: 'block', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Tiêu đề bài viết:</label>
                 <input 
-                  type="text" className="form-control" placeholder="Ví dụ: Cách bấm máy Casio nghiệm nguyên đạo hàm?"
-                  value={newTitle} onChange={e => setNewTitle(e.target.value)} style={{ width: '100%' }} required
+                  type="text" className="form-control" placeholder="Nhập tiêu đề tóm tắt nội dung chính thảo luận..."
+                  value={newTitle} onChange={e => setNewTitle(e.target.value)} style={{ width: '100%', borderRadius: '10px', height: '40px' }} required
                 />
               </div>
 
+              {/* Detail content input with drag-drop and paste previews */}
               <div className="form-group">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                  <label style={{ fontSize: '12px', fontWeight: '600', margin: 0 }}>Nội dung chi tiết câu hỏi:</label>
-                  <label className="btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'pointer', padding: '4px 10px', fontSize: '11px', margin: 0 }}>
+                  <label style={{ fontSize: '12px', fontWeight: '800', margin: 0, textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Nội dung chi tiết:</label>
+                  <label className="btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', padding: '4px 10px', fontSize: '11.5px', margin: 0, borderRadius: '8px' }}>
                     📷 {uploadingImage ? 'Đang tải...' : 'Chèn ảnh'}
                     <input 
                       type="file" 
@@ -2356,8 +2660,9 @@ export default function Forum({ currentUser }) {
                     width: '100%',
                     minHeight: '120px',
                     resize: 'vertical',
-                    border: dragOverPost ? '2px dashed #6c5ce7' : '2.5px solid #000000',
-                    background: dragOverPost ? '#f3f0ff' : '#FFFFFF',
+                    borderRadius: '10px',
+                    border: dragOverPost ? '2px dashed var(--primary)' : '1px solid var(--border)',
+                    background: dragOverPost ? 'var(--primary-bg)' : 'var(--bg-card)',
                     transition: 'all 0.15s ease'
                   }} required
                 />
@@ -2365,14 +2670,14 @@ export default function Forum({ currentUser }) {
                 {postImages.length > 0 && (
                   <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '10px' }}>
                     {postImages.map((url, idx) => (
-                      <div key={idx} style={{ position: 'relative', width: '80px', height: '80px', border: '2px solid #000000', borderRadius: '8px', overflow: 'hidden' }}>
+                      <div key={idx} style={{ position: 'relative', width: '80px', height: '80px', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
                         <img src={url} alt="Uploaded preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         <button
                           type="button"
                           onClick={() => setPostImages(prev => prev.filter((_, i) => i !== idx))}
                           style={{
                             position: 'absolute', top: '2px', right: '2px',
-                            background: '#ff7675', color: '#fff', border: '1px solid #000',
+                            background: '#ff7675', color: '#fff', border: 'none',
                             borderRadius: '50%', width: '18px', height: '18px',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             cursor: 'pointer', fontSize: '9px', fontWeight: 'bold'
@@ -2385,19 +2690,21 @@ export default function Forum({ currentUser }) {
                   </div>
                 )}
               </div>
- 
+
+              {/* Tags Input */}
               <div className="form-group">
-                <label style={{ fontSize: '12px', fontWeight: '600', marginBottom: '6px', display: 'block' }}>Thẻ phân loại (ngăn cách bởi dấu phẩy):</label>
+                <label style={{ fontSize: '12px', fontWeight: '800', marginBottom: '6px', display: 'block', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Thẻ phân loại (ngăn cách bởi dấu phẩy):</label>
                 <input 
-                  type="text" className="form-control" placeholder="Ví dụ: casio, daoham, toan12"
-                  value={newTagsString} onChange={e => setNewTagsString(e.target.value)} style={{ width: '100%' }}
+                  type="text" className="form-control" placeholder="Ví dụ: casio, daoham, toan12, thi_thu"
+                  value={newTagsString} onChange={e => setNewTagsString(e.target.value)} style={{ width: '100%', borderRadius: '10px', height: '40px' }}
                 />
               </div>
- 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
-                <button type="button" className="btn-outline" onClick={() => setShowCreateModal(false)} disabled={submitting}>Hủy bỏ</button>
-                <button type="submit" className="btn-primary" disabled={submitting}>
-                  {submitting ? 'Đang đăng...' : 'Đăng lên diễn đàn'}
+
+              {/* Submit actions */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                <button type="button" className="btn-outline" onClick={() => setShowCreateModal(false)} style={{ borderRadius: '10px', padding: '10px 20px', fontSize: '13px' }} disabled={submitting}>Hủy bỏ</button>
+                <button type="submit" className="btn-primary" style={{ borderRadius: '10px', padding: '10px 20px', fontSize: '13px' }} disabled={submitting}>
+                  {submitting ? 'Đang tạo bài...' : 'Đăng lên diễn đàn'}
                 </button>
               </div>
             </form>
@@ -2408,8 +2715,8 @@ export default function Forum({ currentUser }) {
 
       {/* Edit Post Modal */}
       {showEditModal && createPortal(
-        <div className="modal-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 999 }}>
-          <div className="modal-card card" style={{ maxWidth: '600px', width: '90%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+        <div className="modal-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 999 }}>
+          <div className="modal-card card animate-in" style={{ maxWidth: '600px', width: '90%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h3 style={{ fontSize: '17px', fontWeight: 'bold' }}>Chỉnh sửa bài viết</h3>
               <button onClick={() => setShowEditModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--text-muted)' }}>✕</button>
@@ -2478,8 +2785,8 @@ export default function Forum({ currentUser }) {
                     width: '100%',
                     minHeight: '120px',
                     resize: 'vertical',
-                    border: dragOverPost ? '2px dashed #6c5ce7' : '2.5px solid #000000',
-                    background: dragOverPost ? '#f3f0ff' : '#FFFFFF',
+                    border: dragOverPost ? '2px dashed var(--primary)' : '1px solid var(--border)',
+                    background: dragOverPost ? 'var(--primary-bg)' : 'var(--bg-card)',
                     transition: 'all 0.15s ease'
                   }} required
                 />
@@ -2487,7 +2794,7 @@ export default function Forum({ currentUser }) {
                 {postImages.length > 0 && (
                   <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '10px' }}>
                     {postImages.map((url, idx) => (
-                      <div key={idx} style={{ position: 'relative', width: '80px', height: '80px', border: '2px solid #000000', borderRadius: '8px', overflow: 'hidden' }}>
+                      <div key={idx} style={{ position: 'relative', width: '80px', height: '80px', border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
                         <img src={resolveImageUrl(url)} alt="Uploaded preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         <button
                           type="button"
@@ -2522,35 +2829,35 @@ export default function Forum({ currentUser }) {
         document.body
       )}
 
-      {/* Create New Group Modal */}
+      {/* Create New Group Modal Redesigned */}
       {showGroupModal && createPortal(
-        <div className="modal-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 999 }}>
-          <div className="modal-card card" style={{ maxWidth: '500px', width: '90%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ fontSize: '17px', fontWeight: 'bold' }}>Tạo nhóm học tập mới</h3>
-              <button onClick={() => setShowGroupModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--text-muted)' }}>✕</button>
+        <div className="modal-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 999 }}>
+          <div className="modal-card card animate-in" style={{ maxWidth: '520px', width: '90%', padding: '28px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '20px', boxShadow: 'var(--shadow-lg)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '17px', fontWeight: '900', color: 'var(--text-primary)' }}>Tạo nhóm học tập mới 👥</h3>
+              <button onClick={() => setShowGroupModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: 'var(--text-muted)' }}>✕</button>
             </div>
 
-            <form onSubmit={handleCreateStudyGroup} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <form onSubmit={handleCreateStudyGroup} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div className="form-group">
-                <label style={{ fontSize: '12px', fontWeight: '600', marginBottom: '6px', display: 'block' }}>Tên nhóm học tập:</label>
-                <input type="text" name="groupName" className="form-control" placeholder="Ví dụ: Ôn thi khối A1 chuyên sâu" style={{ width: '100%' }} required />
+                <label style={{ fontSize: '12px', fontWeight: '800', marginBottom: '8px', display: 'block', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Tên nhóm học tập:</label>
+                <input type="text" name="groupName" className="form-control" placeholder="Ví dụ: Luyện đề Toán Lý Hóa 2026 THPTQG" style={{ width: '100%', borderRadius: '10px', height: '40px' }} required />
               </div>
 
               <div className="form-group">
-                <label style={{ fontSize: '12px', fontWeight: '600', marginBottom: '6px', display: 'block' }}>Mô tả mục tiêu nhóm:</label>
-                <textarea name="groupDesc" className="form-control" placeholder="Mô tả lịch học, tài liệu trao đổi..." style={{ width: '100%', minHeight: '80px' }} required />
+                <label style={{ fontSize: '12px', fontWeight: '800', marginBottom: '8px', display: 'block', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Mô tả mục tiêu nhóm:</label>
+                <textarea name="groupDesc" className="form-control" placeholder="Ví dụ: Nhóm học nhóm vào mỗi tối thứ 2, 4, 6 chia sẻ tài liệu nâng cao..." style={{ width: '100%', minHeight: '100px', borderRadius: '10px', resize: 'vertical' }} required />
               </div>
 
-              <div className="form-group" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <input type="checkbox" name="groupPrivate" id="groupPrivate" />
-                <label htmlFor="groupPrivate" style={{ fontSize: '13px' }}>Đặt nhóm ở chế độ riêng tư (Yêu cầu lời mời)</label>
+              <div className="form-group" style={{ display: 'flex', gap: '10px', alignItems: 'center', background: 'var(--bg-main)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                <input type="checkbox" name="groupPrivate" id="groupPrivate" style={{ width: '16px', height: '16px' }} />
+                <label htmlFor="groupPrivate" style={{ fontSize: '13px', fontWeight: 'bold', margin: 0, cursor: 'pointer', color: 'var(--text-primary)' }}>Đặt nhóm ở chế độ riêng tư (Yêu cầu lời mời)</label>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
-                <button type="button" className="btn-outline" onClick={() => setShowGroupModal(false)} disabled={submitting}>Hủy bỏ</button>
-                <button type="submit" className="btn-primary" disabled={submitting}>
-                  {submitting ? 'Đang tạo...' : 'Tạo nhóm'}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                <button type="button" className="btn-outline" onClick={() => setShowGroupModal(false)} style={{ borderRadius: '10px', padding: '10px 20px' }} disabled={submitting}>Hủy bỏ</button>
+                <button type="submit" className="btn-primary" style={{ borderRadius: '10px', padding: '10px 20px' }} disabled={submitting}>
+                  {submitting ? 'Đang tạo...' : 'Tạo nhóm học tập'}
                 </button>
               </div>
             </form>
@@ -2561,32 +2868,78 @@ export default function Forum({ currentUser }) {
 
       {/* Safety Report Modal */}
       {showReportModal && createPortal(
-        <div className="modal-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 999 }}>
-          <div className="modal-card card" style={{ maxWidth: '400px', width: '90%', padding: '24px', background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+        <div className="modal-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 999 }}>
+          <div className="modal-card card animate-in" style={{ maxWidth: '440px', width: '90%', padding: '24px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 'bold' }}>Báo cáo nội dung không lành mạnh</h3>
+              <h3 style={{ fontSize: '16px', fontWeight: '900', color: 'var(--text-primary)' }}>Báo cáo nội dung vi phạm</h3>
               <button onClick={() => setShowReportModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--text-muted)' }}>✕</button>
             </div>
 
-            <form onSubmit={handleSendReport} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <form onSubmit={handleSendReport} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div className="form-group">
-                <label style={{ fontSize: '12.5px', marginBottom: '6px', display: 'block' }}>Lý do báo cáo:</label>
+                <label style={{ fontSize: '12.5px', marginBottom: '8px', display: 'block', color: 'var(--text-secondary)', fontWeight: 'bold' }}>Lý do báo cáo chi tiết:</label>
                 <textarea 
                   id="report-reason-input"
                   className="form-control" 
-                  placeholder="Vui lòng cung cấp lý do chi tiết (Spam, ngôn từ kích động, xúc phạm giáo viên/học sinh...)" 
+                  placeholder="Vui lòng nêu rõ lý do vi phạm (Ví dụ: Spam quảng cáo, xúc phạm danh dự người khác, đáp án sai lệch gây tranh cãi ác ý...)" 
                   value={reportReason} 
                   onChange={e => setReportReason(e.target.value)} 
-                  style={{ width: '100%', minHeight: '100px' }} 
+                  style={{ width: '100%', minHeight: '110px', borderRadius: '10px' }} 
                   required 
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
-                <button id="report-cancel-btn" type="button" className="btn-outline" onClick={() => setShowReportModal(false)}>Hủy</button>
-                <button id="report-submit-btn" type="submit" className="btn-primary">Gửi báo cáo</button>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', borderTop: '1px solid var(--border)', paddingTop: '14px' }}>
+                <button id="report-cancel-btn" type="button" className="btn-outline" onClick={() => setShowReportModal(false)} style={{ borderRadius: '8px' }}>Hủy</button>
+                <button id="report-submit-btn" type="submit" className="btn-primary" style={{ borderRadius: '8px' }}>Gửi báo cáo vi phạm</button>
               </div>
             </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* XP calculations guide modal */}
+      {showXPHelp && createPortal(
+        <div className="modal-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 999 }}>
+          <div className="modal-card card animate-in" style={{ maxWidth: '420px', width: '90%', padding: '24px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '20px', boxShadow: 'var(--shadow-lg)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '900', color: 'var(--text-primary)', margin: 0 }}>💡 Thể lệ tính điểm XP</h3>
+              <button onClick={() => setShowXPHelp(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--text-muted)' }}>✕</button>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+              <p style={{ margin: 0 }}>Điểm kinh nghiệm (XP) dùng để thăng cấp học viên và xếp hạng trên bảng vinh danh EduPath Community.</p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'var(--bg-main)', padding: '12px 16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>✍️ Đăng câu hỏi mới:</span>
+                  <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>+5 XP</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>💬 Đóng góp bình luận:</span>
+                  <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>+2 XP</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>✓ Lời giải được chọn:</span>
+                  <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>+15 XP</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>📥 Tải tài liệu hữu ích:</span>
+                  <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>+5 XP</span>
+                </div>
+              </div>
+              
+              <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>* Tích cực tham gia thảo luận và chia sẻ tài liệu chính xác sẽ giúp bạn đạt được các huy hiệu vinh danh độc quyền!</p>
+            </div>
+
+            <button 
+              onClick={() => setShowXPHelp(false)} 
+              className="btn-primary" 
+              style={{ width: '100%', marginTop: '20px', borderRadius: '10px', height: '38px', fontSize: '13px', fontWeight: 'bold' }}
+            >
+              Tôi đã hiểu
+            </button>
           </div>
         </div>,
         document.body
@@ -2594,3 +2947,4 @@ export default function Forum({ currentUser }) {
     </div>
   );
 }
+

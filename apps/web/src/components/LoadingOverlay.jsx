@@ -1,9 +1,10 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 
 export default function LoadingOverlay({ message = 'Đang xử lý dữ liệu...' }) {
   const letters = ['E', 'd', 'u', 'P', 'a', 't', 'h'];
 
-  return (
+  return createPortal(
     <div className="edupath-loader-overlay">
       <div className="edupath-loader-container">
         {/* Animated dual spinner */}
@@ -35,6 +36,7 @@ export default function LoadingOverlay({ message = 'Đang xử lý dữ liệu..
           </p>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
